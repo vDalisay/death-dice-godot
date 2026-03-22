@@ -11,50 +11,65 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
-layout_mode = 0
-offset_left = 260.0
-offset_top = 60.0
-offset_right = 740.0
-offset_bottom = 620.0
-theme_override_constants/separation = 20
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
 
-[node name="ScoreLabel" type="Label" parent="VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2
-text = "Score: 0"
+theme_override_constants/separation = 16
+
+[node name="ScoreLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Total Score: 0"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 28
 
-[node name="GridContainer" type="GridContainer" parent="VBoxContainer"]
+[node name="TurnScoreLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
-columns = 2
+text = "This turn: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="StopLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Stops: 0 / 3"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Press 'Roll All' to begin your turn!"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+autowrap_mode = 3
+
+[node name="DiceContainer" type="HFlowContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
 
-[node name="Box0" type="Button" parent="VBoxContainer/GridContainer"]
+[node name="ButtonRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(200, 200)
+alignment = 1
+theme_override_constants/separation = 20
 
-[node name="Box1" type="Button" parent="VBoxContainer/GridContainer"]
+[node name="RollButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(200, 200)
+custom_minimum_size = Vector2(180, 54)
+text = "Roll All"
+theme_override_font_sizes/font_size = 20
 
-[node name="Box2" type="Button" parent="VBoxContainer/GridContainer"]
+[node name="BankButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(200, 200)
-
-[node name="Box3" type="Button" parent="VBoxContainer/GridContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(200, 200)
-
-[node name="StatusLabel" type="Label" parent="VBoxContainer"]
-layout_mode = 2
-text = ""
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 24
-autowrap_mode = 3
-
-[node name="PlayAgainButton" type="Button" parent="VBoxContainer"]
-layout_mode = 2
-text = "Play Again"
-visible = false
+custom_minimum_size = Vector2(180, 54)
+text = "Bank Score"
+theme_override_font_sizes/font_size = 20
