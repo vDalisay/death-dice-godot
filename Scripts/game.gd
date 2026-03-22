@@ -193,8 +193,8 @@ func _pop_die(index: int) -> void:
 	var btn: Button = die_buttons[index]
 	btn.pivot_offset = btn.size / 2.0
 	var tween: Tween = create_tween()
-	tween.tween_property(btn, "scale", Vector2(1.3, 1.3), 0.08).set_ease(Tween.EASE_OUT)
-	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.08).set_ease(Tween.EASE_IN)
+	tween.tween_property(btn, "scale", Vector2(1.3, 1.3), 0.25).set_ease(Tween.EASE_OUT)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.25).set_ease(Tween.EASE_IN)
 
 # ---------------------------------------------------------------------------
 # UI refresh
