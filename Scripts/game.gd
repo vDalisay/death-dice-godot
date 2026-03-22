@@ -22,8 +22,9 @@ var turn_state: TurnState = TurnState.IDLE
 
 var dice_pool: Array[DiceData] = []
 var current_results: Array[DiceFaceData] = []  # null until rolled
-var dice_stopped: Array[bool] = []             # permanently locked this turn
+var dice_stopped: Array[bool] = []             # permanently locked by STOP face
 var dice_keep: Array[bool] = []                # true = player wants to keep (not reroll)
+var dice_keep_locked: Array[bool] = []         # keep confirmed by a reroll — cannot be undone
 var die_buttons: Array[Button] = []
 
 func _ready() -> void:
@@ -49,6 +50,8 @@ func _start_new_turn() -> void:
 	dice_stopped.fill(false)
 	dice_keep.resize(dice_pool.size())
 	dice_keep.fill(false)
+	dice_keep_locked.resize(dice_pool.size())
+	dice_keep_locked.fill(false)
 	_rebuild_die_buttons()
 	_refresh_ui()
 
@@ -82,6 +85,13 @@ func _on_roll_pressed() -> void:
 func _on_bank_pressed() -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
+	# Pop all scoring dice before banking.
+	for i: int in dice_pool.size():
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type in [DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP]:
+			_pop_die(i)
 	last_banked = _calculate_turn_score()
 	total_score += last_banked
 	turn_state = TurnState.BANKED
@@ -90,7 +100,8 @@ func _on_bank_pressed() -> void:
 func _on_die_clicked(index: int) -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
-	if dice_stopped[index]:
+	# Stopped and locked-keep dice cannot be toggled.
+	if dice_stopped[index] or dice_keep_locked[index]:
 		return
 	dice_keep[index] = not dice_keep[index]
 	_refresh_die_button(index)
@@ -108,29 +119,38 @@ func _roll_all_dice() -> void:
 	_process_roll_results(all_indices)
 
 func _reroll_selected_dice() -> void:
+	# Confirm all currently-kept dice as permanently locked before rerolling.
+	for i: int in dice_pool.size():
+		if dice_keep[i] and not dice_keep_locked[i]:
+			dice_keep_locked[i] = true
 	var rerolled: Array[int] = []
 	for i: int in dice_pool.size():
 		if not dice_stopped[i] and not dice_keep[i]:
 			current_results[i] = dice_pool[i].roll()
 			rerolled.append(i)
 	if rerolled.is_empty():
-		status_label.text = "Keep at least one die to reroll, or Bank your score."
+		status_label.text = "All dice are kept — Bank your score or start a new turn."
 		return
 	_process_roll_results(rerolled)
 
 func _process_roll_results(rolled_indices: Array[int]) -> void:
-	# Lock any dice that landed on STOP this roll.
 	for i: int in rolled_indices:
 		var face: DiceFaceData = current_results[i]
 		if face == null:
 			continue
-		if face.type == DiceFaceData.FaceType.STOP:
-			dice_stopped[i] = true
-			dice_keep[i] = false
-		else:
-			# Newly rolled non-stop dice default to "will reroll" (orange).
-			# Player clicks to keep them (green).
-			dice_keep[i] = false
+		match face.type:
+			DiceFaceData.FaceType.STOP:
+				dice_stopped[i] = true
+				dice_keep[i] = false
+			DiceFaceData.FaceType.AUTO_KEEP:
+				# Instantly kept & locked — not user-selectable.
+				dice_keep[i] = true
+				dice_keep_locked[i] = true
+				_pop_die(i)
+			_:
+				# NUMBER / BLANK — default to reroll unless already locked.
+				if not dice_keep_locked[i]:
+					dice_keep[i] = false
 
 	var stop_count: int = _count_stops()
 	if stop_count >= BUST_THRESHOLD:
@@ -152,7 +172,9 @@ func _calculate_turn_score() -> int:
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
-		if face != null and face.type == DiceFaceData.FaceType.NUMBER:
+		if face == null:
+			continue
+		if face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP:
 			score += face.value
 	return score
 
@@ -162,6 +184,17 @@ func _count_stops() -> int:
 		if stopped:
 			count += 1
 	return count
+
+# ---------------------------------------------------------------------------
+# Animations
+# ---------------------------------------------------------------------------
+
+func _pop_die(index: int) -> void:
+	var btn: Button = die_buttons[index]
+	btn.pivot_offset = btn.size / 2.0
+	var tween: Tween = create_tween()
+	tween.tween_property(btn, "scale", Vector2(1.3, 1.3), 0.08).set_ease(Tween.EASE_OUT)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.08).set_ease(Tween.EASE_IN)
 
 # ---------------------------------------------------------------------------
 # UI refresh
@@ -180,11 +213,19 @@ func _refresh_die_button(index: int) -> void:
 	btn.text = face.get_display_text()
 
 	if dice_stopped[index]:
-		# Red — permanently locked
+		# Red — bust-locked
 		btn.modulate = Color(0.9, 0.2, 0.2)
 		btn.disabled = true
+	elif face.type == DiceFaceData.FaceType.AUTO_KEEP:
+		# Gold — auto-kept, not user-selectable
+		btn.modulate = Color(1.0, 0.85, 0.0)
+		btn.disabled = true
+	elif dice_keep_locked[index]:
+		# Dark green — player locked this keep via reroll, cannot undo
+		btn.modulate = Color(0.1, 0.65, 0.1)
+		btn.disabled = true
 	elif dice_keep[index]:
-		# Green — player is keeping this die
+		# Bright green — player chose keep, still toggleable until next reroll
 		btn.modulate = Color(0.3, 0.85, 0.3)
 		btn.disabled = false
 	else:
@@ -210,7 +251,7 @@ func _refresh_ui() -> void:
 			bank_button.disabled = true
 
 		TurnState.ACTIVE:
-			status_label.text    = "Green = keep · Orange = reroll · Click dice to toggle"
+			status_label.text    = "Green = keep · Orange = reroll · Click to toggle (locks on reroll)"
 			status_label.modulate = Color.WHITE
 			roll_button.text     = "Reroll Selected"
 			roll_button.disabled = false

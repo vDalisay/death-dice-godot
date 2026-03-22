@@ -15,12 +15,12 @@ static func make_standard_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Standard D6"
 	var configs: Array = [
-		[DiceFaceData.FaceType.NUMBER, 1],
-		[DiceFaceData.FaceType.NUMBER, 1],
-		[DiceFaceData.FaceType.NUMBER, 2],
-		[DiceFaceData.FaceType.NUMBER, 2],
-		[DiceFaceData.FaceType.BLANK,  0],
-		[DiceFaceData.FaceType.STOP,   0],
+		[DiceFaceData.FaceType.NUMBER,    1],
+		[DiceFaceData.FaceType.NUMBER,    1],
+		[DiceFaceData.FaceType.NUMBER,    2],
+		[DiceFaceData.FaceType.AUTO_KEEP, 2],  # Instantly kept & banked
+		[DiceFaceData.FaceType.BLANK,     0],
+		[DiceFaceData.FaceType.STOP,      0],
 	]
 	for config: Array in configs:
 		var face := DiceFaceData.new()
