@@ -22,7 +22,7 @@ Start Run
               ├── Bank: score added, advance to next stage
               └── Bust: run ends (roguelike permadeath)
   └── Between Stages: Shop / Upgrade
-        ├── Buy new dice (expand pool)
+        ├── Buy new dice (expand pool — this is the primary spend; bigger pools = more fun)
         ├── Empower existing dice (upgrade faces)
         └── Buy passive modifiers (joker-equivalents)
   └── If all stages cleared: Win screen
@@ -32,6 +32,7 @@ Start Run
 
 ### Dice Pool
 - Player starts with a small base set of dice (e.g., 4-6 dice).
+- **Rolling huge numbers of dice at once is a core fantasy** — the pool can grow very large (20+ dice) as the player buys more between stages. The satisfying chaos of throwing a massive fistful of dice is a primary source of fun.
 - Dice have multiple faces with different symbols/values.
 - Dice can be upgraded between stages to replace weak faces with stronger ones.
 
