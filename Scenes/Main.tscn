@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=5 format=3]
 
-[ext_resource type="Script" path="res://Scripts/game.gd" id="1"]
+[ext_resource type="Script" path="res://Scripts/RollPhase.gd" id="1"]
+[ext_resource type="PackedScene" path="res://Scenes/HUD.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://Scenes/DiceTray.tscn" id="3"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -27,35 +29,11 @@ theme_override_constants/margin_bottom = 40
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="ScoreLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="HUD" parent="MarginContainer/VBoxContainer" instance=ExtResource("2")]
 layout_mode = 2
-text = "Total Score: 0"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 28
 
-[node name="TurnScoreLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="DiceTray" parent="MarginContainer/VBoxContainer" instance=ExtResource("3")]
 layout_mode = 2
-text = "This turn: 0"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 22
-
-[node name="StopLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-text = "Stops: 0 / 3"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 18
-
-[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-text = "Press 'Roll All' to begin your turn!"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 20
-autowrap_mode = 3
-
-[node name="DiceContainer" type="HFlowContainer" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_constants/h_separation = 10
-theme_override_constants/v_separation = 10
 
 [node name="ButtonRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

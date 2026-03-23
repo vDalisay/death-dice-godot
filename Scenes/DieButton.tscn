@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/DieButton.gd" id="1"]
+
+[node name="DieButton" type="Button"]
+layout_mode = 2
+custom_minimum_size = Vector2(90, 90)
+script = ExtResource("1")
