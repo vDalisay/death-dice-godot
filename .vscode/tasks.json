@@ -2,23 +2,15 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Install & Build godot-mcp",
+      "label": "Install & Build godot-mcp-runtime",
       "type": "shell",
-      "command": "cd Mcp\\godot-mcp ; npm install ; npm run build",
+      "command": "cd Mcp\\godot-mcp-runtime ; npm install ; npm run build",
       "problemMatcher": []
     },
     {
-      "label": "Run godot-mcp",
+      "label": "Run godot-mcp-runtime",
       "type": "shell",
-      "command": "cd Mcp\\godot-mcp ; pwsh -File .\\run-godot-mcp.ps1 -GodotPath '${input:godotPath}'",
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared" }
-    }
-    ,
-    {
-      "label": "Run godot-mcp (build)",
-      "type": "shell",
-      "command": "cd Mcp\\godot-mcp ; pwsh -File .\\run-godot-mcp-build.ps1 -GodotPath '${input:godotPath}'",
+      "command": "$env:GODOT_PATH='${input:godotPath}'; $env:DEBUG='true'; node Mcp\\godot-mcp-runtime\\dist\\index.js",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared" }
     }
