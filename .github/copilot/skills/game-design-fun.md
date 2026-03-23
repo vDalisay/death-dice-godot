@@ -280,6 +280,86 @@ When reviewing any game mechanic or feature, run it through these questions:
 3. **Check the reward schedule**: Are rewards variable? Layered? Proportional to skill/risk?
 4. **Test for "solved" states**: Can a knowledgeable player always take the optimal path? If yes, add variance or new challenges.
 
+## Reference Game Analysis: CloverPit & Slots & Daggers
+
+Both games are published by Future Friends Games and sit in the same design family as Death Dice: gambling-adjacent randomness dressed in roguelike progression. Both launched in late 2025 and hit 90%+ positive reviews on Steam.
+
+- **CloverPit** — Balatro × Buckshot Roulette. Trapped with a slot machine and a debt to pay. 150+ items with snowballing synergies. Horror framing amplifies the pressure.
+- **Slots & Daggers** — Slot machine × fantasy RPG. 4-8 hour campaign, solo dev, shipped to 100K copies. Explicitly designed around "one more turn."
+
+### What Makes Them Addicting
+
+**1. Juicy moment-to-moment feedback first**
+The reels spinning, the "PLING PLING PLING" coins — the *sound and visual* of a good outcome landing IS nearly the whole product. The reward isn't the points; it's the sensation of the result. This means audio and animation are not polish — they are primary design elements.
+
+**2. Push-luck tension with clear agency**
+The player always knows their choices: take the safe bank or spin again. The tension feels like *your* decision, not randomness happening to you. Wins feel earned. Losses feel deserved.
+
+**3. The snowball fantasy**
+CloverPit's synergy system exists to enable occasional runs where everything combos and numbers go insane. Players chase the *memory* of that peak run every subsequent attempt. The possibility of it is addictive even when it rarely occurs.
+
+**4. Short feedback loops**
+S&D is 4-8 hours. CloverPit has clear per-round debt objectives. You know fast whether the run is alive or dead. Slow failure revelation kills "one more run" momentum.
+
+**5. Thematic stakes**
+CloverPit's debt metaphor transforms every round into survival. The horror framing makes losing feel meaningful rather than arbitrary. Stakes + theme = emotional investment in the outcome.
+
+**6. Meta-progression unlocks**
+Both have things that survive run death. This gives players a reason to keep losing — every run unlocks something for the next. Only layer this on *after* the core loop is already fun.
+
+### Applying These Lessons to Death Dice
+
+| Lesson | Death Dice Application |
+|--------|----------------------|
+| **Juicy feedback is primary** | Dice sounds and animations on roll/reroll/bust/bank are critical, not cosmetic. Each face type should have a distinct feel. |
+| **Snowball fantasy** | Passive modifiers should be able to combo into absurd multipliers on exceptional runs. Let players occasionally feel broken — that peak is what they chase. |
+| **Push-luck visual tension** | Amplify the bust counter as stops accumulate: color shifts to red, die buttons shake or glow. The feeling of danger should be visible, not just numerical. |
+| **Short run length** | Full run target: 20-40 minutes. Fast retry after bust is essential. Friction between runs kills momentum. |
+| **Thematic stakes** | "Death Dice" already names the stakes — lean into it. The bust = death. The dice = fate. Use framing and UI language that feels dangerous, not clinical. |
+| **Meta-progression** | Unlockable dice types, faces, or modifiers that persist between runs will convert casual players into dedicated ones — but only once the core roll/reroll loop is already compelling. |
+
+**Key insight**: Both games are primarily audio/visual experiences dressed in mechanics. The *feeling* of spinning and landing is the fun. The strategy is what gives players permission to keep chasing the feeling. Build the sensation first, then build the depth.
+
+## Death Dice — Core Match Structure (Decided)
+
+### The Score Target + Lives System
+
+A single match in Death Dice uses a **score target** system (not combat HP). This is the purest expression of push-your-luck because the player's accumulated score *is* the resource at stake — the tension of "should I reroll?" maps directly and unambiguously onto the single decision that defines the game.
+
+**Why not combat HP:** Combat adds a reactive threat (enemy attacks) that competes with the deliberate reroll evaluation. It makes the game busier without making it deeper. The Cubitos-style reroll loop is slow and deliberate — that's a strength. Don't interrupt it.
+
+### Match Structure
+
+```
+Stage begins → Target score shown
+  └── Turn loop:
+        Player rolls all dice
+        Player evaluates, holds/rerolls selectively
+        Player banks (adds to run score) OR busts (loses turn score + loses a life)
+  └── Run score reaches target → Stage cleared, advance
+  └── All lives lost → Run ends (permadeath)
+```
+
+### Lives System Design
+
+- **3 lives per run** (tunable constant).
+- A bust on any turn costs **1 life + the entire turn's accumulated score**.
+- Losing all lives ends the run permanently.
+- Lives do NOT restore between stages — every bust has lasting run consequences.
+
+**Why this works:**
+The push decision becomes: *"Is gaining more score worth risking a life?"* A life lost isn't just this turn's problem — it threatens the whole run. This elevates every reroll from a tactical decision to a strategic one, which is maximum push-your-luck tension.
+
+It also fits the game's name perfectly: **Death Dice**. Your lives are literally dice rolls away from death.
+
+### Optional "Overshoot Bonus"
+
+If the player banks a score significantly above the stage target, reward them (e.g., extra gold in the shop, a bonus modifier). This prevents "I'm already ahead, no reason to push" and keeps the push decision alive even on comfortable turns.
+
+### Stage Targets Scaling
+
+Score targets should scale aggressively enough that the player *needs* to push on later stages to have any chance of clearing — safety becomes impossible. Early stages forgive conservative play; late stages demand risk.
+
 ## Key References
 
 These works inform the principles above:

@@ -10,6 +10,13 @@ enum DieState { UNROLLED, REROLLABLE, KEPT, KEEP_LOCKED, AUTO_KEPT, STOPPED }
 const POP_SCALE: Vector2 = Vector2(1.3, 1.3)
 const POP_DURATION: float = 0.25
 
+const COLOR_UNROLLED: Color   = Color(0.6, 0.6, 0.6)
+const COLOR_REROLLABLE: Color = Color(1.0, 0.65, 0.2)   # Orange
+const COLOR_KEPT: Color       = Color(0.3, 0.85, 0.3)   # Bright green
+const COLOR_KEEP_LOCKED: Color = Color(0.1, 0.65, 0.1)  # Dark green
+const COLOR_AUTO_KEPT: Color  = Color(1.0, 0.85, 0.0)   # Gold
+const COLOR_STOPPED: Color    = Color(0.9, 0.2, 0.2)    # Red
+
 var die_index: int = -1
 var die_state: DieState = DieState.UNROLLED
 
@@ -62,20 +69,20 @@ func _on_pressed() -> void:
 func _apply_visual() -> void:
 	match die_state:
 		DieState.UNROLLED:
-			modulate = Color(0.6, 0.6, 0.6)
+			modulate = COLOR_UNROLLED
 			disabled = true
 		DieState.REROLLABLE:
-			modulate = Color(1.0, 0.65, 0.2)   # Orange
+			modulate = COLOR_REROLLABLE
 			disabled = false
 		DieState.KEPT:
-			modulate = Color(0.3, 0.85, 0.3)   # Bright green
+			modulate = COLOR_KEPT
 			disabled = false
 		DieState.KEEP_LOCKED:
-			modulate = Color(0.1, 0.65, 0.1)   # Dark green
+			modulate = COLOR_KEEP_LOCKED
 			disabled = true
 		DieState.AUTO_KEPT:
-			modulate = Color(1.0, 0.85, 0.0)   # Gold
+			modulate = COLOR_AUTO_KEPT
 			disabled = true
 		DieState.STOPPED:
-			modulate = Color(0.9, 0.2, 0.2)    # Red
+			modulate = COLOR_STOPPED
 			disabled = true

@@ -63,17 +63,28 @@ Start Run
 
 ```
 death-dice/
-├── Scenes/          # .tscn scene files
-│   └── Main.tscn    # Current main scene (placeholder box-picker demo)
-├── Scripts/         # GDScript files
-│   ├── game.gd      # Current placeholder game logic
-│   └── show_text.gd # Legacy prototype (to be removed)
-├── Mcp/godot-mcp/   # MCP server for AI → Godot communication
+├── Scenes/
+│   ├── Main.tscn         # Root scene (RollPhase.gd attached)
+│   ├── HUD.tscn          # HUD label panel
+│   ├── DiceTray.tscn     # Dynamic die-button grid
+│   └── DieButton.tscn    # Single die button template
+├── Scripts/
+│   ├── RollPhase.gd      # Turn state machine (roll/reroll/bank/bust)
+│   ├── GameManager.gd    # Autoload: score, lives, stage target
+│   ├── SaveManager.gd    # Autoload: run persistence, highscore
+│   ├── HUD.gd            # Observe-only label renderer
+│   ├── DiceTray.gd       # Manages grid of DieButton instances
+│   ├── DieButton.gd      # Single die visual + toggle + pop animation
+│   ├── DiceData.gd       # Resource: die with N faces
+│   ├── DiceFaceData.gd   # Resource: single face (type + value)
+│   └── RunSaveData.gd    # Resource: run snapshot for persistence
+├── Mcp/godot-mcp/        # MCP server for AI → Godot communication
 ├── .github/
 │   ├── copilot-instructions.md
 │   └── copilot/skills/
-│       └── godot-gdscript-patterns.md  # Godot 4 GDScript patterns skill
-└── CLAUDE.md        # This file
+│       ├── godot-gdscript-patterns.md
+│       └── game-design-fun.md
+└── CLAUDE.md             # This file
 ```
 
 ## GDScript Conventions (enforced)
@@ -81,31 +92,32 @@ death-dice/
 - **Static typing everywhere** — all variables, parameters, and return types annotated.
 - **Signals for decoupling** — scenes never reach into each other directly; communicate via signals.
 - **`@onready` for node refs** — never call `get_node()` in `_process()`.
-- **Autoloads for global state** — `GameManager`, `EventBus` as autoloads; keep them minimal.
+- **Autoloads for global state** — `GameManager`, `SaveManager` as autoloads; keep them minimal.
 - **Resources for data** — dice definitions, stage configs etc. stored as `Resource` subclasses.
 - **No magic numbers** — constants or exports only.
 - **GDScript patterns skill** at `.github/copilot/skills/godot-gdscript-patterns.md` — follow all patterns therein.
 
 ## Current State of the Codebase
 
-The repo currently contains a **placeholder prototype**: a 4-box clicking game used to validate the Godot MCP toolchain. This is NOT the final game. It demonstrates:
-- Scene loading and running via MCP.
-- Basic UI (Control nodes, Button, Label).
-- Signal-based interaction.
-
-All of this will be replaced or heavily extended as the actual dice game is built.
+The core dice-rolling game loop is implemented and playable:
+- **Roll phase**: roll all dice → view results → select keep/reroll → reroll → repeat until bank or bust.
+- **Bust protection**: turn 1 is immune; turns 2-3 have lenient threshold (4); turns 4+ standard (3).
+- **Lives system**: 3 lives per run; bust costs one life; 0 lives = run over.
+- **Stage target**: score goal (500) to clear a stage.
+- **Save system**: runs persisted to disk with highscore tracking.
+- **New Run button**: appears on game over / stage clear; saves run and resets.
 
 ## Roadmap (rough)
 
-1. [ ] Core dice rolling system (roll N dice, display faces)
-2. [ ] Reroll mechanic (select dice, reroll subset)
-3. [ ] Stop/bust mechanic
-4. [ ] Basic scoring and stage targets
+1. [x] Core dice rolling system (roll N dice, display faces)
+2. [x] Reroll mechanic (select dice, reroll subset)
+3. [x] Stop/bust mechanic
+4. [x] Basic scoring and stage targets
 5. [ ] Stage progression loop
 6. [ ] Between-stage shop/upgrade screen
 7. [ ] Dice pool management (buy, upgrade faces)
 8. [ ] Passive modifier system (Joker-equivalents)
-9. [ ] Run structure (start → stages → win/lose)
+9. [x] Run structure (start → stages → win/lose)
 10. [ ] Polish: animations, sound, UI
 
 ## Agent Instructions
