@@ -8,15 +8,18 @@ extends VBoxContainer
 @onready var turn_score_label: Label = $TurnScoreLabel
 @onready var stop_label: Label       = $StopLabel
 @onready var status_label: Label     = $StatusLabel
+@onready var highscore_label: Label  = $HighscoreLabel
 
 func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.lives_changed.connect(_on_lives_changed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
+	SaveManager.highscore_changed.connect(_on_highscore_changed)
 	_on_score_changed(GameManager.total_score)
 	_on_lives_changed(GameManager.lives)
 	target_label.text = "Target: %d" % GameManager.stage_target_score
+	highscore_label.text = "Highscore: %d" % SaveManager.highscore
 
 # ---------------------------------------------------------------------------
 # Public API — called by RollPhase to push turn-local info
@@ -46,3 +49,6 @@ func _on_run_ended() -> void:
 
 func _on_stage_cleared() -> void:
 	show_status("STAGE CLEARED!", Color(0.3, 0.9, 0.3))
+
+func _on_highscore_changed(new_highscore: int) -> void:
+	highscore_label.text = "Highscore: %d" % new_highscore

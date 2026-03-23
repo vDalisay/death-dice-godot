@@ -12,6 +12,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var dice_tray: DiceTray = $MarginContainer/VBoxContainer/DiceTray
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
+@onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -28,9 +29,11 @@ var _run_active: bool = true
 func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
 	bank_button.pressed.connect(_on_bank_pressed)
+	new_run_button.pressed.connect(_on_new_run_pressed)
 	dice_tray.die_toggled.connect(_on_die_toggled)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
+	new_run_button.visible = false
 	_build_dice_pool()
 	_start_new_turn()
 
@@ -226,13 +229,25 @@ func _on_run_ended() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
+	new_run_button.visible = true
 	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
 
 func _on_stage_cleared() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
+	new_run_button.visible = true
 	hud.show_status("STAGE CLEARED!", Color(0.3, 0.9, 0.3))
+
+func _on_new_run_pressed() -> void:
+	var snapshot: Resource = SaveManager.make_run_snapshot()
+	SaveManager.record_run(snapshot)
+	GameManager.reset_run()
+	_run_active = true
+	turn_number = 0
+	new_run_button.visible = false
+	_build_dice_pool()
+	_start_new_turn()
 
 func _sync_buttons() -> void:
 	if not _run_active:
