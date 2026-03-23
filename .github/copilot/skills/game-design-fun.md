@@ -117,6 +117,7 @@ Push-your-luck mechanics are among the most engaging in all of game design becau
 - **Too easy to bust** → Players always play safe. No excitement.
 - **Too hard to bust** → Players always push. No decisions.
 - **Sweet spot** → Players bust roughly 20-35% of the time when playing aggressively. This creates maximum "near miss" experiences which are highly engaging.
+- **Graduated protection** (implemented): Turn 1 is bust-immune ("Close call!"), turns 2-3 have a lenient threshold (4), turns 4+ use the standard threshold (3) — this ensures the player always gets to *play* before they can lose.
 
 ## Roguelike Design Principles
 

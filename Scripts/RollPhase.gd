@@ -4,7 +4,7 @@ extends Control
 ## Owns dice logic. Delegates visuals to DiceTray and HUD.
 
 const STARTING_DICE_COUNT: int = 5
-const BUST_THRESHOLD: int = 3
+const BASE_BUST_THRESHOLD: int = 3
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -14,6 +14,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 
 var turn_state: TurnState = TurnState.IDLE
+var turn_number: int = 0
 
 # Per-die state arrays (same length as dice_pool).
 var dice_pool: Array[DiceData] = []
@@ -40,6 +41,7 @@ func _build_dice_pool() -> void:
 
 func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
+	turn_number += 1
 	var count: int = dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
@@ -132,13 +134,18 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
 
-	if _count_stops() >= BUST_THRESHOLD:
+	var stop_count: int = _count_stops()
+	var threshold: int = _get_bust_threshold()
+	if stop_count >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
 	else:
 		turn_state = TurnState.ACTIVE
 
 	_sync_all_dice()
 	_sync_ui()
+
+	if turn_number == 1 and stop_count >= threshold:
+		hud.show_status("Close call! Turn 1 — no bust this time.", Color(1.0, 0.85, 0.0))
 
 # ---------------------------------------------------------------------------
 # Score / helpers
@@ -162,6 +169,13 @@ func _count_stops() -> int:
 		if stopped:
 			count += 1
 	return count
+
+func _get_bust_threshold() -> int:
+	if turn_number <= 1:
+		return BASE_BUST_THRESHOLD + 99  # Effectively immune
+	if turn_number <= 3:
+		return BASE_BUST_THRESHOLD + 1   # Lenient: 4
+	return BASE_BUST_THRESHOLD           # Standard: 3
 
 func _die_visual_state(index: int) -> DieButton.DieState:
 	var face: DiceFaceData = current_results[index]
@@ -188,7 +202,7 @@ func _sync_all_dice() -> void:
 func _sync_ui() -> void:
 	var stop_count: int = _count_stops()
 	var turn_score: int = _calculate_turn_score()
-	hud.update_turn(turn_score, stop_count, BUST_THRESHOLD)
+	hud.update_turn(turn_score, stop_count, _get_bust_threshold())
 	_sync_buttons()
 
 	match turn_state:

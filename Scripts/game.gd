@@ -4,7 +4,7 @@ extends Control
 ## Roll all dice → STOP faces lock → select dice to keep/reroll → bust or bank.
 
 const STARTING_DICE_COUNT: int = 5
-const BUST_THRESHOLD: int = 3
+const BASE_BUST_THRESHOLD: int = 3
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -19,6 +19,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 var total_score: int = 0
 var last_banked: int = 0
 var turn_state: TurnState = TurnState.IDLE
+var turn_number: int = 0
 
 var dice_pool: Array[DiceData] = []
 var current_results: Array[DiceFaceData] = []  # null until rolled
@@ -44,6 +45,7 @@ func _build_dice_pool() -> void:
 
 func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
+	turn_number += 1
 	current_results.clear()
 	current_results.resize(dice_pool.size())  # filled with null
 	dice_stopped.resize(dice_pool.size())
@@ -153,7 +155,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 					dice_keep[i] = false
 
 	var stop_count: int = _count_stops()
-	if stop_count >= BUST_THRESHOLD:
+	var threshold: int = _get_bust_threshold()
+	if stop_count >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
 	else:
 		turn_state = TurnState.ACTIVE
@@ -161,6 +164,10 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	for i: int in dice_pool.size():
 		_refresh_die_button(i)
 	_refresh_ui()
+
+	if turn_number == 1 and stop_count >= threshold:
+		status_label.text = "Close call! Turn 1 — no bust this time."
+		status_label.modulate = Color(1.0, 0.85, 0.0)
 
 # ---------------------------------------------------------------------------
 # Score calculation
@@ -184,6 +191,13 @@ func _count_stops() -> int:
 		if stopped:
 			count += 1
 	return count
+
+func _get_bust_threshold() -> int:
+	if turn_number <= 1:
+		return BASE_BUST_THRESHOLD + 99  # Effectively immune
+	if turn_number <= 3:
+		return BASE_BUST_THRESHOLD + 1   # Lenient: 4
+	return BASE_BUST_THRESHOLD           # Standard: 3
 
 # ---------------------------------------------------------------------------
 # Animations
@@ -239,7 +253,7 @@ func _refresh_ui() -> void:
 
 	score_label.text      = "Total Score: %d" % total_score
 	turn_score_label.text = "This turn: %d" % turn_score
-	stop_label.text       = "Stops: %d / %d" % [stop_count, BUST_THRESHOLD]
+	stop_label.text       = "Stops: %d / %d" % [stop_count, _get_bust_threshold()]
 	stop_label.modulate   = Color(0.9, 0.2, 0.2) if stop_count > 0 else Color.WHITE
 
 	match turn_state:
