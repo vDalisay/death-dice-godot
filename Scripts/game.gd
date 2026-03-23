@@ -193,8 +193,6 @@ func _count_stops() -> int:
 	return count
 
 func _get_bust_threshold() -> int:
-	if turn_number <= 1:
-		return BASE_BUST_THRESHOLD + 99  # Effectively immune
 	if turn_number <= 3:
 		return BASE_BUST_THRESHOLD + 1   # Lenient: 4
 	return BASE_BUST_THRESHOLD           # Standard: 3
