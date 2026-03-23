@@ -23,10 +23,14 @@ var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
 
+var _run_active: bool = true
+
 func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
 	bank_button.pressed.connect(_on_bank_pressed)
 	dice_tray.die_toggled.connect(_on_die_toggled)
+	GameManager.run_ended.connect(_on_run_ended)
+	GameManager.stage_cleared.connect(_on_stage_cleared)
 	_build_dice_pool()
 	_start_new_turn()
 
@@ -59,6 +63,8 @@ func _start_new_turn() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_roll_pressed() -> void:
+	if not _run_active:
+		return
 	match turn_state:
 		TurnState.IDLE:
 			_roll_all_dice()
@@ -138,6 +144,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var threshold: int = _get_bust_threshold()
 	if stop_count >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
+		GameManager.lose_life()
 	else:
 		turn_state = TurnState.ACTIVE
 
@@ -215,7 +222,23 @@ func _sync_ui() -> void:
 		TurnState.BANKED:
 			pass  # Already set in _on_bank_pressed
 
+func _on_run_ended() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
+
+func _on_stage_cleared() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	hud.show_status("STAGE CLEARED!", Color(0.3, 0.9, 0.3))
+
 func _sync_buttons() -> void:
+	if not _run_active:
+		roll_button.disabled = true
+		bank_button.disabled = true
+		return
 	match turn_state:
 		TurnState.IDLE:
 			roll_button.text     = "Roll All"

@@ -2,6 +2,8 @@ class_name HUD
 extends VBoxContainer
 ## Observes GameManager and RollPhase signals. Renders labels only — no game logic.
 
+@onready var lives_label: Label      = $LivesLabel
+@onready var target_label: Label     = $TargetLabel
 @onready var score_label: Label      = $ScoreLabel
 @onready var turn_score_label: Label = $TurnScoreLabel
 @onready var stop_label: Label       = $StopLabel
@@ -9,7 +11,12 @@ extends VBoxContainer
 
 func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
+	GameManager.lives_changed.connect(_on_lives_changed)
+	GameManager.run_ended.connect(_on_run_ended)
+	GameManager.stage_cleared.connect(_on_stage_cleared)
 	_on_score_changed(GameManager.total_score)
+	_on_lives_changed(GameManager.lives)
+	target_label.text = "Target: %d" % GameManager.stage_target_score
 
 # ---------------------------------------------------------------------------
 # Public API — called by RollPhase to push turn-local info
@@ -30,3 +37,12 @@ func show_status(message: String, colour: Color = Color.WHITE) -> void:
 
 func _on_score_changed(new_total: int) -> void:
 	score_label.text = "Total Score: %d" % new_total
+
+func _on_lives_changed(new_lives: int) -> void:
+	lives_label.text = "Lives: %d" % new_lives
+
+func _on_run_ended() -> void:
+	show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
+
+func _on_stage_cleared() -> void:
+	show_status("STAGE CLEARED!", Color(0.3, 0.9, 0.3))
