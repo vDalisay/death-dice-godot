@@ -3,3 +3,11 @@
 /android/
 .claude/worktrees/
 .mcp/
+
+# GdUnit4 generated files
+addons/gdUnit4/test/
+reports/
+
+# Test artifacts
+test_stderr.txt
+test_stdout.txt
