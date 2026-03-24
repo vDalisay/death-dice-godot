@@ -157,9 +157,18 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if turn_number == 1 and stop_count >= threshold:
 		hud.show_status("Close call! Turn 1 — no bust this time.", Color(1.0, 0.85, 0.0))
 
+	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
+		_on_bank_pressed()
+
 # ---------------------------------------------------------------------------
 # Score / helpers
 # ---------------------------------------------------------------------------
+
+func _all_dice_resolved() -> bool:
+	for i: int in dice_pool.size():
+		if not dice_stopped[i] and not dice_keep[i]:
+			return false
+	return true
 
 func _calculate_turn_score() -> int:
 	var score: int = 0
