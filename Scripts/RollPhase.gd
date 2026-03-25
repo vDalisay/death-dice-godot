@@ -25,6 +25,7 @@ var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
 
 var _run_active: bool = true
+var _loop_complete_pending: bool = false
 
 func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
@@ -79,12 +80,14 @@ func _on_bank_pressed() -> void:
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
-		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP):
+		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY):
 			dice_tray.pop_die(i)
 	var banked: int = _calculate_turn_score()
 	GameManager.add_score(banked)
 	turn_state = TurnState.BANKED
-	hud.show_status("Banked %d points!  Total: %d" % [banked, GameManager.total_score], Color(0.3, 0.9, 0.3))
+	var mult: int = _get_turn_multiplier()
+	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
+	hud.show_status("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score], Color(0.3, 0.9, 0.3))
 	_sync_buttons()
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
@@ -130,7 +133,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			DiceFaceData.FaceType.STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-			DiceFaceData.FaceType.AUTO_KEEP:
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				dice_tray.pop_die(i)
@@ -139,8 +142,10 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 					dice_keep[i] = false
 
 	var stop_count: int = _count_stops()
+	var shield_count: int = _count_shields()
+	var effective_stops: int = maxi(0, stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
-	if stop_count >= threshold and turn_number > 1:
+	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
 		GameManager.lose_life()
 	else:
@@ -149,8 +154,12 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	_sync_all_dice()
 	_sync_ui()
 
-	if turn_number == 1 and stop_count >= threshold:
+	if turn_number == 1 and effective_stops >= threshold:
 		hud.show_status("Close call! Turn 1 — no bust this time.", Color(1.0, 0.85, 0.0))
+
+	if shield_count > 0 and stop_count > 0 and stop_count > effective_stops:
+		var shielded: int = stop_count - effective_stops
+		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
 
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
@@ -167,15 +176,19 @@ func _all_dice_resolved() -> bool:
 
 func _calculate_turn_score() -> int:
 	var score: int = 0
+	var multiplier: int = 1
 	for i: int in GameManager.dice_pool.size():
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
 		if face == null:
 			continue
-		if face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP:
-			score += face.value
-	return score
+		match face.type:
+			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP:
+				score += face.value
+			DiceFaceData.FaceType.MULTIPLY:
+				multiplier *= face.value
+	return score * multiplier
 
 func _count_stops() -> int:
 	var count: int = 0
@@ -183,6 +196,24 @@ func _count_stops() -> int:
 		if stopped:
 			count += 1
 	return count
+
+func _count_shields() -> int:
+	var count: int = 0
+	for i: int in GameManager.dice_pool.size():
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type == DiceFaceData.FaceType.SHIELD:
+			count += face.value
+	return count
+
+func _get_turn_multiplier() -> int:
+	var multiplier: int = 1
+	for i: int in GameManager.dice_pool.size():
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type == DiceFaceData.FaceType.MULTIPLY:
+			multiplier *= face.value
+	return multiplier
 
 func _get_bust_threshold() -> int:
 	if turn_number <= 3:
@@ -195,7 +226,7 @@ func _die_visual_state(index: int) -> DieButton.DieState:
 		return DieButton.DieState.UNROLLED
 	if dice_stopped[index]:
 		return DieButton.DieState.STOPPED
-	if face.type == DiceFaceData.FaceType.AUTO_KEEP:
+	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY:
 		return DieButton.DieState.AUTO_KEPT
 	if dice_keep_locked[index]:
 		return DieButton.DieState.KEEP_LOCKED
@@ -213,8 +244,10 @@ func _sync_all_dice() -> void:
 
 func _sync_ui() -> void:
 	var stop_count: int = _count_stops()
+	var shield_count: int = _count_shields()
+	var effective_stops: int = maxi(0, stop_count - shield_count)
 	var turn_score: int = _calculate_turn_score()
-	hud.update_turn(turn_score, stop_count, _get_bust_threshold())
+	hud.update_turn(turn_score, effective_stops, _get_bust_threshold())
 	_sync_buttons()
 
 	match turn_state:
@@ -223,7 +256,7 @@ func _sync_ui() -> void:
 		TurnState.ACTIVE:
 			hud.show_status("Green = keep · Orange = reroll · Click to toggle (locks on reroll)")
 		TurnState.BUST:
-			hud.show_status("BUST! %d stops — turn score lost!" % stop_count, Color(0.9, 0.2, 0.2))
+			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:
 			pass  # Already set in _on_bank_pressed
 
@@ -238,21 +271,26 @@ func _on_stage_cleared() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	GameManager.add_gold(GameManager.STAGE_CLEAR_GOLD_BONUS)
+	GameManager.add_gold(GameManager.get_stage_clear_bonus())
 	if GameManager.is_final_stage():
-		new_run_button.visible = true
 		hud.show_status(
-			"RUN COMPLETE! All %d stages cleared!" % GameManager.STAGES_PER_RUN,
+			"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop, GameManager.current_loop + 1],
 			Color(1.0, 0.85, 0.0))
+		_open_shop(true)
 	else:
-		_open_shop()
+		_open_shop(false)
 
-func _open_shop() -> void:
+func _open_shop(is_loop_complete: bool = false) -> void:
+	_loop_complete_pending = is_loop_complete
 	_roll_content.visible = false
-	shop_panel.open(GameManager.current_stage)
+	shop_panel.open(GameManager.current_stage, is_loop_complete)
 
 func _on_shop_closed() -> void:
-	GameManager.advance_stage()
+	if _loop_complete_pending:
+		GameManager.advance_loop()
+		_loop_complete_pending = false
+	else:
+		GameManager.advance_stage()
 	shop_panel.visible = false
 	_roll_content.visible = true
 	_run_active = true

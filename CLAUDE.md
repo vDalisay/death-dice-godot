@@ -105,13 +105,17 @@ death-dice/
 The full game loop is implemented and playable:
 - **Roll phase**: roll all dice → view results → select keep/reroll → reroll → repeat until bank or bust.
 - **Bust protection**: turn 1 is immune; turns 2-3 have lenient threshold (4); turns 4+ standard (3).
+- **Shield mechanic**: SHIELD faces auto-keep and absorb stops during bust check (reduces effective stop count).
+- **Multiplier mechanic**: MULTIPLY faces auto-keep and multiply the entire turn score when banking.
 - **Lives system**: 3 lives per run; bust costs one life; 0 lives = run over.
-- **Stage progression**: 5 stages per run with scaling targets (30, 55, 80, 105, 130).
-- **Gold economy**: 1 gold per banked point + 20 bonus on stage clear.
-- **Between-stage shop**: buy Standard Die (20g), Lucky Die (50g), or Empower Die upgrade (30g).
+- **Endless loop progression**: Loop 1 has 5 stages, loop 2+ has 7 stages. Clearing all stages advances to the next loop with scaled targets and gold bonuses. Run only ends on death.
+- **Stage targets scale by loop**: base × (1 + 0.5 × (loop−1)). Loop 1: 30–130, Loop 2: 45–270, etc.
+- **Gold economy**: 1 gold per banked point + scaled bonus on stage clear (20 + 10 per loop).
+- **Between-stage shop**: Standard Die (20g), Lucky Die (50g), Empower Die (30g). Loop 2+ unlocks Runner Die (40g), Shield Die (45g), Multiplier Die (60g).
+- **Dice balance invariant**: every die always retains at least 1 STOP face; upgrades skip the last STOP.
 - **Dice pool growth**: pool starts at 5 dice, grows via shop purchases between stages.
-- **Save system**: runs persisted to disk with highscore and stages_cleared tracking.
-- **New Run button**: appears on game over / run complete; saves run and resets.
+- **Save system**: runs persisted to disk with highscore, stages_cleared, and loops_completed tracking.
+- **New Run button**: appears on game over; saves run and resets.
 
 ## Roadmap (rough)
 
@@ -122,9 +126,13 @@ The full game loop is implemented and playable:
 5. [x] Stage progression loop
 6. [x] Between-stage shop/upgrade screen
 7. [x] Dice pool management (buy, upgrade faces)
-8. [ ] Passive modifier system (Joker-equivalents)
-9. [x] Run structure (start → stages → win/lose)
-10. [ ] Polish: animations, sound, UI
+8. [x] Dice balance invariant (every die keeps ≥1 STOP face)
+9. [x] New face types (SHIELD absorbs stops, MULTIPLY amplifies score)
+10. [x] New dice types (Runner, Shield, Multiplier — Cubitos-inspired)
+11. [x] Endless loop progression (loops escalate targets and unlock dice)
+12. [ ] Passive modifier system (Joker-equivalents)
+13. [x] Run structure (start → stages → loops → die)
+14. [ ] Polish: animations, sound, UI
 
 ## Agent Instructions
 

@@ -27,9 +27,13 @@ func _ready() -> void:
 # Public API — called by RollPhase
 # ---------------------------------------------------------------------------
 
-func open(stage_just_cleared: int) -> void:
-	_title_label.text = "Stage %d Complete!" % stage_just_cleared
-	_continue_button.text = "Continue to Stage %d" % (stage_just_cleared + 1)
+func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
+	if is_loop_complete:
+		_title_label.text = "Loop %d Complete!" % (GameManager.current_loop - 1)
+		_continue_button.text = "Start Loop %d" % GameManager.current_loop
+	else:
+		_title_label.text = "Stage %d Complete!" % stage_just_cleared
+		_continue_button.text = "Continue to Stage %d" % (stage_just_cleared + 1)
 	_generate_items()
 	_refresh_display()
 	visible = true
@@ -43,6 +47,11 @@ func _generate_items() -> void:
 	_items.clear()
 	_items.append(ShopItemData.make_buy_standard_die())
 	_items.append(ShopItemData.make_buy_lucky_die())
+	# Unlock new dice types in loop 2+
+	if GameManager.current_loop >= 2:
+		_items.append(ShopItemData.make_buy_runner_die())
+		_items.append(ShopItemData.make_buy_shield_die())
+		_items.append(ShopItemData.make_buy_multiplier_die())
 	if not GameManager.dice_pool.is_empty():
 		_items.append(ShopItemData.make_upgrade_die())
 	_build_item_rows()
@@ -93,6 +102,12 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_standard_d6())
 		ShopItemData.ItemType.BUY_LUCKY_DIE:
 			GameManager.add_dice(DiceData.make_lucky_d6())
+		ShopItemData.ItemType.BUY_RUNNER_DIE:
+			GameManager.add_dice(DiceData.make_runner_d6())
+		ShopItemData.ItemType.BUY_SHIELD_DIE:
+			GameManager.add_dice(DiceData.make_shield_d6())
+		ShopItemData.ItemType.BUY_MULTIPLIER_DIE:
+			GameManager.add_dice(DiceData.make_multiplier_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
 			_upgrade_random_die()
 	_refresh_display()
