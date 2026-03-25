@@ -125,9 +125,13 @@ func _reroll_selected_dice() -> void:
 			dice_keep_locked[i] = true
 	var rerolled: Array[int] = []
 	for i: int in GameManager.dice_pool.size():
-		if not dice_stopped[i] and not dice_keep[i]:
-			current_results[i] = GameManager.dice_pool[i].roll()
-			rerolled.append(i)
+		if dice_keep[i] or dice_keep_locked[i]:
+			continue
+		# Stopped dice are rerolled too (Cubitos-style: pick them up and retry)
+		if dice_stopped[i]:
+			dice_stopped[i] = false
+		current_results[i] = GameManager.dice_pool[i].roll()
+		rerolled.append(i)
 	if rerolled.is_empty():
 		hud.show_status("All dice are kept — Bank your score or start a new turn.")
 		return
