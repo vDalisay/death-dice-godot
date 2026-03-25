@@ -80,7 +80,7 @@ func _on_bank_pressed() -> void:
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
-		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE):
+		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT):
 			dice_tray.pop_die(i)
 	var banked: int = _calculate_turn_score()
 	GameManager.add_score(banked)
@@ -150,7 +150,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			DiceFaceData.FaceType.STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY:
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				dice_tray.pop_die(i)
@@ -204,9 +204,13 @@ func _all_dice_resolved() -> bool:
 	return true
 
 func _calculate_turn_score() -> int:
-	var score: int = 0
+	var pool_size: int = GameManager.dice_pool.size()
+	# Pass 1: compute per-die base scores
+	var base_scores: Array[int] = []
+	base_scores.resize(pool_size)
+	base_scores.fill(0)
 	var multiplier: int = 1
-	for i: int in GameManager.dice_pool.size():
+	for i: int in pool_size:
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
@@ -214,9 +218,22 @@ func _calculate_turn_score() -> int:
 			continue
 		match face.type:
 			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
-				score += face.value
+				base_scores[i] = face.value
 			DiceFaceData.FaceType.MULTIPLY:
 				multiplier *= face.value
+	# Pass 2: apply MULTIPLY_LEFT — multiply the left neighbor's base score
+	for i: int in pool_size:
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face == null:
+			continue
+		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT and i > 0 and not dice_stopped[i - 1]:
+			base_scores[i - 1] *= face.value
+	# Sum all per-die scores, then apply global multiplier
+	var score: int = 0
+	for s: int in base_scores:
+		score += s
 	return score * multiplier
 
 func _count_stops() -> int:
@@ -275,7 +292,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			elif face.type == DiceFaceData.FaceType.STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY:
+			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				dice_tray.pop_die(i)
@@ -304,7 +321,7 @@ func _die_visual_state(index: int) -> DieButton.DieState:
 		return DieButton.DieState.UNROLLED
 	if dice_stopped[index]:
 		return DieButton.DieState.STOPPED
-	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE:
+	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
 		return DieButton.DieState.AUTO_KEPT
 	if dice_keep_locked[index]:
 		return DieButton.DieState.KEEP_LOCKED

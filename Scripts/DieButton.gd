@@ -19,6 +19,7 @@ const COLOR_STOPPED: Color    = Color(0.9, 0.2, 0.2)    # Red
 
 var die_index: int = -1
 var die_state: DieState = DieState.UNROLLED
+var custom_color: Color = Color.TRANSPARENT
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(90, 90)
@@ -91,3 +92,5 @@ func _apply_visual() -> void:
 		DieState.STOPPED:
 			modulate = COLOR_STOPPED
 			disabled = false
+	if custom_color != Color.TRANSPARENT:
+		modulate = custom_color

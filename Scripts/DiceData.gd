@@ -9,10 +9,12 @@ const MAX_FACE_VALUE: int = 5
 const MAX_SHIELD_VALUE: int = 3
 const MAX_MULTIPLY_VALUE: int = 4
 const MAX_EXPLODE_VALUE: int = 5
+const MAX_MULTIPLY_LEFT_VALUE: int = 4
 const MAX_CHAIN_ROLLS: int = 10
 
 @export var dice_name: String = "Standard D6"
 @export var faces: Array[DiceFaceData] = []
+@export var custom_color: Color = Color.TRANSPARENT
 
 
 func roll() -> DiceFaceData:
@@ -71,6 +73,10 @@ func upgrade_weakest_face() -> bool:
 			if face.value >= MAX_EXPLODE_VALUE:
 				return false
 			face.value += 1
+		DiceFaceData.FaceType.MULTIPLY_LEFT:
+			if face.value >= MAX_MULTIPLY_LEFT_VALUE:
+				return false
+			face.value += 1
 	return true
 
 
@@ -90,6 +96,8 @@ func _face_power(face: DiceFaceData) -> int:
 			return 18 + face.value
 		DiceFaceData.FaceType.EXPLODE:
 			return 22 + face.value
+		DiceFaceData.FaceType.MULTIPLY_LEFT:
+			return 18 + face.value
 	return 0
 
 
@@ -214,6 +222,27 @@ static func make_explosive_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,    0],
 		[DiceFaceData.FaceType.STOP,    0],
 		[DiceFaceData.FaceType.STOP,    0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+## Pink die — multiplies the score of the die to the left. 3 stops, high risk.
+static func make_pink_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Pink D6"
+	die.custom_color = Color(1.0, 0.4, 0.7)
+	var configs: Array = [
+		[DiceFaceData.FaceType.MULTIPLY_LEFT, 2],
+		[DiceFaceData.FaceType.MULTIPLY_LEFT, 2],
+		[DiceFaceData.FaceType.STOP,          0],
+		[DiceFaceData.FaceType.STOP,          0],
+		[DiceFaceData.FaceType.STOP,          0],
+		[DiceFaceData.FaceType.BLANK,         0],
 	]
 	for config: Array in configs:
 		var face := DiceFaceData.new()

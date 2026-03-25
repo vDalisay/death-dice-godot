@@ -24,6 +24,8 @@ func build(count: int) -> void:
 	for i: int in count:
 		var btn: DieButton = DIE_BUTTON_SCENE.instantiate() as DieButton
 		btn.setup(i)
+		if i < GameManager.dice_pool.size():
+			btn.custom_color = GameManager.dice_pool[i].custom_color
 		btn.toggled_keep.connect(_on_die_toggled)
 		add_child(btn)
 		_buttons.append(btn)

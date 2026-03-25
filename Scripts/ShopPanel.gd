@@ -48,6 +48,7 @@ func _generate_items() -> void:
 	_items.append(ShopItemData.make_buy_standard_die())
 	_items.append(ShopItemData.make_buy_blank_canvas_die())
 	_items.append(ShopItemData.make_buy_lucky_die())
+	_items.append(ShopItemData.make_buy_pink_die())
 	# Unlock new dice types in loop 2+
 	if GameManager.current_loop >= 2:
 		_items.append(ShopItemData.make_buy_runner_die())
@@ -114,6 +115,8 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_explosive_d6())
 		ShopItemData.ItemType.BUY_BLANK_CANVAS_DIE:
 			GameManager.add_dice(DiceData.make_blank_canvas_d6())
+		ShopItemData.ItemType.BUY_PINK_DIE:
+			GameManager.add_dice(DiceData.make_pink_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
 			_upgrade_random_die()
 	_refresh_display()
