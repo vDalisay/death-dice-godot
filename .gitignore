@@ -8,6 +8,9 @@
 addons/gdUnit4/test/
 reports/
 
+# Broken submodule (no .gitmodules entry)
+Mcp/godot-mcp-runtime
+
 # Test artifacts
 test_stderr.txt
 test_stdout.txt
