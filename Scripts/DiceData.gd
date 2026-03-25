@@ -8,6 +8,8 @@ extends Resource
 const MAX_FACE_VALUE: int = 5
 const MAX_SHIELD_VALUE: int = 3
 const MAX_MULTIPLY_VALUE: int = 4
+const MAX_EXPLODE_VALUE: int = 5
+const MAX_CHAIN_ROLLS: int = 10
 
 @export var dice_name: String = "Standard D6"
 @export var faces: Array[DiceFaceData] = []
@@ -65,6 +67,10 @@ func upgrade_weakest_face() -> bool:
 			if face.value >= MAX_MULTIPLY_VALUE:
 				return false
 			face.value += 1
+		DiceFaceData.FaceType.EXPLODE:
+			if face.value >= MAX_EXPLODE_VALUE:
+				return false
+			face.value += 1
 	return true
 
 
@@ -82,6 +88,8 @@ func _face_power(face: DiceFaceData) -> int:
 			return 12 + face.value
 		DiceFaceData.FaceType.MULTIPLY:
 			return 18 + face.value
+		DiceFaceData.FaceType.EXPLODE:
+			return 22 + face.value
 	return 0
 
 
@@ -135,15 +143,35 @@ static func make_lucky_d6() -> DiceData:
 	return die
 
 
-## High risk, high reward die. More stops but higher values.
-static func make_runner_d6() -> DiceData:
+## High risk, high reward die. No blanks, 2 stops as risk tax.
+static func make_gambler_d6() -> DiceData:
 	var die := DiceData.new()
-	die.dice_name = "Runner D6"
+	die.dice_name = "Gambler D6"
 	var configs: Array = [
-		[DiceFaceData.FaceType.NUMBER,    3],
-		[DiceFaceData.FaceType.NUMBER,    3],
-		[DiceFaceData.FaceType.NUMBER,    4],
-		[DiceFaceData.FaceType.AUTO_KEEP, 4],
+		[DiceFaceData.FaceType.NUMBER, 3],
+		[DiceFaceData.FaceType.NUMBER, 4],
+		[DiceFaceData.FaceType.NUMBER, 5],
+		[DiceFaceData.FaceType.NUMBER, 5],
+		[DiceFaceData.FaceType.STOP,   0],
+		[DiceFaceData.FaceType.STOP,   0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+## Auto-keep gold mine. Punishing with 2 stops but great when it hits.
+static func make_golden_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Golden D6"
+	var configs: Array = [
+		[DiceFaceData.FaceType.AUTO_KEEP, 2],
+		[DiceFaceData.FaceType.AUTO_KEEP, 2],
+		[DiceFaceData.FaceType.AUTO_KEEP, 3],
+		[DiceFaceData.FaceType.BLANK,     0],
 		[DiceFaceData.FaceType.STOP,      0],
 		[DiceFaceData.FaceType.STOP,      0],
 	]
@@ -155,16 +183,36 @@ static func make_runner_d6() -> DiceData:
 	return die
 
 
-## Defensive utility die. Shield faces absorb stops during bust check.
-static func make_shield_d6() -> DiceData:
+## Big numbers die. High ceiling, 2 stops as risk cost.
+static func make_heavy_d6() -> DiceData:
 	var die := DiceData.new()
-	die.dice_name = "Shield D6"
+	die.dice_name = "Heavy D6"
 	var configs: Array = [
-		[DiceFaceData.FaceType.NUMBER,  1],
-		[DiceFaceData.FaceType.NUMBER,  1],
-		[DiceFaceData.FaceType.SHIELD,  1],
-		[DiceFaceData.FaceType.SHIELD,  1],
-		[DiceFaceData.FaceType.BLANK,   0],
+		[DiceFaceData.FaceType.NUMBER, 4],
+		[DiceFaceData.FaceType.NUMBER, 5],
+		[DiceFaceData.FaceType.NUMBER, 6],
+		[DiceFaceData.FaceType.BLANK,  0],
+		[DiceFaceData.FaceType.STOP,   0],
+		[DiceFaceData.FaceType.STOP,   0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+## Chain reaction die. EXPLODE faces score AND re-roll. 3 stops — very risky.
+static func make_explosive_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Explosive D6"
+	var configs: Array = [
+		[DiceFaceData.FaceType.EXPLODE, 2],
+		[DiceFaceData.FaceType.EXPLODE, 2],
+		[DiceFaceData.FaceType.NUMBER,  2],
+		[DiceFaceData.FaceType.STOP,    0],
+		[DiceFaceData.FaceType.STOP,    0],
 		[DiceFaceData.FaceType.STOP,    0],
 	]
 	for config: Array in configs:
@@ -175,17 +223,17 @@ static func make_shield_d6() -> DiceData:
 	return die
 
 
-## Score amplifier die. Multiply faces multiply the entire turn score.
-static func make_multiplier_d6() -> DiceData:
+## Blank canvas — cheapest die, minimal use until upgraded. 1 stop minimum.
+static func make_blank_canvas_d6() -> DiceData:
 	var die := DiceData.new()
-	die.dice_name = "Multiplier D6"
+	die.dice_name = "Blank Canvas D6"
 	var configs: Array = [
-		[DiceFaceData.FaceType.NUMBER,   1],
-		[DiceFaceData.FaceType.MULTIPLY, 2],
-		[DiceFaceData.FaceType.BLANK,    0],
-		[DiceFaceData.FaceType.BLANK,    0],
-		[DiceFaceData.FaceType.STOP,     0],
-		[DiceFaceData.FaceType.STOP,     0],
+		[DiceFaceData.FaceType.BLANK, 0],
+		[DiceFaceData.FaceType.BLANK, 0],
+		[DiceFaceData.FaceType.BLANK, 0],
+		[DiceFaceData.FaceType.BLANK, 0],
+		[DiceFaceData.FaceType.BLANK, 0],
+		[DiceFaceData.FaceType.STOP,  0],
 	]
 	for config: Array in configs:
 		var face := DiceFaceData.new()

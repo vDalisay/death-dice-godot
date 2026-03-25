@@ -40,8 +40,11 @@ Start Run
 - All dice in the pool are rolled at once.
 - Player sees all results simultaneously.
 - Player selects any dice to reroll (hold/keep others).
-- **Stop faces**: if accumulated stops reach the bust threshold, the turn ends forcibly (bust).
-- Rerolling is free but risky — more rolls = more bust risk.
+- **Stop faces**: landing STOP shows the die red, but the player CAN pick it up and reroll it. Stops are NOT permanent.
+- **Per-roll bust check**: if stops from a SINGLE roll ≥ bust threshold → bust. Each reroll is a fresh gamble.
+- **Shield faces**: absorb stops during bust check (reduce effective stop count).
+- **Explode faces**: score their value AND immediately chain-reroll the die. If EXPLODE lands again, chains continue.
+- Rerolling is free but risky — each roll is its own bust evaluation.
 
 ### Empowerment / Roguelike Progression
 - Dice can be upgraded with special face types (multipliers, special symbols).
@@ -105,13 +108,17 @@ death-dice/
 The full game loop is implemented and playable:
 - **Roll phase**: roll all dice → view results → select keep/reroll → reroll → repeat until bank or bust.
 - **Bust protection**: turn 1 is immune; turns 2-3 have lenient threshold (4); turns 4+ standard (3).
+- **Per-roll bust check**: only stops from the current roll count — not accumulated across rerolls.
+- **Rerollable stops**: STOP faces show red but player can click to pick them up and reroll. Cubitos-style informed risk.
 - **Shield mechanic**: SHIELD faces auto-keep and absorb stops during bust check (reduces effective stop count).
 - **Multiplier mechanic**: MULTIPLY faces auto-keep and multiply the entire turn score when banking.
+- **Explode mechanic**: EXPLODE faces score their value and chain-reroll the die. Chains until non-EXPLODE.
 - **Lives system**: 3 lives per run; bust costs one life; 0 lives = run over.
 - **Endless loop progression**: Loop 1 has 5 stages, loop 2+ has 7 stages. Clearing all stages advances to the next loop with scaled targets and gold bonuses. Run only ends on death.
 - **Stage targets scale by loop**: base × (1 + 0.5 × (loop−1)). Loop 1: 30–130, Loop 2: 45–270, etc.
 - **Gold economy**: 1 gold per banked point + scaled bonus on stage clear (20 + 10 per loop).
-- **Between-stage shop**: Standard Die (20g), Lucky Die (50g), Empower Die (30g). Loop 2+ unlocks Runner Die (40g), Shield Die (45g), Multiplier Die (60g).
+- **Cubitos-inspired dice lineup**: Standard (1 stop), Lucky (1 stop), Gambler (2 stops), Golden (2 stops), Heavy (2 stops), Explosive (3 stops), Blank Canvas (1 stop, upgrade target).
+- **Between-stage shop**: Standard Die (20g), Blank Canvas (10g), Lucky Die (50g), Empower Die (30g). Loop 2+ unlocks Gambler (40g), Golden (50g), Heavy (45g), Explosive (60g).
 - **Dice balance invariant**: every die always retains at least 1 STOP face; upgrades skip the last STOP.
 - **Dice pool growth**: pool starts at 5 dice, grows via shop purchases between stages.
 - **Save system**: runs persisted to disk with highscore, stages_cleared, and loops_completed tracking.

@@ -32,3 +32,24 @@ func test_default_face_is_number_zero() -> void:
 	var face := DiceFaceData.new()
 	assert_int(face.type).is_equal(DiceFaceData.FaceType.NUMBER)
 	assert_int(face.value).is_equal(0)
+
+
+func test_explode_face_display() -> void:
+	var face := DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.EXPLODE
+	face.value = 2
+	assert_str(face.get_display_text()).is_equal("💥2")
+
+
+func test_shield_face_display() -> void:
+	var face := DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.SHIELD
+	face.value = 1
+	assert_str(face.get_display_text()).is_equal("SH")
+
+
+func test_multiply_face_display() -> void:
+	var face := DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.MULTIPLY
+	face.value = 2
+	assert_str(face.get_display_text()).is_equal("x2")

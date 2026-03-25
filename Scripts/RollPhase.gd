@@ -80,7 +80,7 @@ func _on_bank_pressed() -> void:
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
-		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY):
+		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE):
 			dice_tray.pop_die(i)
 	var banked: int = _calculate_turn_score()
 	GameManager.add_score(banked)
@@ -93,7 +93,16 @@ func _on_bank_pressed() -> void:
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
-	if dice_stopped[die_index] or dice_keep_locked[die_index]:
+	if dice_keep_locked[die_index]:
+		return
+	# Allow picking up stopped dice (Cubitos-style rerollable stops)
+	if dice_stopped[die_index] and not is_kept:
+		dice_stopped[die_index] = false
+		dice_keep[die_index] = false
+		_sync_all_dice()
+		_sync_ui()
+		return
+	if dice_stopped[die_index]:
 		return
 	dice_keep[die_index] = is_kept
 	_sync_ui()
@@ -125,6 +134,9 @@ func _reroll_selected_dice() -> void:
 	_process_roll_results(rerolled)
 
 func _process_roll_results(rolled_indices: Array[int]) -> void:
+	# Track which dice need chain re-rolls (EXPLODE faces)
+	var chain_reroll: Array[int] = []
+
 	for i: int in rolled_indices:
 		var face: DiceFaceData = current_results[i]
 		if face == null:
@@ -137,13 +149,20 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				dice_tray.pop_die(i)
+			DiceFaceData.FaceType.EXPLODE:
+				# EXPLODE: score its value AND chain-reroll this die
+				dice_keep[i] = true
+				dice_keep_locked[i] = true
+				dice_tray.pop_die(i)
+				chain_reroll.append(i)
 			_:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
 
-	var stop_count: int = _count_stops()
+	# Per-roll bust check: only count stops from THIS roll, offset by shields
+	var roll_stop_count: int = _count_stops_in(rolled_indices)
 	var shield_count: int = _count_shields()
-	var effective_stops: int = maxi(0, stop_count - shield_count)
+	var effective_stops: int = maxi(0, roll_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
 	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
@@ -157,9 +176,14 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if turn_number == 1 and effective_stops >= threshold:
 		hud.show_status("Close call! Turn 1 — no bust this time.", Color(1.0, 0.85, 0.0))
 
-	if shield_count > 0 and stop_count > 0 and stop_count > effective_stops:
-		var shielded: int = stop_count - effective_stops
+	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > effective_stops:
+		var shielded: int = roll_stop_count - effective_stops
 		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
+
+	# Handle EXPLODE chain re-rolls (free extra rolls, not counted toward bust)
+	if turn_state == TurnState.ACTIVE and not chain_reroll.is_empty():
+		_process_explode_chains(chain_reroll)
+		return
 
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
@@ -184,7 +208,7 @@ func _calculate_turn_score() -> int:
 		if face == null:
 			continue
 		match face.type:
-			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP:
+			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
 				score += face.value
 			DiceFaceData.FaceType.MULTIPLY:
 				multiplier *= face.value
@@ -194,6 +218,14 @@ func _count_stops() -> int:
 	var count: int = 0
 	for stopped: bool in dice_stopped:
 		if stopped:
+			count += 1
+	return count
+
+## Count stops only among the specified dice indices (per-roll bust check).
+func _count_stops_in(indices: Array[int]) -> int:
+	var count: int = 0
+	for i: int in indices:
+		if dice_stopped[i]:
 			count += 1
 	return count
 
@@ -215,6 +247,47 @@ func _get_turn_multiplier() -> int:
 			multiplier *= face.value
 	return multiplier
 
+## EXPLODE chain: re-roll each exploding die. If it lands EXPLODE again, chain.
+## Chains are free rolls (not counted toward bust). Capped to prevent infinite loops.
+func _process_explode_chains(exploding_indices: Array[int]) -> void:
+	var chain_depth: int = 0
+	var to_reroll: Array[int] = exploding_indices.duplicate()
+	while not to_reroll.is_empty() and chain_depth < DiceData.MAX_CHAIN_ROLLS:
+		chain_depth += 1
+		var next_chain: Array[int] = []
+		for i: int in to_reroll:
+			# Unlock the die for chain reroll
+			dice_keep[i] = false
+			dice_keep_locked[i] = false
+			current_results[i] = GameManager.dice_pool[i].roll()
+			var face: DiceFaceData = current_results[i]
+			if face.type == DiceFaceData.FaceType.EXPLODE:
+				# Chain continues! Score and reroll again.
+				dice_keep[i] = true
+				dice_keep_locked[i] = true
+				dice_tray.pop_die(i)
+				next_chain.append(i)
+			elif face.type == DiceFaceData.FaceType.STOP:
+				dice_stopped[i] = true
+				dice_keep[i] = false
+			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY:
+				dice_keep[i] = true
+				dice_keep_locked[i] = true
+				dice_tray.pop_die(i)
+			else:
+				if not dice_keep_locked[i]:
+					dice_keep[i] = false
+		to_reroll = next_chain
+
+	_sync_all_dice()
+	_sync_ui()
+
+	if chain_depth > 0:
+		hud.show_status("💥 Chain x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
+
+	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
+		_on_bank_pressed()
+
 func _get_bust_threshold() -> int:
 	if turn_number <= 3:
 		return BASE_BUST_THRESHOLD + 1   # Lenient: 4
@@ -226,7 +299,7 @@ func _die_visual_state(index: int) -> DieButton.DieState:
 		return DieButton.DieState.UNROLLED
 	if dice_stopped[index]:
 		return DieButton.DieState.STOPPED
-	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY:
+	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE:
 		return DieButton.DieState.AUTO_KEPT
 	if dice_keep_locked[index]:
 		return DieButton.DieState.KEEP_LOCKED
@@ -254,7 +327,7 @@ func _sync_ui() -> void:
 		TurnState.IDLE:
 			hud.show_status("Press 'Roll All' to begin your turn!")
 		TurnState.ACTIVE:
-			hud.show_status("Green = keep · Orange = reroll · Click to toggle (locks on reroll)")
+			hud.show_status("Green = keep · Orange = reroll · Red = pick up to reroll")
 		TurnState.BUST:
 			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:

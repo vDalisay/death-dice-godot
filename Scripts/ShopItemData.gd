@@ -6,9 +6,11 @@ extends Resource
 enum ItemType {
 	BUY_STANDARD_DIE,
 	BUY_LUCKY_DIE,
-	BUY_RUNNER_DIE,
-	BUY_SHIELD_DIE,
-	BUY_MULTIPLIER_DIE,
+	BUY_GAMBLER_DIE,
+	BUY_GOLDEN_DIE,
+	BUY_HEAVY_DIE,
+	BUY_EXPLOSIVE_DIE,
+	BUY_BLANK_CANVAS_DIE,
 	UPGRADE_DIE,
 }
 
@@ -38,28 +40,46 @@ static func make_buy_lucky_die() -> ShopItemData:
 
 static func make_buy_runner_die() -> ShopItemData:
 	var item := ShopItemData.new()
-	item.item_name = "Runner Die"
-	item.description = "High risk, high reward. (3, 3, 4, ★4, STOP, STOP)"
+	item.item_name = "Gambler Die"
+	item.description = "High risk, high reward. (3, 4, 5, 5, STOP, STOP)"
 	item.cost = 40
-	item.item_type = ItemType.BUY_RUNNER_DIE
+	item.item_type = ItemType.BUY_GAMBLER_DIE
 	return item
 
 
-static func make_buy_shield_die() -> ShopItemData:
+static func make_buy_golden_die() -> ShopItemData:
 	var item := ShopItemData.new()
-	item.item_name = "Shield Die"
-	item.description = "Shields absorb stops. (1, 1, SH, SH, —, STOP)"
+	item.item_name = "Golden Die"
+	item.description = "Auto-keep gold. Punishing stops. (★2, ★2, ★3, —, STOP, STOP)"
+	item.cost = 50
+	item.item_type = ItemType.BUY_GOLDEN_DIE
+	return item
+
+
+static func make_buy_heavy_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Heavy Die"
+	item.description = "Big numbers, big risk. (4, 5, 6, —, STOP, STOP)"
 	item.cost = 45
-	item.item_type = ItemType.BUY_SHIELD_DIE
+	item.item_type = ItemType.BUY_HEAVY_DIE
 	return item
 
 
-static func make_buy_multiplier_die() -> ShopItemData:
+static func make_buy_explosive_die() -> ShopItemData:
 	var item := ShopItemData.new()
-	item.item_name = "Multiplier Die"
-	item.description = "Multiply your turn score! (1, x2, —, —, STOP, STOP)"
+	item.item_name = "Explosive Die"
+	item.description = "Chain reaction! 💥 re-rolls itself. (💥2, 💥2, 2, STOP×3)"
 	item.cost = 60
-	item.item_type = ItemType.BUY_MULTIPLIER_DIE
+	item.item_type = ItemType.BUY_EXPLOSIVE_DIE
+	return item
+
+
+static func make_buy_blank_canvas_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Blank Canvas Die"
+	item.description = "Cheap and upgradeable. (—, —, —, —, —, STOP)"
+	item.cost = 10
+	item.item_type = ItemType.BUY_BLANK_CANVAS_DIE
 	return item
 
 

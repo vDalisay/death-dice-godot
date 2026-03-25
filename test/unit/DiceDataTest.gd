@@ -93,8 +93,8 @@ func test_upgrade_weakest_face_preserves_last_stop() -> void:
 
 
 func test_upgrade_removes_stop_when_multiple_exist() -> void:
-	# Runner die has 2 STOPs — one can be removed.
-	var die: DiceData = DiceData.make_runner_d6()
+	# Gambler die has 2 STOPs — one can be removed.
+	var die: DiceData = DiceData.make_gambler_d6()
 	var result: bool = die.upgrade_weakest_face()
 	assert_bool(result).is_true()
 	var stop_count: int = 0
@@ -128,6 +128,59 @@ func test_face_power_ordering() -> void:
 	var auto := DiceFaceData.new()
 	auto.type = DiceFaceData.FaceType.AUTO_KEEP
 	auto.value = 2
+	var explode := DiceFaceData.new()
+	explode.type = DiceFaceData.FaceType.EXPLODE
+	explode.value = 2
 	assert_int(die._face_power(stop)).is_less(die._face_power(blank))
 	assert_int(die._face_power(blank)).is_less(die._face_power(num))
 	assert_int(die._face_power(num)).is_less(die._face_power(auto))
+	assert_int(die._face_power(auto)).is_less(die._face_power(explode))
+
+
+# ---------------------------------------------------------------------------
+# New Cubitos-inspired dice
+# ---------------------------------------------------------------------------
+
+func test_all_dice_have_at_least_one_stop() -> void:
+	var dice: Array[DiceData] = [
+		DiceData.make_standard_d6(),
+		DiceData.make_lucky_d6(),
+		DiceData.make_gambler_d6(),
+		DiceData.make_golden_d6(),
+		DiceData.make_heavy_d6(),
+		DiceData.make_explosive_d6(),
+		DiceData.make_blank_canvas_d6(),
+	]
+	for die: DiceData in dice:
+		assert_bool(die.has_stop_face()).is_true()
+
+
+func test_gambler_d6_has_two_stops() -> void:
+	var die: DiceData = DiceData.make_gambler_d6()
+	assert_int(die.faces.size()).is_equal(6)
+	assert_int(die._count_stop_faces()).is_equal(2)
+
+
+func test_explosive_d6_has_three_stops() -> void:
+	var die: DiceData = DiceData.make_explosive_d6()
+	assert_int(die.faces.size()).is_equal(6)
+	assert_int(die._count_stop_faces()).is_equal(3)
+
+
+func test_explosive_d6_has_explode_faces() -> void:
+	var die: DiceData = DiceData.make_explosive_d6()
+	var explode_count: int = 0
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.EXPLODE:
+			explode_count += 1
+	assert_int(explode_count).is_equal(2)
+
+
+func test_blank_canvas_d6_is_mostly_blank() -> void:
+	var die: DiceData = DiceData.make_blank_canvas_d6()
+	var blank_count: int = 0
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.BLANK:
+			blank_count += 1
+	assert_int(blank_count).is_equal(5)
+	assert_int(die._count_stop_faces()).is_equal(1)

@@ -64,6 +64,11 @@ func _on_pressed() -> void:
 		die_state = DieState.REROLLABLE
 		_apply_visual()
 		toggled_keep.emit(die_index, false)
+	elif die_state == DieState.STOPPED:
+		# Cubitos-style: player can pick up a stopped die and reroll it.
+		die_state = DieState.REROLLABLE
+		_apply_visual()
+		toggled_keep.emit(die_index, false)
 	# All other states are non-interactive — ignore.
 
 func _apply_visual() -> void:
@@ -85,4 +90,4 @@ func _apply_visual() -> void:
 			disabled = true
 		DieState.STOPPED:
 			modulate = COLOR_STOPPED
-			disabled = true
+			disabled = false
