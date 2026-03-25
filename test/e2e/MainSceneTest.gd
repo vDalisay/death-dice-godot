@@ -25,8 +25,7 @@ func test_initial_state_is_idle() -> void:
 func test_dice_pool_starts_with_five_dice() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
-	assert_int(root.dice_pool.size()).is_equal(RollPhase.STARTING_DICE_COUNT)
+	assert_int(GameManager.dice_pool.size()).is_equal(GameManager.STARTING_DICE_COUNT)
 
 
 func test_roll_button_starts_enabled() -> void:
@@ -66,7 +65,7 @@ func test_rolling_populates_results() -> void:
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
 	# Every die should have a result after rolling.
-	for i: int in root.dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		assert_object(root.current_results[i]).is_not_null()
 
 
@@ -74,7 +73,7 @@ func test_dice_tray_has_buttons_matching_pool() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = runner.scene() as RollPhase
-	assert_int(root.dice_tray.get_button_count()).is_equal(root.dice_pool.size())
+	assert_int(root.dice_tray.get_button_count()).is_equal(GameManager.dice_pool.size())
 
 
 func test_hud_shows_correct_lives() -> void:
@@ -88,7 +87,7 @@ func test_hud_shows_correct_target() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = runner.scene() as RollPhase
-	assert_str(root.hud.target_label.text).contains("500")
+	assert_str(root.hud.target_label.text).contains("30")
 
 
 func test_banking_adds_score_to_total() -> void:
@@ -104,7 +103,7 @@ func test_banking_adds_score_to_total() -> void:
 	await runner.simulate_frames(2)
 	# If state went to ACTIVE, override results and bank.
 	if root.turn_state == RollPhase.TurnState.ACTIVE:
-		for i: int in root.dice_pool.size():
+		for i: int in GameManager.dice_pool.size():
 			root.current_results[i] = scoring_face
 			root.dice_stopped[i] = false
 			root.dice_keep[i] = true
@@ -119,3 +118,18 @@ func test_new_run_button_hidden_initially() -> void:
 	await runner.simulate_frames(2)
 	var root: RollPhase = runner.scene() as RollPhase
 	assert_bool(root.new_run_button.visible).is_false()
+
+
+func test_shop_panel_hidden_initially() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+	assert_bool(root.shop_panel.visible).is_false()
+
+
+func test_hud_shows_stage_label() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+	assert_str(root.hud.stage_label.text).contains("Stage")
+	assert_str(root.hud.stage_label.text).contains("1")

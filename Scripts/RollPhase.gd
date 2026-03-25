@@ -3,22 +3,22 @@ extends Control
 ## Turn state machine for the Cubitos-style dice rolling phase.
 ## Owns dice logic. Delegates visuals to DiceTray and HUD.
 
-const STARTING_DICE_COUNT: int = 5
 const BASE_BUST_THRESHOLD: int = 3
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
+@onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
 @onready var dice_tray: DiceTray = $MarginContainer/VBoxContainer/DiceTray
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
+@onready var shop_panel: ShopPanel = $ShopPanel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
 
-# Per-die state arrays (same length as dice_pool).
-var dice_pool: Array[DiceData] = []
+# Per-die state arrays (same length as GameManager.dice_pool).
 var current_results: Array[DiceFaceData] = []
 var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
@@ -31,25 +31,20 @@ func _ready() -> void:
 	bank_button.pressed.connect(_on_bank_pressed)
 	new_run_button.pressed.connect(_on_new_run_pressed)
 	dice_tray.die_toggled.connect(_on_die_toggled)
+	shop_panel.shop_closed.connect(_on_shop_closed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	new_run_button.visible = false
-	_build_dice_pool()
 	_start_new_turn()
 
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
 
-func _build_dice_pool() -> void:
-	dice_pool.clear()
-	for i: int in STARTING_DICE_COUNT:
-		dice_pool.append(DiceData.make_standard_d6())
-
 func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
 	turn_number += 1
-	var count: int = dice_pool.size()
+	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
 	dice_stopped.resize(count)
@@ -80,7 +75,7 @@ func _on_bank_pressed() -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
 	# Pop all scoring dice.
-	for i: int in dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
@@ -106,20 +101,20 @@ func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 
 func _roll_all_dice() -> void:
 	var indices: Array[int] = []
-	for i: int in dice_pool.size():
-		current_results[i] = dice_pool[i].roll()
+	for i: int in GameManager.dice_pool.size():
+		current_results[i] = GameManager.dice_pool[i].roll()
 		indices.append(i)
 	_process_roll_results(indices)
 
 func _reroll_selected_dice() -> void:
 	# Lock all currently-kept dice permanently before rerolling.
-	for i: int in dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] and not dice_keep_locked[i]:
 			dice_keep_locked[i] = true
 	var rerolled: Array[int] = []
-	for i: int in dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		if not dice_stopped[i] and not dice_keep[i]:
-			current_results[i] = dice_pool[i].roll()
+			current_results[i] = GameManager.dice_pool[i].roll()
 			rerolled.append(i)
 	if rerolled.is_empty():
 		hud.show_status("All dice are kept — Bank your score or start a new turn.")
@@ -165,14 +160,14 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 # ---------------------------------------------------------------------------
 
 func _all_dice_resolved() -> bool:
-	for i: int in dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		if not dice_stopped[i] and not dice_keep[i]:
 			return false
 	return true
 
 func _calculate_turn_score() -> int:
 	var score: int = 0
-	for i: int in dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
@@ -213,7 +208,7 @@ func _die_visual_state(index: int) -> DieButton.DieState:
 # ---------------------------------------------------------------------------
 
 func _sync_all_dice() -> void:
-	for i: int in dice_pool.size():
+	for i: int in GameManager.dice_pool.size():
 		dice_tray.update_die(i, current_results[i], _die_visual_state(i))
 
 func _sync_ui() -> void:
@@ -243,8 +238,26 @@ func _on_stage_cleared() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	new_run_button.visible = true
-	hud.show_status("STAGE CLEARED!", Color(0.3, 0.9, 0.3))
+	GameManager.add_gold(GameManager.STAGE_CLEAR_GOLD_BONUS)
+	if GameManager.is_final_stage():
+		new_run_button.visible = true
+		hud.show_status(
+			"RUN COMPLETE! All %d stages cleared!" % GameManager.STAGES_PER_RUN,
+			Color(1.0, 0.85, 0.0))
+	else:
+		_open_shop()
+
+func _open_shop() -> void:
+	_roll_content.visible = false
+	shop_panel.open(GameManager.current_stage)
+
+func _on_shop_closed() -> void:
+	GameManager.advance_stage()
+	shop_panel.visible = false
+	_roll_content.visible = true
+	_run_active = true
+	turn_number = 0
+	_start_new_turn()
 
 func _on_new_run_pressed() -> void:
 	var snapshot: Resource = SaveManager.make_run_snapshot()
@@ -253,7 +266,8 @@ func _on_new_run_pressed() -> void:
 	_run_active = true
 	turn_number = 0
 	new_run_button.visible = false
-	_build_dice_pool()
+	shop_panel.visible = false
+	_roll_content.visible = true
 	_start_new_turn()
 
 func _sync_buttons() -> void:

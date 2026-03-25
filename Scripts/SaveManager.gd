@@ -27,6 +27,7 @@ func make_run_snapshot() -> Resource:
 	var run: Resource = RunSaveDataScript.new()
 	run.score = GameManager.total_score
 	run.timestamp = Time.get_datetime_string_from_system()
+	run.stages_cleared = GameManager.current_stage - 1
 	return run
 
 # ---------------------------------------------------------------------------
@@ -66,5 +67,6 @@ func _load() -> void:
 			var save: Resource = RunSaveDataScript.new()
 			save.score = (entry as Dictionary).get("score", 0) as int
 			save.timestamp = (entry as Dictionary).get("timestamp", "") as String
+			save.stages_cleared = (entry as Dictionary).get("stages_cleared", 0) as int
 			run_history.append(save)
 	highscore_changed.emit(highscore)

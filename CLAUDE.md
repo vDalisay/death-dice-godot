@@ -67,16 +67,19 @@ death-dice/
 │   ├── Main.tscn         # Root scene (RollPhase.gd attached)
 │   ├── HUD.tscn          # HUD label panel
 │   ├── DiceTray.tscn     # Dynamic die-button grid
-│   └── DieButton.tscn    # Single die button template
+│   ├── DieButton.tscn    # Single die button template
+│   └── ShopPanel.tscn    # Between-stage shop UI
 ├── Scripts/
 │   ├── RollPhase.gd      # Turn state machine (roll/reroll/bank/bust)
-│   ├── GameManager.gd    # Autoload: score, lives, stage target
+│   ├── GameManager.gd    # Autoload: score, lives, stage, gold, dice pool
 │   ├── SaveManager.gd    # Autoload: run persistence, highscore
 │   ├── HUD.gd            # Observe-only label renderer
 │   ├── DiceTray.gd       # Manages grid of DieButton instances
 │   ├── DieButton.gd      # Single die visual + toggle + pop animation
-│   ├── DiceData.gd       # Resource: die with N faces
+│   ├── DiceData.gd       # Resource: die with N faces + factory methods
 │   ├── DiceFaceData.gd   # Resource: single face (type + value)
+│   ├── ShopItemData.gd   # Resource: shop item definition
+│   ├── ShopPanel.gd      # Between-stage shop logic + purchase handling
 │   └── RunSaveData.gd    # Resource: run snapshot for persistence
 ├── Mcp/godot-mcp/        # MCP server for AI → Godot communication
 ├── .github/
@@ -99,13 +102,16 @@ death-dice/
 
 ## Current State of the Codebase
 
-The core dice-rolling game loop is implemented and playable:
+The full game loop is implemented and playable:
 - **Roll phase**: roll all dice → view results → select keep/reroll → reroll → repeat until bank or bust.
 - **Bust protection**: turn 1 is immune; turns 2-3 have lenient threshold (4); turns 4+ standard (3).
 - **Lives system**: 3 lives per run; bust costs one life; 0 lives = run over.
-- **Stage target**: score goal (500) to clear a stage.
-- **Save system**: runs persisted to disk with highscore tracking.
-- **New Run button**: appears on game over / stage clear; saves run and resets.
+- **Stage progression**: 5 stages per run with scaling targets (30, 55, 80, 105, 130).
+- **Gold economy**: 1 gold per banked point + 20 bonus on stage clear.
+- **Between-stage shop**: buy Standard Die (20g), Lucky Die (50g), or Empower Die upgrade (30g).
+- **Dice pool growth**: pool starts at 5 dice, grows via shop purchases between stages.
+- **Save system**: runs persisted to disk with highscore and stages_cleared tracking.
+- **New Run button**: appears on game over / run complete; saves run and resets.
 
 ## Roadmap (rough)
 
@@ -113,9 +119,9 @@ The core dice-rolling game loop is implemented and playable:
 2. [x] Reroll mechanic (select dice, reroll subset)
 3. [x] Stop/bust mechanic
 4. [x] Basic scoring and stage targets
-5. [ ] Stage progression loop
-6. [ ] Between-stage shop/upgrade screen
-7. [ ] Dice pool management (buy, upgrade faces)
+5. [x] Stage progression loop
+6. [x] Between-stage shop/upgrade screen
+7. [x] Dice pool management (buy, upgrade faces)
 8. [ ] Passive modifier system (Joker-equivalents)
 9. [x] Run structure (start → stages → win/lose)
 10. [ ] Polish: animations, sound, UI

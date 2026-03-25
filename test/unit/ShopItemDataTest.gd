@@ -1,0 +1,33 @@
+extends GdUnitTestSuite
+## Unit tests for ShopItemData resource.
+
+
+func test_standard_die_item() -> void:
+	var item: ShopItemData = ShopItemData.make_buy_standard_die()
+	assert_str(item.item_name).is_equal("Standard Die")
+	assert_int(item.cost).is_equal(20)
+	assert_int(item.item_type).is_equal(ShopItemData.ItemType.BUY_STANDARD_DIE)
+
+
+func test_lucky_die_item() -> void:
+	var item: ShopItemData = ShopItemData.make_buy_lucky_die()
+	assert_str(item.item_name).is_equal("Lucky Die")
+	assert_int(item.cost).is_equal(50)
+	assert_int(item.item_type).is_equal(ShopItemData.ItemType.BUY_LUCKY_DIE)
+
+
+func test_upgrade_die_item() -> void:
+	var item: ShopItemData = ShopItemData.make_upgrade_die()
+	assert_str(item.item_name).is_equal("Empower Die")
+	assert_int(item.cost).is_equal(30)
+	assert_int(item.item_type).is_equal(ShopItemData.ItemType.UPGRADE_DIE)
+
+
+func test_all_items_have_descriptions() -> void:
+	var items: Array[ShopItemData] = [
+		ShopItemData.make_buy_standard_die(),
+		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_upgrade_die(),
+	]
+	for item: ShopItemData in items:
+		assert_str(item.description).is_not_empty()

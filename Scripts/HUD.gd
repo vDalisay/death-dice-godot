@@ -2,7 +2,9 @@ class_name HUD
 extends VBoxContainer
 ## Observes GameManager and RollPhase signals. Renders labels only — no game logic.
 
+@onready var stage_label: Label      = $StageLabel
 @onready var lives_label: Label      = $LivesLabel
+@onready var gold_label: Label       = $GoldLabel
 @onready var target_label: Label     = $TargetLabel
 @onready var score_label: Label      = $ScoreLabel
 @onready var turn_score_label: Label = $TurnScoreLabel
@@ -13,12 +15,15 @@ extends VBoxContainer
 func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.lives_changed.connect(_on_lives_changed)
+	GameManager.gold_changed.connect(_on_gold_changed)
+	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	SaveManager.highscore_changed.connect(_on_highscore_changed)
 	_on_score_changed(GameManager.total_score)
 	_on_lives_changed(GameManager.lives)
-	target_label.text = "Target: %d" % GameManager.stage_target_score
+	_on_gold_changed(GameManager.gold)
+	_refresh_stage_display()
 	highscore_label.text = "Highscore: %d" % SaveManager.highscore
 
 # ---------------------------------------------------------------------------
@@ -44,6 +49,12 @@ func _on_score_changed(new_total: int) -> void:
 func _on_lives_changed(new_lives: int) -> void:
 	lives_label.text = "Lives: %d" % new_lives
 
+func _on_gold_changed(new_gold: int) -> void:
+	gold_label.text = "Gold: %d" % new_gold
+
+func _on_stage_advanced(_new_stage: int) -> void:
+	_refresh_stage_display()
+
 func _on_run_ended() -> void:
 	show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
 
@@ -52,3 +63,7 @@ func _on_stage_cleared() -> void:
 
 func _on_highscore_changed(new_highscore: int) -> void:
 	highscore_label.text = "Highscore: %d" % new_highscore
+
+func _refresh_stage_display() -> void:
+	stage_label.text = "Stage: %d / %d" % [GameManager.current_stage, GameManager.STAGES_PER_RUN]
+	target_label.text = "Target: %d" % GameManager.stage_target_score

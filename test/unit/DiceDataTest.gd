@@ -48,3 +48,69 @@ func test_roll_distribution_has_variety() -> void:
 func test_empty_die_has_no_faces() -> void:
 	var die := DiceData.new()
 	assert_int(die.faces.size()).is_equal(0)
+
+
+# ---------------------------------------------------------------------------
+# Lucky D6
+# ---------------------------------------------------------------------------
+
+func test_make_lucky_d6_has_six_faces() -> void:
+	var die: DiceData = DiceData.make_lucky_d6()
+	assert_int(die.faces.size()).is_equal(6)
+
+
+func test_lucky_d6_has_no_blank() -> void:
+	var die: DiceData = DiceData.make_lucky_d6()
+	for face: DiceFaceData in die.faces:
+		assert_int(face.type).is_not_equal(DiceFaceData.FaceType.BLANK)
+
+
+func test_lucky_d6_name() -> void:
+	var die: DiceData = DiceData.make_lucky_d6()
+	assert_str(die.dice_name).is_equal("Lucky D6")
+
+
+# ---------------------------------------------------------------------------
+# Upgrade system
+# ---------------------------------------------------------------------------
+
+func test_upgrade_weakest_face_upgrades_stop() -> void:
+	var die: DiceData = DiceData.make_standard_d6()
+	# Standard die has a STOP face — that's the weakest.
+	var result: bool = die.upgrade_weakest_face()
+	assert_bool(result).is_true()
+	# After upgrade, the former STOP should now be BLANK.
+	var has_stop: bool = false
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.STOP:
+			has_stop = true
+	assert_bool(has_stop).is_false()
+
+
+func test_upgrade_weakest_face_twice() -> void:
+	var die: DiceData = DiceData.make_standard_d6()
+	die.upgrade_weakest_face()  # STOP → BLANK
+	die.upgrade_weakest_face()  # One of the BLANKs → NUMBER(1)
+	var blank_count: int = 0
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.BLANK:
+			blank_count += 1
+	# Started with 1 BLANK + gained 1 from STOP upgrade, then lost 1 = 1 BLANK remaining.
+	assert_int(blank_count).is_equal(1)
+
+
+func test_face_power_ordering() -> void:
+	var die := DiceData.new()
+	var stop := DiceFaceData.new()
+	stop.type = DiceFaceData.FaceType.STOP
+	var blank := DiceFaceData.new()
+	blank.type = DiceFaceData.FaceType.BLANK
+	var num := DiceFaceData.new()
+	num.type = DiceFaceData.FaceType.NUMBER
+	num.value = 1
+	var auto := DiceFaceData.new()
+	auto.type = DiceFaceData.FaceType.AUTO_KEEP
+	auto.value = 2
+	assert_int(die._face_power(stop)).is_less(die._face_power(blank))
+	assert_int(die._face_power(blank)).is_less(die._face_power(num))
+	assert_int(die._face_power(num)).is_less(die._face_power(auto))
