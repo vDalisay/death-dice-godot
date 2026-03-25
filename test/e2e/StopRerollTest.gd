@@ -273,3 +273,71 @@ func test_multiple_rerolls_keep_clearing_stops() -> void:
 
 		# Die 0 was rerolled — it has a result (may be STOP again, that's fine).
 		assert_object(root.current_results[0]).is_not_null()
+
+
+# ---------------------------------------------------------------------------
+# Auto-bank when no reroll options remain
+# ---------------------------------------------------------------------------
+
+func test_auto_bank_when_all_dice_kept_and_reroll_pressed() -> void:
+	## Pressing Reroll when every die is kept should auto-bank instead of
+	## showing a dead-end message.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	# Force all dice to kept + locked scoring faces.
+	for i: int in GameManager.dice_pool.size():
+		var face := DiceFaceData.new()
+		face.type = DiceFaceData.FaceType.NUMBER
+		face.value = 2
+		root.current_results[i] = face
+		root.dice_keep[i] = true
+		root.dice_keep_locked[i] = true
+		root.dice_stopped[i] = false
+	root._sync_all_dice()
+	root._sync_ui()
+
+	var score_before: int = GameManager.total_score
+
+	# Press Reroll — should auto-bank since nothing can be rerolled.
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+
+	assert_int(root.turn_state).is_equal(RollPhase.TurnState.BANKED)
+	assert_int(GameManager.total_score).is_greater(score_before)
+
+
+func test_auto_bank_score_correct_when_all_kept() -> void:
+	## Auto-bank from all-kept should bank the correct score (2 × 5 = 10).
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	for i: int in GameManager.dice_pool.size():
+		var face := DiceFaceData.new()
+		face.type = DiceFaceData.FaceType.NUMBER
+		face.value = 2
+		root.current_results[i] = face
+		root.dice_keep[i] = true
+		root.dice_keep_locked[i] = true
+		root.dice_stopped[i] = false
+	root._sync_all_dice()
+	root._sync_ui()
+
+	GameManager.total_score = 0
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+
+	# 5 dice × value 2 = 10
+	assert_int(GameManager.total_score).is_equal(2 * GameManager.dice_pool.size())

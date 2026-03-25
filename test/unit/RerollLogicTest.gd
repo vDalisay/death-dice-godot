@@ -137,6 +137,42 @@ func test_turn2_busts_at_threshold() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Auto-bank when no reroll options remain
+# ---------------------------------------------------------------------------
+
+func test_empty_reroll_set_triggers_auto_bank() -> void:
+	## When compute_reroll_set returns all-false, auto-bank should fire.
+	var stopped: Array[bool]     = [false, false, false, false, false]
+	var keep: Array[bool]        = [true,  true,  true,  true,  true]
+	var keep_locked: Array[bool] = [true,  true,  true,  true,  true]
+
+	var should_reroll: Array[bool] = _compute_reroll_set(stopped, keep, keep_locked)
+	var any_rerollable: bool = false
+	for r: bool in should_reroll:
+		if r:
+			any_rerollable = true
+			break
+	# No dice to reroll → auto-bank condition met.
+	assert_bool(any_rerollable).is_false()
+
+
+func test_mixed_kept_and_stopped_still_has_rerolls() -> void:
+	## If some dice are stopped (not kept), rerolls still exist → no auto-bank.
+	var stopped: Array[bool]     = [true,  false, false]
+	var keep: Array[bool]        = [false, true,  true]
+	var keep_locked: Array[bool] = [false, true,  true]
+
+	var should_reroll: Array[bool] = _compute_reroll_set(stopped, keep, keep_locked)
+	var any_rerollable: bool = false
+	for r: bool in should_reroll:
+		if r:
+			any_rerollable = true
+			break
+	# Die 0 is stopped but not kept → still rerollable → no auto-bank.
+	assert_bool(any_rerollable).is_true()
+
+
+# ---------------------------------------------------------------------------
 # Mirror functions (same algorithms as RollPhase.gd)
 # ---------------------------------------------------------------------------
 

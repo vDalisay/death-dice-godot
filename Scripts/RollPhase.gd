@@ -133,7 +133,8 @@ func _reroll_selected_dice() -> void:
 		current_results[i] = GameManager.dice_pool[i].roll()
 		rerolled.append(i)
 	if rerolled.is_empty():
-		hud.show_status("All dice are kept — Bank your score or start a new turn.")
+		# No dice to reroll — all are kept/locked, so auto-bank.
+		_on_bank_pressed()
 		return
 	_process_roll_results(rerolled)
 
