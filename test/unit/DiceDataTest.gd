@@ -74,29 +74,46 @@ func test_lucky_d6_name() -> void:
 # Upgrade system
 # ---------------------------------------------------------------------------
 
-func test_upgrade_weakest_face_upgrades_stop() -> void:
+func test_upgrade_weakest_face_preserves_last_stop() -> void:
 	var die: DiceData = DiceData.make_standard_d6()
-	# Standard die has a STOP face — that's the weakest.
+	# Standard die has only 1 STOP — balance invariant protects it.
+	# Weakest upgradeable face is BLANK → NUMBER 1.
 	var result: bool = die.upgrade_weakest_face()
 	assert_bool(result).is_true()
-	# After upgrade, the former STOP should now be BLANK.
 	var has_stop: bool = false
+	var blank_count: int = 0
 	for face: DiceFaceData in die.faces:
 		if face.type == DiceFaceData.FaceType.STOP:
 			has_stop = true
-	assert_bool(has_stop).is_false()
+		if face.type == DiceFaceData.FaceType.BLANK:
+			blank_count += 1
+	# STOP is preserved, BLANK was upgraded away.
+	assert_bool(has_stop).is_true()
+	assert_int(blank_count).is_equal(0)
+
+
+func test_upgrade_removes_stop_when_multiple_exist() -> void:
+	# Runner die has 2 STOPs — one can be removed.
+	var die: DiceData = DiceData.make_runner_d6()
+	var result: bool = die.upgrade_weakest_face()
+	assert_bool(result).is_true()
+	var stop_count: int = 0
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.STOP:
+			stop_count += 1
+	assert_int(stop_count).is_equal(1)
 
 
 func test_upgrade_weakest_face_twice() -> void:
 	var die: DiceData = DiceData.make_standard_d6()
-	die.upgrade_weakest_face()  # STOP → BLANK
-	die.upgrade_weakest_face()  # One of the BLANKs → NUMBER(1)
+	die.upgrade_weakest_face()  # BLANK → NUMBER(1) (STOP protected)
+	die.upgrade_weakest_face()  # Weakest NUMBER(1) → NUMBER(2)
 	var blank_count: int = 0
 	for face: DiceFaceData in die.faces:
 		if face.type == DiceFaceData.FaceType.BLANK:
 			blank_count += 1
-	# Started with 1 BLANK + gained 1 from STOP upgrade, then lost 1 = 1 BLANK remaining.
-	assert_int(blank_count).is_equal(1)
+	# BLANK was already upgraded in first pass; no blanks remain.
+	assert_int(blank_count).is_equal(0)
 
 
 func test_face_power_ordering() -> void:

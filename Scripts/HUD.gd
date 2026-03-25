@@ -19,6 +19,7 @@ func _ready() -> void:
 	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
+	GameManager.loop_advanced.connect(_on_loop_advanced)
 	SaveManager.highscore_changed.connect(_on_highscore_changed)
 	_on_score_changed(GameManager.total_score)
 	_on_lives_changed(GameManager.lives)
@@ -61,9 +62,13 @@ func _on_run_ended() -> void:
 func _on_stage_cleared() -> void:
 	show_status("STAGE CLEARED!", Color(0.3, 0.9, 0.3))
 
+func _on_loop_advanced(_new_loop: int) -> void:
+	_refresh_stage_display()
+
 func _on_highscore_changed(new_highscore: int) -> void:
 	highscore_label.text = "Highscore: %d" % new_highscore
 
 func _refresh_stage_display() -> void:
-	stage_label.text = "Stage: %d / %d" % [GameManager.current_stage, GameManager.STAGES_PER_RUN]
+	var loop_text: String = " (Loop %d)" % GameManager.current_loop if GameManager.current_loop > 1 else ""
+	stage_label.text = "Stage: %d / %d%s" % [GameManager.current_stage, GameManager.get_stages_in_current_loop(), loop_text]
 	target_label.text = "Target: %d" % GameManager.stage_target_score
