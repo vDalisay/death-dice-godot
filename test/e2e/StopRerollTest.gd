@@ -149,6 +149,7 @@ func test_manual_pickup_then_reroll() -> void:
 	root.current_results[0] = stop_face
 	root.dice_stopped[0] = true
 	root.dice_keep[0] = false
+	root.dice_keep_locked[0] = false
 	root._sync_all_dice()
 
 	# Simulate clicking the stopped die to pick it up (toggle signal).
@@ -341,3 +342,103 @@ func test_auto_bank_score_correct_when_all_kept() -> void:
 
 	# 5 dice × value 2 = 10
 	assert_int(GameManager.total_score).is_equal(2 * GameManager.dice_pool.size())
+
+
+# ---------------------------------------------------------------------------
+# Accumulated stops across rerolls
+# ---------------------------------------------------------------------------
+
+func test_stops_accumulate_across_rerolls() -> void:
+	## Stops from roll 1 should persist and add to stops from roll 2.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+	var pool_size: int = GameManager.dice_pool.size()
+
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	# Force: die 0 = STOP, die 1..N = NUMBER (kept so they won't reroll).
+	var stop_face := DiceFaceData.new()
+	stop_face.type = DiceFaceData.FaceType.STOP
+	stop_face.value = 0
+	root.current_results[0] = stop_face
+	root.dice_stopped[0] = true
+	root.dice_keep[0] = false
+
+	for i: int in range(1, pool_size):
+		var num_face := DiceFaceData.new()
+		num_face.type = DiceFaceData.FaceType.NUMBER
+		num_face.value = 1
+		root.current_results[i] = num_face
+		root.dice_stopped[i] = false
+		root.dice_keep[i] = true
+		root.dice_keep_locked[i] = true
+
+	root._sync_all_dice()
+	root._sync_ui()
+
+	# Verify 1 stop showing in UI state.
+	assert_int(root._count_stops()).is_equal(1)
+
+	# Now force die 0 to be picked up and prepare a reroll that lands STOP again.
+	# Simulate: die 0 picked up, then rerolled, lands STOP again.
+	root.dice_stopped[0] = false
+	root.dice_keep[0] = false
+	root.dice_keep_locked[0] = false
+
+	# Manually reroll die 0 by forcing STOP result again.
+	root.current_results[0] = stop_face
+	root.dice_stopped[0] = true
+
+	# The accumulated stop count should be 1 (only 1 die is currently stopped).
+	assert_int(root._count_stops()).is_equal(1)
+
+
+func test_accumulated_stops_cause_bust_on_turn_2() -> void:
+	## With enough accumulated stops, turn 2+ should bust.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+	var pool_size: int = GameManager.dice_pool.size()
+
+	# Roll to get to ACTIVE state.
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	# Force all dice to NUMBER, none stopped — clean slate.
+	for i: int in pool_size:
+		var num_face := DiceFaceData.new()
+		num_face.type = DiceFaceData.FaceType.NUMBER
+		num_face.value = 1
+		root.current_results[i] = num_face
+		root.dice_stopped[i] = false
+		root.dice_keep[i] = false
+		root.dice_keep_locked[i] = false
+	root._sync_all_dice()
+
+	# Force 4 dice to STOP (threshold is 4 for turn 2-3).
+	var stops_needed: int = mini(4, pool_size)
+	for i: int in stops_needed:
+		var stop_face := DiceFaceData.new()
+		stop_face.type = DiceFaceData.FaceType.STOP
+		stop_face.value = 0
+		root.current_results[i] = stop_face
+		root.dice_stopped[i] = true
+		root.dice_keep[i] = false
+
+	# Ensure we're past turn 1
+	root.turn_number = 2
+
+	# Process results with accumulated stops — should bust.
+	var rolled: Array[int] = []
+	for i: int in pool_size:
+		rolled.append(i)
+	root._process_roll_results(rolled)
+	await runner.simulate_frames(2)
+
+	assert_int(root.turn_state).is_equal(RollPhase.TurnState.BUST)

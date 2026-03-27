@@ -212,3 +212,41 @@ func _get_bust_threshold(turn: int) -> int:
 
 func _should_bust(turn: int, stops: int, threshold: int) -> bool:
 	return stops >= threshold and turn > 1
+
+
+# ---------------------------------------------------------------------------
+# Accumulated stops across rerolls
+# ---------------------------------------------------------------------------
+
+func test_accumulated_stops_bust_at_threshold() -> void:
+	## With accumulated stops >= threshold on turn 2+, should bust.
+	var turn: int = 2
+	var accumulated_stops: int = 4
+	var threshold: int = _get_bust_threshold(turn)  # 4
+	assert_bool(_should_bust(turn, accumulated_stops, threshold)).is_true()
+
+
+func test_accumulated_stops_below_threshold_no_bust() -> void:
+	## Accumulated stops below threshold should not bust.
+	var turn: int = 2
+	var accumulated_stops: int = 3
+	var threshold: int = _get_bust_threshold(turn)  # 4
+	assert_bool(_should_bust(turn, accumulated_stops, threshold)).is_false()
+
+
+func test_accumulated_stops_with_shields_no_bust() -> void:
+	## Shields reduce effective stop count below threshold.
+	var accumulated_stops: int = 4
+	var shields: int = 2
+	var effective: int = maxi(0, accumulated_stops - shields)  # 2
+	var threshold: int = _get_bust_threshold(2)  # 4
+	assert_bool(_should_bust(2, effective, threshold)).is_false()
+
+
+func test_accumulated_stops_with_shields_still_bust() -> void:
+	## Shields not enough — still bust.
+	var accumulated_stops: int = 5
+	var shields: int = 1
+	var effective: int = maxi(0, accumulated_stops - shields)  # 4
+	var threshold: int = _get_bust_threshold(2)  # 4
+	assert_bool(_should_bust(2, effective, threshold)).is_true()
