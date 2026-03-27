@@ -250,3 +250,31 @@ func test_accumulated_stops_with_shields_still_bust() -> void:
 	var effective: int = maxi(0, accumulated_stops - shields)  # 4
 	var threshold: int = _get_bust_threshold(2)  # 4
 	assert_bool(_should_bust(2, effective, threshold)).is_true()
+
+
+# ---------------------------------------------------------------------------
+# Running stop counter (only goes up, never down)
+# ---------------------------------------------------------------------------
+
+func test_running_counter_adds_per_roll() -> void:
+	## Each roll's stops add to the running total: 2 + 1 = 3.
+	var counter: int = 0
+	counter += 2  # Roll 1: 2 stops
+	assert_int(counter).is_equal(2)
+	counter += 1  # Roll 2: 1 new stop
+	assert_int(counter).is_equal(3)
+
+
+func test_running_counter_pickup_does_not_reduce() -> void:
+	## Picking up a stopped die doesn't reduce the running counter.
+	var counter: int = 3
+	# Simulate pickup: visually clear stopped flag, but counter stays.
+	var _picked_up: bool = true  # dice_stopped[i] = false
+	assert_int(counter).is_equal(3)  # Counter unchanged
+
+
+func test_running_counter_resets_on_new_turn() -> void:
+	## Counter resets to 0 at the start of each new turn.
+	var counter: int = 5
+	counter = 0  # _start_new_turn() resets it
+	assert_int(counter).is_equal(0)

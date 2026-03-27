@@ -24,6 +24,10 @@ var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
 
+## Running total of STOP faces rolled this turn. Only increases; resets on
+## bank, bust, or new turn. Used for the accumulated bust check.
+var accumulated_stop_count: int = 0
+
 var _run_active: bool = true
 var _loop_complete_pending: bool = false
 
@@ -45,6 +49,7 @@ func _ready() -> void:
 func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
 	turn_number += 1
+	accumulated_stop_count = 0
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
@@ -164,10 +169,10 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
 
-	# Accumulated bust check: total stops across all rolls, offset by shields
-	var total_stop_count: int = _count_stops()
+	# Accumulated bust check: add new stops from this roll to running total
+	accumulated_stop_count += _count_stops_in(rolled_indices)
 	var shield_count: int = _count_shields()
-	var effective_stops: int = maxi(0, total_stop_count - shield_count)
+	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
 	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
@@ -293,6 +298,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			elif face.type == DiceFaceData.FaceType.STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
+				accumulated_stop_count += 1
 			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
@@ -339,9 +345,8 @@ func _sync_all_dice() -> void:
 		dice_tray.update_die(i, current_results[i], _die_visual_state(i))
 
 func _sync_ui() -> void:
-	var stop_count: int = _count_stops()
 	var shield_count: int = _count_shields()
-	var effective_stops: int = maxi(0, stop_count - shield_count)
+	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var turn_score: int = _calculate_turn_score()
 	hud.update_turn(turn_score, effective_stops, _get_bust_threshold())
 	_sync_buttons()

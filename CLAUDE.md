@@ -41,7 +41,7 @@ Start Run
 - Player sees all results simultaneously.
 - Player selects any dice to reroll (hold/keep others).
 - **Stop faces**: landing STOP shows the die red, but the player CAN pick it up and reroll it. Stops are NOT permanent.
-- **Accumulated bust check**: stops accumulate across all rolls in a turn. If total stops (minus shields) ≥ bust threshold → bust. Picking up a stopped die removes it from the count.
+- **Running stop counter**: a running total of STOP faces rolled this turn. Each new STOP adds to the counter; picking up a stopped die does NOT reduce it. Counter resets to 0 on bank, bust, or new turn. If counter (minus shields) ≥ bust threshold → bust.
 - **Shield faces**: absorb stops during bust check (reduce effective stop count).
 - **Explode faces**: score their value AND immediately chain-reroll the die. If EXPLODE lands again, chains continue.
 - Rerolling is free but risky — stops build up across rerolls.
@@ -108,7 +108,7 @@ death-dice/
 The full game loop is implemented and playable:
 - **Roll phase**: roll all dice → view results → select keep/reroll → reroll → repeat until bank or bust.
 - **Bust protection**: turn 1 is immune; turns 2-3 have lenient threshold (4); turns 4+ standard (3).
-- **Accumulated bust check**: stops accumulate across all rolls in a turn. Total stops minus shields checked against threshold.
+- **Running stop counter**: every STOP rolled adds to a running total for the turn. Picking up a die does NOT reduce the counter. Counter resets on bank/bust/new turn. Bust check uses this counter minus shields against threshold.
 - **Rerollable stops**: STOP faces show red but player can click to pick them up and reroll. Cubitos-style informed risk.
 - **Shield mechanic**: SHIELD faces auto-keep and absorb stops during bust check (reduces effective stop count).
 - **Multiplier mechanic**: MULTIPLY faces auto-keep and multiply the entire turn score when banking.
