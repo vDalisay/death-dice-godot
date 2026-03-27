@@ -164,10 +164,10 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
 
-	# Per-roll bust check: only count stops from THIS roll, offset by shields
-	var roll_stop_count: int = _count_stops_in(rolled_indices)
+	# Accumulated bust check: total stops across all rolls, offset by shields
+	var total_stop_count: int = _count_stops()
 	var shield_count: int = _count_shields()
-	var effective_stops: int = maxi(0, roll_stop_count - shield_count)
+	var effective_stops: int = maxi(0, total_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
 	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
@@ -181,8 +181,9 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if turn_number == 1 and effective_stops >= threshold:
 		hud.show_status("Close call! Turn 1 — no bust this time.", Color(1.0, 0.85, 0.0))
 
-	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > effective_stops:
-		var shielded: int = roll_stop_count - effective_stops
+	var roll_stop_count: int = _count_stops_in(rolled_indices)
+	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > maxi(0, roll_stop_count - shield_count):
+		var shielded: int = roll_stop_count - maxi(0, roll_stop_count - shield_count)
 		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
 
 	# Handle EXPLODE chain re-rolls (free extra rolls, not counted toward bust)
