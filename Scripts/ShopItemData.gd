@@ -87,7 +87,7 @@ static func make_buy_blank_canvas_die() -> ShopItemData:
 static func make_buy_pink_die() -> ShopItemData:
 	var item := ShopItemData.new()
 	item.item_name = "Pink Die"
-	item.description = "Multiplies the die on the left. (←×2, ←×2, STOP×3, —)"
+	item.description = "Multiplies ANY face on the die to its left. (←×2, ←×2, STOP×3, —)"
 	item.cost = 45
 	item.item_type = ItemType.BUY_PINK_DIE
 	return item

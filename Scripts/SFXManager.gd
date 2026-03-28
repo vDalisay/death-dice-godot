@@ -23,8 +23,14 @@ func play_roll() -> void:
 
 
 func play_bank() -> void:
-	_play_tone(523.0, 0.12, 0.7)
-	_play_tone_delayed(659.0, 0.12, 0.7, 0.06)
+	_play_tone(523.0, 0.1, 0.7)
+	_play_tone_delayed(659.0, 0.1, 0.7, 0.06)
+	_play_tone_delayed(784.0, 0.12, 0.8, 0.12)
+	_play_tone_delayed(1047.0, 0.18, 0.9, 0.20)
+
+
+func play_score_tick() -> void:
+	_play_tone(880.0, 0.04, 0.35)
 
 
 func play_bust() -> void:

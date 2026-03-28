@@ -48,6 +48,10 @@ func show_chain_label(index: int, depth: int) -> void:
 	_buttons[index].show_chain_label(depth)
 
 
+func show_score_popup(index: int, value: int) -> void:
+	_buttons[index].show_score_popup(value)
+
+
 func reset_all() -> void:
 	for btn: DieButton in _buttons:
 		btn.setup(btn.die_index)

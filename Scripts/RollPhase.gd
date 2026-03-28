@@ -4,6 +4,8 @@ extends Control
 ## Owns dice logic. Delegates visuals to DiceTray and HUD.
 
 const BASE_BUST_THRESHOLD: int = 3
+const AUTO_ADVANCE_DELAY: float = 1.5
+const MAX_SCORE_ANIM_DURATION: float = 2.0
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -74,30 +76,23 @@ func _on_roll_pressed() -> void:
 			_roll_all_dice()
 		TurnState.ACTIVE:
 			_reroll_selected_dice()
-		TurnState.BUST, TurnState.BANKED:
-			_start_new_turn()
 
 func _on_bank_pressed() -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
-	# Pop all scoring dice.
-	for i: int in GameManager.dice_pool.size():
-		if dice_stopped[i]:
-			continue
-		var face: DiceFaceData = current_results[i]
-		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT):
-			dice_tray.pop_die(i)
+	turn_state = TurnState.BANKED
 	var banked: int = _calculate_turn_score()
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
-	turn_state = TurnState.BANKED
 	var mult: int = _get_turn_multiplier()
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
 	hud.show_status("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score], Color(0.3, 0.9, 0.3))
-	hud.animate_score_count(old_total, GameManager.total_score)
-	hud.show_floating_gold(banked)
 	SFXManager.play_bank()
+	# Per-die score count-up animation, then total score tween.
+	_play_score_count_animation(old_total, GameManager.total_score)
 	_sync_buttons()
+	# Auto-advance to next turn after a delay.
+	_schedule_auto_advance()
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	if turn_state != TurnState.ACTIVE:
@@ -195,6 +190,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		GameManager.lose_life()
 		SFXManager.play_bust()
 		_show_bust_overlay(effective_stops)
+		_sync_buttons()
+		_schedule_auto_advance()
 	else:
 		turn_state = TurnState.ACTIVE
 
@@ -464,9 +461,95 @@ func _sync_buttons() -> void:
 			roll_button.disabled = false
 			bank_button.disabled = false
 		TurnState.BUST, TurnState.BANKED:
-			roll_button.text     = "New Turn"
-			roll_button.disabled = false
+			roll_button.text     = "Roll All"
+			roll_button.disabled = true
 			bank_button.disabled = true
+
+# ---------------------------------------------------------------------------
+# Auto-advance & per-die score animation
+# ---------------------------------------------------------------------------
+
+func _schedule_auto_advance() -> void:
+	if not _run_active:
+		return
+	get_tree().create_timer(AUTO_ADVANCE_DELAY).timeout.connect(
+		func() -> void:
+			if turn_state == TurnState.BANKED or turn_state == TurnState.BUST:
+				_start_new_turn()
+	)
+
+
+## Play left-to-right per-die score popups, then the total score tween.
+func _play_score_count_animation(old_total: int, new_total: int) -> void:
+	var pool_size: int = GameManager.dice_pool.size()
+	var per_die: Array[int] = _get_per_die_scores()
+
+	# Compute which dice have a non-zero contribution.
+	var scoring_indices: Array[int] = []
+	for i: int in pool_size:
+		if per_die[i] > 0:
+			scoring_indices.append(i)
+
+	if scoring_indices.is_empty():
+		hud.animate_score_count(old_total, new_total)
+		hud.show_floating_gold(new_total - old_total)
+		return
+
+	# Time per die: never exceed MAX_SCORE_ANIM_DURATION total.
+	var interval: float = minf(0.15, MAX_SCORE_ANIM_DURATION / float(scoring_indices.size()))
+	var tween: Tween = create_tween()
+	var running: int = old_total
+	for idx: int in scoring_indices.size():
+		var die_i: int = scoring_indices[idx]
+		var die_score: int = per_die[die_i]
+		var new_running: int = running + die_score
+		var _old: int = running
+		var _new: int = new_running
+		tween.tween_callback(func() -> void:
+			dice_tray.show_score_popup(die_i, die_score)
+			dice_tray.pop_die(die_i)
+			SFXManager.play_score_tick()
+			hud.animate_score_count(_old, _new)
+		).set_delay(interval)
+		running = new_running
+	# After all per-die popups, show floating gold.
+	tween.tween_callback(func() -> void:
+		hud.show_floating_gold(new_total - old_total)
+	).set_delay(interval)
+
+
+## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).
+func _get_per_die_scores() -> Array[int]:
+	var pool_size: int = GameManager.dice_pool.size()
+	var base_scores: Array[int] = []
+	base_scores.resize(pool_size)
+	base_scores.fill(0)
+	var multiplier: int = 1
+	for i: int in pool_size:
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face == null:
+			continue
+		match face.type:
+			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+				base_scores[i] = face.value
+			DiceFaceData.FaceType.MULTIPLY:
+				multiplier *= face.value
+	for i: int in pool_size:
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face == null:
+			continue
+		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT and i > 0 and not dice_stopped[i - 1]:
+			base_scores[i - 1] *= face.value
+	# Apply global multiplier to each die's individual contribution.
+	var result: Array[int] = []
+	result.resize(pool_size)
+	for i: int in pool_size:
+		result[i] = base_scores[i] * multiplier
+	return result
 
 # ---------------------------------------------------------------------------
 # Juice overlays

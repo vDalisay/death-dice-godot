@@ -75,6 +75,22 @@ func _set_random_glyph() -> void:
 	text = TUMBLE_GLYPHS[randi() % TUMBLE_GLYPHS.size()]
 
 
+## Show a floating score popup above this die (e.g. "+5").
+func show_score_popup(value: int) -> void:
+	var lbl: Label = Label.new()
+	lbl.text = "+%d" % value
+	lbl.add_theme_font_size_override("font_size", 20)
+	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 0.4))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(-5, -25)
+	add_child(lbl)
+	pop()
+	var tween: Tween = lbl.create_tween()
+	tween.tween_property(lbl, "position:y", lbl.position.y - 35.0, 0.6).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN).set_delay(0.2)
+	tween.tween_callback(lbl.queue_free)
+
+
 ## Show a floating chain label above this die (e.g. "CHAIN x2!").
 func show_chain_label(depth: int) -> void:
 	var lbl: Label = Label.new()
