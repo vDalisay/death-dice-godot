@@ -31,3 +31,8 @@ func test_all_items_have_descriptions() -> void:
 	]
 	for item: ShopItemData in items:
 		assert_str(item.description).is_not_empty()
+
+
+func test_pink_die_description_mentions_any_face() -> void:
+	var item: ShopItemData = ShopItemData.make_buy_pink_die()
+	assert_str(item.description).contains("ANY")
