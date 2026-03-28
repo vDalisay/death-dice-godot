@@ -123,6 +123,12 @@ The full game loop is implemented and playable:
 - **Dice pool growth**: pool starts at 5 dice, grows via shop purchases between stages.
 - **Save system**: runs persisted to disk with highscore, stages_cleared, and loops_completed tracking.
 - **New Run button**: appears on game over; saves run and resets.
+- **Hot Streak bonus**: 3 consecutive banks without bust = x1.1 score; 5+ = x1.2. Resets on bust or stage change.
+- **Jackpot clean sweep**: bank on first roll with 5+ dice and 0 stops = +25% gold bonus + "JACKPOT!" flash.
+- **Shop refresh**: "Refresh Shop (5g)" button re-generates shop items. Mini gambling loop.
+- **Upgrade face preview**: Empower Die row shows candidate dice and their weakest face.
+- **Personal best turn score**: tracked in GameManager; "NEW BEST TURN!" flash when beaten.
+- **Bust risk indicator**: after each roll, HUD shows "Bust risk: LOW / MEDIUM / HIGH" based on stop count vs threshold.
 
 ## Roadmap (rough)
 

@@ -179,3 +179,17 @@ func test_dice_pool_starts_empty_without_ready() -> void:
 func test_add_dice() -> void:
 	_gm.add_dice(DiceData.make_standard_d6())
 	assert_int(_gm.dice_pool.size()).is_equal(1)
+
+
+# ---------------------------------------------------------------------------
+# Best turn score
+# ---------------------------------------------------------------------------
+
+func test_best_turn_score_starts_at_zero() -> void:
+	assert_int(_gm.best_turn_score).is_equal(0)
+
+
+func test_best_turn_score_resets_on_run_reset() -> void:
+	_gm.best_turn_score = 42
+	_gm.reset_run()
+	assert_int(_gm.best_turn_score).is_equal(0)

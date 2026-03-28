@@ -6,6 +6,7 @@ extends PanelContainer
 signal shop_closed()
 
 const ITEM_FONT_SIZE: int = 18
+const REFRESH_COST: int = 5
 
 @onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var _gold_label: Label = $MarginContainer/VBoxContainer/GoldLabel
@@ -15,6 +16,7 @@ const ITEM_FONT_SIZE: int = 18
 
 var _items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
+var _refresh_button: Button = null
 
 
 func _ready() -> void:
@@ -76,7 +78,11 @@ func _build_item_rows() -> void:
 		name_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
 		info.add_child(name_label)
 		var desc_label := Label.new()
-		desc_label.text = item.description
+		# Upgrade face preview: show which face on which die will be upgraded.
+		if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
+			desc_label.text = _get_upgrade_preview()
+		else:
+			desc_label.text = item.description
 		desc_label.add_theme_font_size_override("font_size", 14)
 		desc_label.modulate = Color(0.7, 0.7, 0.7)
 		info.add_child(desc_label)
@@ -91,6 +97,14 @@ func _build_item_rows() -> void:
 		_buy_buttons.append(buy_btn)
 
 		_items_container.add_child(row)
+
+	# Refresh shop button at bottom of items.
+	_refresh_button = Button.new()
+	_refresh_button.text = "Refresh Shop (%dg)" % REFRESH_COST
+	_refresh_button.custom_minimum_size = Vector2(180, 40)
+	_refresh_button.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
+	_refresh_button.pressed.connect(_on_refresh_pressed)
+	_items_container.add_child(_refresh_button)
 
 
 # ---------------------------------------------------------------------------
@@ -154,3 +168,40 @@ func _refresh_buy_buttons() -> void:
 	for i: int in _buy_buttons.size():
 		if i < _items.size():
 			_buy_buttons[i].disabled = GameManager.gold < _items[i].cost
+	if _refresh_button != null:
+		_refresh_button.disabled = GameManager.gold < REFRESH_COST
+
+
+func _on_refresh_pressed() -> void:
+	if not GameManager.spend_gold(REFRESH_COST):
+		return
+	SFXManager.play_shop_refresh()
+	_generate_items()
+	_refresh_display()
+
+
+## Preview which face and die would be upgraded by Empower Die.
+func _get_upgrade_preview() -> String:
+	if GameManager.dice_pool.is_empty():
+		return "No dice to upgrade."
+	# Find die with the weakest face (mimics _upgrade_random_die's random pick,
+	# but for preview we show ALL eligible dice's weakest face).
+	var previews: Array[String] = []
+	for die: DiceData in GameManager.dice_pool:
+		var worst_index: int = -1
+		var worst_power: int = 999
+		for i: int in die.faces.size():
+			var power: int = die._face_power(die.faces[i])
+			if power < worst_power:
+				if die.faces[i].type == DiceFaceData.FaceType.STOP and die._count_stop_faces() <= 1:
+					continue
+				worst_power = power
+				worst_index = i
+		if worst_index >= 0:
+			var face_text: String = die.faces[worst_index].get_display_text()
+			var preview: String = "%s [%s]" % [die.dice_name, face_text]
+			if preview not in previews:
+				previews.append(preview)
+	if previews.is_empty():
+		return "No upgradeable faces."
+	return "Will upgrade a random die. Candidates: %s" % ", ".join(previews)

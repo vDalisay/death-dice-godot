@@ -62,6 +62,25 @@ func play_shop_purchase() -> void:
 	_play_tone_delayed(554.0, 0.08, 0.5, 0.06)
 
 
+func play_jackpot() -> void:
+	_play_tone(523.0, 0.1, 0.8)
+	_play_tone_delayed(659.0, 0.1, 0.8, 0.08)
+	_play_tone_delayed(784.0, 0.1, 0.8, 0.16)
+	_play_tone_delayed(1047.0, 0.2, 0.9, 0.24)
+	_play_tone_delayed(1319.0, 0.25, 1.0, 0.34)
+
+
+func play_personal_best() -> void:
+	_play_tone(698.0, 0.1, 0.7)
+	_play_tone_delayed(880.0, 0.12, 0.8, 0.1)
+	_play_tone_delayed(1047.0, 0.18, 0.9, 0.2)
+
+
+func play_shop_refresh() -> void:
+	_play_tone(330.0, 0.06, 0.4)
+	_play_tone_delayed(440.0, 0.06, 0.4, 0.05)
+
+
 # ---------------------------------------------------------------------------
 # Internal
 # ---------------------------------------------------------------------------

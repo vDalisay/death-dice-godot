@@ -27,6 +27,7 @@ var gold: int = 0
 var stage_target_score: int = BASE_STAGE_TARGET
 var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
+var best_turn_score: int = 0
 
 
 func _ready() -> void:
@@ -142,6 +143,7 @@ func reset_run() -> void:
 	total_stages_cleared = 0
 	lives = MAX_LIVES
 	gold = 0
+	best_turn_score = 0
 	stage_target_score = _calculate_stage_target(current_stage)
 	_build_starting_pool()
 	score_changed.emit(total_score)

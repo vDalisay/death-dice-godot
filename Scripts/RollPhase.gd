@@ -6,6 +6,12 @@ extends Control
 const BASE_BUST_THRESHOLD: int = 3
 const AUTO_ADVANCE_DELAY: float = 1.5
 const MAX_SCORE_ANIM_DURATION: float = 2.0
+const HOT_STREAK_TIER_1: int = 3
+const HOT_STREAK_TIER_2: int = 5
+const HOT_STREAK_MULT_1: float = 1.1
+const HOT_STREAK_MULT_2: float = 1.2
+const JACKPOT_MIN_DICE: int = 5
+const JACKPOT_GOLD_BONUS: float = 0.25
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -32,6 +38,8 @@ var accumulated_stop_count: int = 0
 
 var _run_active: bool = true
 var _loop_complete_pending: bool = false
+var bank_streak: int = 0
+var _reroll_count: int = 0
 
 func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
@@ -52,6 +60,7 @@ func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
 	turn_number += 1
 	accumulated_stop_count = 0
+	_reroll_count = 0
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
@@ -81,13 +90,34 @@ func _on_bank_pressed() -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
 	turn_state = TurnState.BANKED
-	var banked: int = _calculate_turn_score()
+	bank_streak += 1
+	var base_banked: int = _calculate_turn_score()
+	# Hot Streak multiplier: 3+ consecutive banks = x1.1, 5+ = x1.2.
+	var streak_mult: float = _get_streak_multiplier()
+	var banked: int = int(base_banked * streak_mult)
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
+	# Jackpot check: first roll only (no rerolls), 5+ dice, 0 stops.
+	var is_jackpot: bool = _reroll_count == 0 and GameManager.dice_pool.size() >= JACKPOT_MIN_DICE and accumulated_stop_count == 0
+	if is_jackpot:
+		var jackpot_gold: int = maxi(1, int(banked * JACKPOT_GOLD_BONUS))
+		GameManager.add_gold(jackpot_gold)
+		SFXManager.play_jackpot()
+		hud.show_status("JACKPOT! +%dg bonus!" % jackpot_gold, Color(1.0, 0.85, 0.0))
 	var mult: int = _get_turn_multiplier()
+	var status_parts: Array[String] = []
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
-	hud.show_status("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score], Color(0.3, 0.9, 0.3))
+	if streak_mult > 1.0:
+		status_parts.append("ON FIRE x%.1f" % streak_mult)
+	status_parts.append("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score])
+	if not is_jackpot:
+		hud.show_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
 	SFXManager.play_bank()
+	# Personal best turn score check.
+	if banked > GameManager.best_turn_score:
+		GameManager.best_turn_score = banked
+		hud.show_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
+		SFXManager.play_personal_best()
 	# Per-die score count-up animation, then total score tween.
 	_play_score_count_animation(old_total, GameManager.total_score)
 	_sync_buttons()
@@ -124,6 +154,7 @@ func _roll_all_dice() -> void:
 	_process_roll_results(indices)
 
 func _reroll_selected_dice() -> void:
+	_reroll_count += 1
 	# Lock all currently-kept dice permanently before rerolling.
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] and not dice_keep_locked[i]:
@@ -187,6 +218,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var threshold: int = _get_bust_threshold()
 	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
+		bank_streak = 0
 		GameManager.lose_life()
 		SFXManager.play_bust()
 		_show_bust_overlay(effective_stops)
@@ -355,6 +387,23 @@ func _get_bust_threshold() -> int:
 		return BASE_BUST_THRESHOLD + 1   # Lenient: 4
 	return BASE_BUST_THRESHOLD           # Standard: 3
 
+
+func _get_streak_multiplier() -> float:
+	if bank_streak >= HOT_STREAK_TIER_2:
+		return HOT_STREAK_MULT_2
+	elif bank_streak >= HOT_STREAK_TIER_1:
+		return HOT_STREAK_MULT_1
+	return 1.0
+
+
+func _get_bust_risk_text(effective_stops: int, threshold: int) -> String:
+	if effective_stops == 0:
+		return "Bust risk: LOW"
+	elif effective_stops >= threshold - 1:
+		return "Bust risk: HIGH"
+	else:
+		return "Bust risk: MEDIUM"
+
 func _die_visual_state(index: int) -> DieButton.DieState:
 	var face: DiceFaceData = current_results[index]
 	if face == null:
@@ -388,7 +437,13 @@ func _sync_ui() -> void:
 		TurnState.IDLE:
 			hud.show_status("Press 'Roll All' to begin your turn!")
 		TurnState.ACTIVE:
-			hud.show_status("Green = keep · Orange = reroll · Red = pick up to reroll")
+			var risk_text: String = _get_bust_risk_text(effective_stops, _get_bust_threshold())
+			var risk_color: Color = Color.WHITE
+			if effective_stops >= _get_bust_threshold() - 1 and effective_stops > 0:
+				risk_color = Color(0.9, 0.3, 0.3)
+			elif effective_stops > 0:
+				risk_color = Color(1.0, 0.7, 0.2)
+			hud.show_status(risk_text, risk_color)
 		TurnState.BUST:
 			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:
@@ -433,6 +488,7 @@ func _on_shop_closed() -> void:
 	_roll_content.visible = true
 	_run_active = true
 	turn_number = 0
+	bank_streak = 0
 	_start_new_turn()
 
 func _on_new_run_pressed() -> void:
@@ -441,6 +497,7 @@ func _on_new_run_pressed() -> void:
 	GameManager.reset_run()
 	_run_active = true
 	turn_number = 0
+	bank_streak = 0
 	new_run_button.visible = false
 	shop_panel.visible = false
 	_roll_content.visible = true
