@@ -39,6 +39,15 @@ func lock_die(index: int, state: DieButton.DieState) -> void:
 func pop_die(index: int) -> void:
 	_buttons[index].pop()
 
+
+func tumble_die(index: int, face: DiceFaceData, state: DieButton.DieState) -> void:
+	_buttons[index].tumble(face, state)
+
+
+func show_chain_label(index: int, depth: int) -> void:
+	_buttons[index].show_chain_label(depth)
+
+
 func reset_all() -> void:
 	for btn: DieButton in _buttons:
 		btn.setup(btn.die_index)

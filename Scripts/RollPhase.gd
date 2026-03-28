@@ -88,11 +88,15 @@ func _on_bank_pressed() -> void:
 		if face != null and (face.type == DiceFaceData.FaceType.NUMBER or face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT):
 			dice_tray.pop_die(i)
 	var banked: int = _calculate_turn_score()
+	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
 	turn_state = TurnState.BANKED
 	var mult: int = _get_turn_multiplier()
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
 	hud.show_status("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score], Color(0.3, 0.9, 0.3))
+	hud.animate_score_count(old_total, GameManager.total_score)
+	hud.show_floating_gold(banked)
+	SFXManager.play_bank()
 	_sync_buttons()
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
@@ -117,6 +121,7 @@ func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 # ---------------------------------------------------------------------------
 
 func _roll_all_dice() -> void:
+	SFXManager.play_roll()
 	var indices: Array[int] = []
 	for i: int in GameManager.dice_pool.size():
 		current_results[i] = GameManager.dice_pool[i].roll()
@@ -128,6 +133,7 @@ func _reroll_selected_dice() -> void:
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] and not dice_keep_locked[i]:
 			dice_keep_locked[i] = true
+	SFXManager.play_roll()
 	var rerolled: Array[int] = []
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] or dice_keep_locked[i]:
@@ -158,16 +164,26 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
-				dice_tray.pop_die(i)
 			DiceFaceData.FaceType.EXPLODE:
 				# EXPLODE: score its value AND chain-reroll this die
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
-				dice_tray.pop_die(i)
 				chain_reroll.append(i)
 			_:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
+
+	# Tumble animation for rolled dice; pop auto-kept dice after tumble.
+	for i: int in rolled_indices:
+		dice_tray.tumble_die(i, current_results[i], _die_visual_state(i))
+	for i: int in rolled_indices:
+		var face: DiceFaceData = current_results[i]
+		if face == null:
+			continue
+		if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
+				or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
+				or face.type == DiceFaceData.FaceType.EXPLODE:
+			dice_tray.pop_die(i)
 
 	# Accumulated bust check: add new stops from this roll to running total
 	accumulated_stop_count += _count_stops_in(rolled_indices)
@@ -177,14 +193,28 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
 		GameManager.lose_life()
+		SFXManager.play_bust()
+		_show_bust_overlay(effective_stops)
 	else:
 		turn_state = TurnState.ACTIVE
 
-	_sync_all_dice()
+	# Sync non-rolled dice (rolled ones already have tumble animation).
+	for i: int in GameManager.dice_pool.size():
+		if i not in rolled_indices:
+			dice_tray.update_die(i, current_results[i], _die_visual_state(i))
 	_sync_ui()
 
-	if turn_number == 1 and effective_stops >= threshold:
-		hud.show_status("Close call! Turn 1 — no bust this time.", Color(1.0, 0.85, 0.0))
+	# Status messages based on roll outcome.
+	if turn_state == TurnState.BUST:
+		pass  # Bust overlay handles messaging.
+	elif turn_number == 1 and effective_stops >= threshold:
+		hud.show_status("CLOSE CALL! Turn 1 — no bust this time.", Color(1.0, 0.6, 0.0))
+	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
+		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
+		SFXManager.play_close_call()
+	elif effective_stops == 0 and rolled_indices.size() > 0:
+		hud.show_status("CLEAN ROLL! No stops!", Color(0.3, 1.0, 0.3))
+		SFXManager.play_clean_roll()
 
 	var roll_stop_count: int = _count_stops_in(rolled_indices)
 	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > maxi(0, roll_stop_count - shield_count):
@@ -293,26 +323,32 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				# Chain continues! Score and reroll again.
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
+				dice_tray.tumble_die(i, face, _die_visual_state(i))
 				dice_tray.pop_die(i)
+				dice_tray.show_chain_label(i, chain_depth)
 				next_chain.append(i)
 			elif face.type == DiceFaceData.FaceType.STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
 				accumulated_stop_count += 1
+				dice_tray.tumble_die(i, face, _die_visual_state(i))
 			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
+				dice_tray.tumble_die(i, face, _die_visual_state(i))
 				dice_tray.pop_die(i)
 			else:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
+				dice_tray.tumble_die(i, face, _die_visual_state(i))
 		to_reroll = next_chain
 
 	_sync_all_dice()
 	_sync_ui()
 
 	if chain_depth > 0:
-		hud.show_status("💥 Chain x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
+		SFXManager.play_explode()
+		hud.show_status("CHAIN x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
 
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
@@ -372,7 +408,11 @@ func _on_stage_cleared() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	GameManager.add_gold(GameManager.get_stage_clear_bonus())
+	var bonus: int = GameManager.get_stage_clear_bonus()
+	var surplus: int = GameManager.total_score - GameManager.stage_target_score
+	GameManager.add_gold(bonus)
+	SFXManager.play_stage_clear()
+	_show_stage_clear_overlay(bonus, surplus)
 	if GameManager.is_final_stage():
 		hud.show_status(
 			"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop, GameManager.current_loop + 1],
@@ -427,3 +467,71 @@ func _sync_buttons() -> void:
 			roll_button.text     = "New Turn"
 			roll_button.disabled = false
 			bank_button.disabled = true
+
+# ---------------------------------------------------------------------------
+# Juice overlays
+# ---------------------------------------------------------------------------
+
+func _show_bust_overlay(effective_stops: int) -> void:
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = Color(0.9, 0.1, 0.1, 0.0)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var lbl: Label = Label.new()
+	lbl.text = "BUST! -%d Life" % 1
+	lbl.add_theme_font_size_override("font_size", 48)
+	lbl.add_theme_color_override("font_color", Color.WHITE)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.modulate.a = 0.0
+	overlay.add_child(lbl)
+	add_child(overlay)
+	var tween: Tween = create_tween()
+	# Flash red background.
+	tween.tween_property(overlay, "color:a", 0.45, 0.15)
+	tween.tween_property(lbl, "modulate:a", 1.0, 0.1)
+	tween.tween_interval(1.2)
+	tween.tween_property(overlay, "color:a", 0.0, 0.4)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(overlay.queue_free)
+	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+
+
+func _show_stage_clear_overlay(bonus_gold: int, surplus: int) -> void:
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = Color(0.2, 0.8, 0.3, 0.0)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_CENTER)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	var title_lbl: Label = Label.new()
+	title_lbl.text = "STAGE CLEARED!"
+	title_lbl.add_theme_font_size_override("font_size", 42)
+	title_lbl.add_theme_color_override("font_color", Color.WHITE)
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var gold_lbl: Label = Label.new()
+	gold_lbl.text = "+%dg" % bonus_gold
+	gold_lbl.add_theme_font_size_override("font_size", 32)
+	gold_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+	gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var surplus_lbl: Label = Label.new()
+	surplus_lbl.text = "Surplus: +%d" % surplus if surplus > 0 else ""
+	surplus_lbl.add_theme_font_size_override("font_size", 24)
+	surplus_lbl.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
+	surplus_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title_lbl)
+	vbox.add_child(gold_lbl)
+	if surplus > 0:
+		vbox.add_child(surplus_lbl)
+	vbox.modulate.a = 0.0
+	overlay.add_child(vbox)
+	add_child(overlay)
+	var tween: Tween = create_tween()
+	tween.tween_property(overlay, "color:a", 0.35, 0.2)
+	tween.parallel().tween_property(vbox, "modulate:a", 1.0, 0.2)
+	tween.tween_interval(1.5)
+	tween.tween_property(overlay, "color:a", 0.0, 0.4)
+	tween.parallel().tween_property(vbox, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(overlay.queue_free)

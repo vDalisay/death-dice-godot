@@ -1,7 +1,7 @@
 class_name DieButton
 extends Button
 ## Visual representation of a single die. Owns its own colour, text,
-## toggle state, and pop animation. Emits `toggled_keep` when clicked.
+## toggle state, pop animation, and tumble reveal. Emits `toggled_keep` when clicked.
 
 signal toggled_keep(die_index: int, is_kept: bool)
 
@@ -9,6 +9,11 @@ enum DieState { UNROLLED, REROLLABLE, KEPT, KEEP_LOCKED, AUTO_KEPT, STOPPED }
 
 const POP_SCALE: Vector2 = Vector2(1.3, 1.3)
 const POP_DURATION: float = 0.25
+const TUMBLE_DURATION: float = 0.35
+const TUMBLE_TICKS: int = 6
+
+## All possible display strings cycled during the tumble animation.
+const TUMBLE_GLYPHS: Array[String] = ["1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "💥3"]
 
 const COLOR_UNROLLED: Color   = Color(0.6, 0.6, 0.6)
 const COLOR_REROLLABLE: Color = Color(1.0, 0.65, 0.2)   # Orange
@@ -20,6 +25,7 @@ const COLOR_STOPPED: Color    = Color(0.9, 0.2, 0.2)    # Red
 var die_index: int = -1
 var die_state: DieState = DieState.UNROLLED
 var custom_color: Color = Color.TRANSPARENT
+var _tumble_tween: Tween = null
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(90, 90)
@@ -51,6 +57,37 @@ func pop() -> void:
 	var tween: Tween = create_tween()
 	tween.tween_property(self, "scale", POP_SCALE, POP_DURATION).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "scale", Vector2.ONE, POP_DURATION).set_ease(Tween.EASE_IN)
+
+
+## Rapidly cycle random face glyphs then settle on the real result.
+func tumble(final_face: DiceFaceData, state: DieState) -> void:
+	if _tumble_tween and _tumble_tween.is_valid():
+		_tumble_tween.kill()
+	_tumble_tween = create_tween()
+	var interval: float = TUMBLE_DURATION / TUMBLE_TICKS
+	for tick: int in TUMBLE_TICKS:
+		_tumble_tween.tween_callback(_set_random_glyph).set_delay(interval)
+	_tumble_tween.tween_callback(show_face.bind(final_face, state))
+	_tumble_tween.tween_callback(pop)
+
+
+func _set_random_glyph() -> void:
+	text = TUMBLE_GLYPHS[randi() % TUMBLE_GLYPHS.size()]
+
+
+## Show a floating chain label above this die (e.g. "CHAIN x2!").
+func show_chain_label(depth: int) -> void:
+	var lbl: Label = Label.new()
+	lbl.text = "CHAIN x%d!" % depth
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.5, 0.0))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(-10, -30)
+	add_child(lbl)
+	var tween: Tween = lbl.create_tween()
+	tween.tween_property(lbl, "position:y", lbl.position.y - 40.0, 0.8).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.8).set_ease(Tween.EASE_IN).set_delay(0.3)
+	tween.tween_callback(lbl.queue_free)
 
 # ---------------------------------------------------------------------------
 # Internal

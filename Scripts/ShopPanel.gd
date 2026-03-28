@@ -100,6 +100,7 @@ func _build_item_rows() -> void:
 func _on_buy_pressed(item: ShopItemData) -> void:
 	if not GameManager.spend_gold(item.cost):
 		return
+	SFXManager.play_shop_purchase()
 	match item.item_type:
 		ShopItemData.ItemType.BUY_STANDARD_DIE:
 			GameManager.add_dice(DiceData.make_standard_d6())

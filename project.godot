@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 GameManager="*res://Scripts/GameManager.gd"
 SaveManager="*res://Scripts/SaveManager.gd"
+SFXManager="*res://Scripts/SFXManager.gd"
 
 [dotnet]
 

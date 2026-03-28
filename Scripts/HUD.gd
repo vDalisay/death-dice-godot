@@ -2,6 +2,9 @@ class_name HUD
 extends VBoxContainer
 ## Observes GameManager and RollPhase signals. Renders labels only — no game logic.
 
+const SCORE_COUNT_DURATION: float = 0.5
+const GOLD_FLOAT_DURATION: float = 1.0
+
 @onready var stage_label: Label      = $StageLabel
 @onready var lives_label: Label      = $LivesLabel
 @onready var gold_label: Label       = $GoldLabel
@@ -11,6 +14,8 @@ extends VBoxContainer
 @onready var stop_label: Label       = $StopLabel
 @onready var status_label: Label     = $StatusLabel
 @onready var highscore_label: Label  = $HighscoreLabel
+
+var _score_tween: Tween = null
 
 func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
@@ -39,6 +44,32 @@ func update_turn(turn_score: int, stop_count: int, bust_threshold: int) -> void:
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.text     = message
 	status_label.modulate = colour
+
+
+## Animate the score label counting from old_value to new_value over time.
+func animate_score_count(old_value: int, new_value: int) -> void:
+	if _score_tween and _score_tween.is_valid():
+		_score_tween.kill()
+	_score_tween = create_tween()
+	_score_tween.tween_method(
+		func(val: float) -> void: score_label.text = "Total Score: %d" % int(val),
+		float(old_value), float(new_value), SCORE_COUNT_DURATION
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+
+## Show a floating "+Ng" label that drifts up and fades out above the score label.
+func show_floating_gold(amount: int) -> void:
+	var lbl: Label = Label.new()
+	lbl.text = "+%dg" % amount
+	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(score_label.position.x + score_label.size.x * 0.5 - 30, score_label.position.y)
+	add_child(lbl)
+	var tween: Tween = lbl.create_tween()
+	tween.tween_property(lbl, "position:y", lbl.position.y - 50.0, GOLD_FLOAT_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, GOLD_FLOAT_DURATION).set_ease(Tween.EASE_IN).set_delay(0.3)
+	tween.tween_callback(lbl.queue_free)
 
 # ---------------------------------------------------------------------------
 # Signal handlers
