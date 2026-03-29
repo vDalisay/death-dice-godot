@@ -49,6 +49,7 @@ var stage_target_score: int = BASE_STAGE_TARGET
 var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
 var best_turn_score: int = 0
+var run_busts: int = 0
 var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
 ## Tracks gold spent in the current shop visit (for Miser modifier).
@@ -171,6 +172,7 @@ func get_stage_clear_bonus() -> int:
 
 func lose_life() -> void:
 	lives -= 1
+	run_busts += 1
 	lives_changed.emit(lives)
 	if lives <= 0:
 		run_ended.emit()
@@ -185,6 +187,7 @@ func reset_run() -> void:
 	current_loop = 1
 	total_score = 0
 	total_stages_cleared = 0
+	run_busts = 0
 	lives = MAX_LIVES
 	gold = 0
 	best_turn_score = 0

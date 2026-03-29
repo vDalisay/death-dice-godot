@@ -21,7 +21,9 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
+@onready var career_button: Button = $MarginContainer/VBoxContainer/ButtonRow/CareerButton
 @onready var shop_panel: ShopPanel = $ShopPanel
+@onready var career_panel: CareerPanel = $CareerPanel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -48,11 +50,15 @@ func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
 	bank_button.pressed.connect(_on_bank_pressed)
 	new_run_button.pressed.connect(_on_new_run_pressed)
+	career_button.pressed.connect(_on_career_pressed)
 	dice_tray.die_toggled.connect(_on_die_toggled)
 	shop_panel.shop_closed.connect(_on_shop_closed)
+	career_panel.closed.connect(_on_career_closed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
+	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
 	new_run_button.visible = false
+	career_button.visible = false
 	_streak_display = StreakDisplayScript.new()
 	add_child(_streak_display)
 	if GameManager.skip_archetype_picker:
@@ -121,6 +127,7 @@ func _on_bank_pressed() -> void:
 		GameManager.add_gold(rush_gold)
 	# Jackpot check: first roll only (no rerolls), 5+ dice, 0 stops.
 	var is_jackpot: bool = _reroll_count == 0 and GameManager.dice_pool.size() >= JACKPOT_MIN_DICE and accumulated_stop_count == 0
+	AchievementManager.on_bank(banked, _reroll_count, accumulated_stop_count, GameManager.dice_pool.size(), bank_streak)
 	if is_jackpot:
 		var jackpot_gold: int = maxi(1, int(banked * JACKPOT_GOLD_BONUS))
 		GameManager.add_gold(jackpot_gold)
@@ -245,6 +252,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		bank_streak = 0
 		_update_streak_display()
 		GameManager.lose_life()
+		AchievementManager.on_bust()
 		SFXManager.play_bust()
 		_show_bust_overlay(effective_stops)
 		_sync_buttons()
@@ -515,9 +523,11 @@ func _on_run_ended() -> void:
 	roll_button.disabled = true
 	bank_button.disabled = true
 	new_run_button.visible = true
+	career_button.visible = true
 	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
 
 func _on_stage_cleared() -> void:
+	AchievementManager.on_stage_cleared()
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
@@ -542,6 +552,7 @@ func _open_shop(is_loop_complete: bool = false) -> void:
 func _on_shop_closed() -> void:
 	if _loop_complete_pending:
 		GameManager.advance_loop()
+		AchievementManager.on_loop_advanced(GameManager.current_loop)
 		_loop_complete_pending = false
 		# Curse event: ~20% chance on loop transition.
 		_maybe_apply_curse()
@@ -559,10 +570,24 @@ func _on_shop_closed() -> void:
 func _on_new_run_pressed() -> void:
 	var snapshot: Resource = SaveManager.make_run_snapshot()
 	SaveManager.record_run(snapshot)
+	AchievementManager.on_run_recorded(snapshot as RunSaveData)
 	new_run_button.visible = false
+	career_button.visible = false
 	shop_panel.visible = false
 	_roll_content.visible = true
 	_show_archetype_picker()
+
+
+func _on_career_pressed() -> void:
+	career_panel.open_panel()
+
+
+func _on_career_closed() -> void:
+	pass
+
+
+func _on_achievement_unlocked(_key: String, title: String) -> void:
+	hud.show_status("Achievement Unlocked: %s" % title, Color(1.0, 0.85, 0.0))
 
 func _sync_buttons() -> void:
 	if not _run_active:

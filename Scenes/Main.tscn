@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/RollPhase.gd" id="1"]
 [ext_resource type="PackedScene" path="res://Scenes/HUD.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://Scenes/DiceTray.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://Scenes/ShopPanel.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://Scenes/CareerPanel.tscn" id="5"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -59,6 +60,12 @@ custom_minimum_size = Vector2(180, 54)
 text = "New Run"
 theme_override_font_sizes/font_size = 20
 
+[node name="CareerButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 54)
+text = "Career"
+theme_override_font_sizes/font_size = 20
+
 [node name="ShopPanel" parent="." instance=ExtResource("4")]
 layout_mode = 1
 anchors_preset = 15
@@ -66,3 +73,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="CareerPanel" parent="." instance=ExtResource("5")]
+layout_mode = 1

@@ -6,6 +6,9 @@ extends Resource
 @export var timestamp: String = ""
 @export var stages_cleared: int = 0
 @export var loops_completed: int = 0
+@export var busts: int = 0
+@export var best_turn_score: int = 0
+@export var final_dice_names: Array[String] = []
 
 func to_dict() -> Dictionary:
 	return {
@@ -13,4 +16,7 @@ func to_dict() -> Dictionary:
 		"timestamp": timestamp,
 		"stages_cleared": stages_cleared,
 		"loops_completed": loops_completed,
+		"busts": busts,
+		"best_turn_score": best_turn_score,
+		"final_dice_names": final_dice_names,
 	}
