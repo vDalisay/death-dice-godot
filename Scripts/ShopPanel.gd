@@ -13,11 +13,15 @@ const MODIFIER_SLOTS: int = 2
 
 @onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var _gold_label: Label = $MarginContainer/VBoxContainer/GoldLabel
-@onready var _items_container: VBoxContainer = $MarginContainer/VBoxContainer/ItemsContainer
+@onready var _dice_container: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceContainer
+@onready var _modifier_container: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierContainer
+@onready var _dice_header: Label = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceHeader
+@onready var _modifier_header: Label = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierHeader
 @onready var _pool_label: Label = $MarginContainer/VBoxContainer/PoolLabel
 @onready var _continue_button: Button = $MarginContainer/VBoxContainer/ContinueButton
 
-var _items: Array[ShopItemData] = []
+var _dice_items: Array[ShopItemData] = []
+var _modifier_items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
 var _refresh_button: Button = null
 
@@ -50,7 +54,8 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 # ---------------------------------------------------------------------------
 
 func _generate_items() -> void:
-	_items.clear()
+	_dice_items.clear()
+	_modifier_items.clear()
 	# Build the pool of all available dice shop items.
 	var dice_pool: Array[ShopItemData] = [
 		ShopItemData.make_buy_simple_die(),
@@ -69,10 +74,13 @@ func _generate_items() -> void:
 	dice_pool.shuffle()
 	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
 	for i: int in pick_count:
-		_items.append(dice_pool[i])
+		_dice_items.append(dice_pool[i])
 	# Empower Die is always available if the player has dice.
 	if not GameManager.dice_pool.is_empty():
-		_items.append(ShopItemData.make_upgrade_die())
+		_dice_items.append(ShopItemData.make_upgrade_die())
+	# Cleanse Curse: available if any die has a CURSED_STOP face (dice section).
+	if _any_die_has_cursed_stop():
+		_dice_items.append(ShopItemData.make_cleanse_curse())
 	# Modifier items: offer 1-2 random modifiers the player doesn't already own.
 	if GameManager.can_add_modifier():
 		var mod_factories: Array[Callable] = RunModifier.all_factories()
@@ -85,56 +93,66 @@ func _generate_items() -> void:
 		var mod_count: int = mini(MODIFIER_SLOTS, available_mods.size())
 		for i: int in mod_count:
 			var mod: RunModifier = available_mods[i].call() as RunModifier
-			_items.append(ShopItemData.make_buy_modifier(mod))
-	# Cleanse Curse: available if any die has a CURSED_STOP face.
-	if _any_die_has_cursed_stop():
-		_items.append(ShopItemData.make_cleanse_curse())
+			_modifier_items.append(ShopItemData.make_buy_modifier(mod))
 	_build_item_rows()
 
 
 func _build_item_rows() -> void:
-	for child: Node in _items_container.get_children():
+	for child: Node in _dice_container.get_children():
+		child.queue_free()
+	for child: Node in _modifier_container.get_children():
 		child.queue_free()
 	_buy_buttons.clear()
 
-	for item: ShopItemData in _items:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 12)
+	# Dice section
+	_dice_header.visible = not _dice_items.is_empty()
+	for item: ShopItemData in _dice_items:
+		_dice_container.add_child(_make_item_row(item))
 
-		var info := VBoxContainer.new()
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var name_label := Label.new()
-		name_label.text = item.item_name
-		name_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
-		info.add_child(name_label)
-		var desc_label := Label.new()
-		# Upgrade face preview: show which face on which die will be upgraded.
-		if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
-			desc_label.text = _get_upgrade_preview()
-		else:
-			desc_label.text = item.description
-		desc_label.add_theme_font_size_override("font_size", 14)
-		desc_label.modulate = Color(0.7, 0.7, 0.7)
-		info.add_child(desc_label)
-		row.add_child(info)
+	# Modifier section
+	_modifier_header.visible = not _modifier_items.is_empty()
+	for item: ShopItemData in _modifier_items:
+		_modifier_container.add_child(_make_item_row(item))
 
-		var buy_btn := Button.new()
-		buy_btn.text = "Buy (%dg)" % item.cost
-		buy_btn.custom_minimum_size = Vector2(120, 40)
-		buy_btn.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
-		buy_btn.pressed.connect(_on_buy_pressed.bind(item))
-		row.add_child(buy_btn)
-		_buy_buttons.append(buy_btn)
-
-		_items_container.add_child(row)
-
-	# Refresh shop button at bottom of items.
+	# Refresh shop button after both sections.
 	_refresh_button = Button.new()
 	_refresh_button.text = "Refresh Shop (%dg)" % REFRESH_COST
-	_refresh_button.custom_minimum_size = Vector2(180, 40)
+	_refresh_button.custom_minimum_size = Vector2(180, 36)
+	_refresh_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_refresh_button.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
 	_refresh_button.pressed.connect(_on_refresh_pressed)
-	_items_container.add_child(_refresh_button)
+	_modifier_container.add_child(_refresh_button)
+
+
+func _make_item_row(item: ShopItemData) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var name_label := Label.new()
+	name_label.text = item.item_name
+	name_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
+	info.add_child(name_label)
+	var desc_label := Label.new()
+	if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
+		desc_label.text = _get_upgrade_preview()
+	else:
+		desc_label.text = item.description
+	desc_label.add_theme_font_size_override("font_size", 14)
+	desc_label.modulate = Color(0.7, 0.7, 0.7)
+	info.add_child(desc_label)
+	row.add_child(info)
+
+	var buy_btn := Button.new()
+	buy_btn.text = "Buy (%dg)" % item.cost
+	buy_btn.custom_minimum_size = Vector2(120, 36)
+	buy_btn.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
+	buy_btn.pressed.connect(_on_buy_pressed.bind(item))
+	row.add_child(buy_btn)
+	_buy_buttons.append(buy_btn)
+
+	return row
 
 
 # ---------------------------------------------------------------------------
@@ -210,9 +228,12 @@ func _refresh_display() -> void:
 
 
 func _refresh_buy_buttons() -> void:
+	var all_items: Array[ShopItemData] = []
+	all_items.append_array(_dice_items)
+	all_items.append_array(_modifier_items)
 	for i: int in _buy_buttons.size():
-		if i < _items.size():
-			var item: ShopItemData = _items[i]
+		if i < all_items.size():
+			var item: ShopItemData = all_items[i]
 			var too_expensive: bool = GameManager.gold < item.cost
 			var mod_full: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and not GameManager.can_add_modifier()
 			var already_owned: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type)
