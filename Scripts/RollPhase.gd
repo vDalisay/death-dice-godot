@@ -49,6 +49,9 @@ var _is_roll_animating: bool = false
 var _roll_anim_nonce: int = 0
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
+const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
+const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
+const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
 
 func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
@@ -595,6 +598,10 @@ func _on_career_closed() -> void:
 
 
 func _on_achievement_unlocked(_key: String, title: String) -> void:
+	var toast: PanelContainer = AchievementToastScene.instantiate() as PanelContainer
+	add_child(toast)
+	toast.call("show_unlock", title)
+	SFXManager.play_achievement_unlock()
 	hud.show_status("Achievement Unlocked: %s" % title, Color(1.0, 0.85, 0.0))
 
 func _sync_buttons() -> void:
@@ -731,82 +738,19 @@ func _get_per_die_scores() -> Array[int]:
 # ---------------------------------------------------------------------------
 
 func _show_bust_overlay(effective_stops: int) -> void:
-	var overlay: ColorRect = ColorRect.new()
-	overlay.color = Color(0.9, 0.1, 0.1, 0.0)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var lbl: Label = Label.new()
-	lbl.text = "BUST! -%d Life" % 1
-	lbl.add_theme_font_size_override("font_size", 48)
-	lbl.add_theme_color_override("font_color", Color.WHITE)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.modulate.a = 0.0
-	overlay.add_child(lbl)
+	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
 	add_child(overlay)
-	var tween: Tween = create_tween()
-	# Flash red background.
-	tween.tween_property(overlay, "color:a", 0.45, 0.15)
-	tween.tween_property(lbl, "modulate:a", 1.0, 0.1)
-	tween.tween_interval(1.2)
-	tween.tween_property(overlay, "color:a", 0.0, 0.4)
-	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.4)
-	tween.tween_callback(overlay.queue_free)
+	overlay.call("play", 1)
 	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 
 
 func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> void:
-	var overlay: ColorRect = ColorRect.new()
-	overlay.color = Color(0.2, 0.8, 0.3, 0.0)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# CenterContainer fills the overlay and centers its child at any resolution.
-	var center: CenterContainer = CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var title_lbl: Label = Label.new()
-	title_lbl.text = "STAGE CLEARED!"
-	title_lbl.add_theme_font_size_override("font_size", 42)
-	title_lbl.add_theme_color_override("font_color", Color.WHITE)
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var gold_lbl: Label = Label.new()
-	gold_lbl.text = "+%dg" % bonus_gold
-	gold_lbl.add_theme_font_size_override("font_size", 32)
-	gold_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
-	gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var surplus_lbl: Label = Label.new()
-	surplus_lbl.text = "Surplus: +%d" % surplus if surplus > 0 else ""
-	surplus_lbl.add_theme_font_size_override("font_size", 24)
-	surplus_lbl.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
-	surplus_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var proceed_btn: Button = Button.new()
-	proceed_btn.text = "  \u2192  "
-	proceed_btn.add_theme_font_size_override("font_size", 36)
-	proceed_btn.modulate.a = 0.0
-	proceed_btn.focus_mode = Control.FOCUS_NONE
-	proceed_btn.pressed.connect(func() -> void:
+	var overlay: ColorRect = StageClearedScene.instantiate() as ColorRect
+	add_child(overlay)
+	overlay.call("setup", bonus_gold, surplus, is_loop)
+	overlay.connect("proceed_requested", func() -> void:
 		overlay.queue_free()
 		_open_shop(is_loop)
-	)
-	vbox.add_child(title_lbl)
-	vbox.add_child(gold_lbl)
-	if surplus > 0:
-		vbox.add_child(surplus_lbl)
-	vbox.add_child(proceed_btn)
-	vbox.modulate.a = 0.0
-	center.add_child(vbox)
-	overlay.add_child(center)
-	add_child(overlay)
-	var tween: Tween = create_tween()
-	tween.tween_property(overlay, "color:a", 0.35, 0.2)
-	tween.parallel().tween_property(vbox, "modulate:a", 1.0, 0.2)
-	# After fade-in, reveal the proceed button and allow clicks through overlay.
-	tween.tween_callback(func() -> void:
-		proceed_btn.modulate.a = 1.0
-		overlay.mouse_filter = Control.MOUSE_FILTER_PASS
 	)
 
 

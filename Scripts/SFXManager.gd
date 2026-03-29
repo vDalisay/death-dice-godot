@@ -76,6 +76,12 @@ func play_personal_best() -> void:
 	_play_tone_delayed(1047.0, 0.18, 0.9, 0.2)
 
 
+func play_achievement_unlock() -> void:
+	_play_tone(784.0, 0.08, 0.7)
+	_play_tone_delayed(988.0, 0.1, 0.8, 0.08)
+	_play_tone_delayed(1175.0, 0.14, 0.9, 0.18)
+
+
 func play_shop_refresh() -> void:
 	_play_tone(330.0, 0.06, 0.4)
 	_play_tone_delayed(440.0, 0.06, 0.4, 0.05)
