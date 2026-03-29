@@ -12,6 +12,7 @@ const PULSE_DURATION: float = 0.8
 var _streak: int = 0
 var _multiplier: float = 1.0
 var _fire_labels: Array[Label] = []
+var _fire_base_positions: Array[Vector2] = []
 var _mult_label: Label = null
 var _container: Control = null
 var _flicker_timer: float = 0.0
@@ -35,6 +36,7 @@ func _ready() -> void:
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_container.add_child(lbl)
 		_fire_labels.append(lbl)
+		_fire_base_positions.append(Vector2.ZERO)
 
 	# Multiplier text, centered on the fire.
 	_mult_label = Label.new()
@@ -95,7 +97,9 @@ func _layout_fire() -> void:
 		var spread: float = lerpf(4.0, 12.0, t)
 		var x_off: float = randf_range(-spread, spread)
 		var y_off: float = randf_range(-spread * 0.5, spread * 0.3)
-		lbl.position = Vector2(x_off, y_off)
+		var base_pos: Vector2 = Vector2(x_off, y_off)
+		lbl.position = base_pos
+		_fire_base_positions[i] = base_pos
 
 	# Multiplier label — bright white with black outline for contrast.
 	var mult_font_size: int = int(lerpf(20.0, 36.0, t))
@@ -116,10 +120,10 @@ func _apply_flicker() -> void:
 		if not _fire_labels[i].visible:
 			continue
 		var lbl: Label = _fire_labels[i]
-		# Subtle position jitter.
-		var base_pos: Vector2 = lbl.position
-		lbl.position.x = base_pos.x + randf_range(-2.0, 2.0)
-		lbl.position.y = base_pos.y + randf_range(-3.0, 1.0)
+		var origin: Vector2 = _fire_base_positions[i]
+		# Jitter around the fixed origin — max ~5px drift.
+		lbl.position.x = origin.x + randf_range(-2.5, 2.5)
+		lbl.position.y = origin.y + randf_range(-2.5, 2.5)
 		# Subtle opacity flicker.
 		lbl.modulate.a = randf_range(0.7, 1.0)
 
