@@ -401,3 +401,34 @@ func test_streak_display_hidden_after_bust() -> void:
 	await runner.simulate_frames(2)
 
 	assert_bool(root._streak_display.visible).is_false()
+
+
+# ---------------------------------------------------------------------------
+# Stage Clear Proceed Button (#16)
+# ---------------------------------------------------------------------------
+
+func test_stage_clear_does_not_open_shop_immediately() -> void:
+	## After triggering stage clear, the shop should NOT open until the player
+	## clicks the proceed button in the stage-clear overlay.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+
+	# Roll and enter ACTIVE state.
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	_force_clean_state(root)
+	# Set score high enough to clear the stage.
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 5
+	for i: int in GameManager.dice_pool.size():
+		root.current_results[i] = _make_face(DiceFaceData.FaceType.NUMBER, 5)
+
+	root.bank_button.pressed.emit()
+	await runner.simulate_frames(5)
+
+	# Shop should NOT be visible yet — overlay with proceed button should be up.
+	assert_bool(root.shop_panel.visible).is_false()

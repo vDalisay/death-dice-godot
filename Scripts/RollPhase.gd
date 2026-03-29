@@ -476,14 +476,12 @@ func _on_stage_cleared() -> void:
 	var surplus: int = GameManager.total_score - GameManager.stage_target_score
 	GameManager.add_gold(bonus)
 	SFXManager.play_stage_clear()
-	_show_stage_clear_overlay(bonus, surplus)
-	if GameManager.is_final_stage():
+	var is_loop: bool = GameManager.is_final_stage()
+	if is_loop:
 		hud.show_status(
 			"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop, GameManager.current_loop + 1],
 			Color(1.0, 0.85, 0.0))
-		_open_shop(true)
-	else:
-		_open_shop(false)
+	_show_stage_clear_overlay(bonus, surplus, is_loop)
 
 func _open_shop(is_loop_complete: bool = false) -> void:
 	_loop_complete_pending = is_loop_complete
@@ -655,7 +653,7 @@ func _show_bust_overlay(effective_stops: int) -> void:
 	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 
 
-func _show_stage_clear_overlay(bonus_gold: int, surplus: int) -> void:
+func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> void:
 	var overlay: ColorRect = ColorRect.new()
 	overlay.color = Color(0.2, 0.8, 0.3, 0.0)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -681,10 +679,20 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int) -> void:
 	surplus_lbl.add_theme_font_size_override("font_size", 24)
 	surplus_lbl.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
 	surplus_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var proceed_btn: Button = Button.new()
+	proceed_btn.text = "  \u2192  "
+	proceed_btn.add_theme_font_size_override("font_size", 36)
+	proceed_btn.modulate.a = 0.0
+	proceed_btn.focus_mode = Control.FOCUS_NONE
+	proceed_btn.pressed.connect(func() -> void:
+		overlay.queue_free()
+		_open_shop(is_loop)
+	)
 	vbox.add_child(title_lbl)
 	vbox.add_child(gold_lbl)
 	if surplus > 0:
 		vbox.add_child(surplus_lbl)
+	vbox.add_child(proceed_btn)
 	vbox.modulate.a = 0.0
 	center.add_child(vbox)
 	overlay.add_child(center)
@@ -692,7 +700,8 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int) -> void:
 	var tween: Tween = create_tween()
 	tween.tween_property(overlay, "color:a", 0.35, 0.2)
 	tween.parallel().tween_property(vbox, "modulate:a", 1.0, 0.2)
-	tween.tween_interval(1.5)
-	tween.tween_property(overlay, "color:a", 0.0, 0.4)
-	tween.parallel().tween_property(vbox, "modulate:a", 0.0, 0.4)
-	tween.tween_callback(overlay.queue_free)
+	# After fade-in, reveal the proceed button and allow clicks through overlay.
+	tween.tween_callback(func() -> void:
+		proceed_btn.modulate.a = 1.0
+		overlay.mouse_filter = Control.MOUSE_FILTER_PASS
+	)

@@ -82,11 +82,13 @@ func show_score_popup(value: int) -> void:
 	lbl.add_theme_font_size_override("font_size", 20)
 	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 0.4))
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = Vector2(-5, -25)
+	lbl.top_level = true
 	add_child(lbl)
+	var start_pos: Vector2 = global_position + Vector2(-5, -25)
+	lbl.global_position = start_pos
 	pop()
 	var tween: Tween = lbl.create_tween()
-	tween.tween_property(lbl, "position:y", lbl.position.y - 35.0, 0.6).set_ease(Tween.EASE_OUT)
+	tween.tween_property(lbl, "global_position:y", start_pos.y - 35.0, 0.6).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN).set_delay(0.2)
 	tween.tween_callback(lbl.queue_free)
 
@@ -98,10 +100,12 @@ func show_chain_label(depth: int) -> void:
 	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.5, 0.0))
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = Vector2(-10, -30)
+	lbl.top_level = true
 	add_child(lbl)
+	var start_pos: Vector2 = global_position + Vector2(-10, -30)
+	lbl.global_position = start_pos
 	var tween: Tween = lbl.create_tween()
-	tween.tween_property(lbl, "position:y", lbl.position.y - 40.0, 0.8).set_ease(Tween.EASE_OUT)
+	tween.tween_property(lbl, "global_position:y", start_pos.y - 40.0, 0.8).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.8).set_ease(Tween.EASE_IN).set_delay(0.3)
 	tween.tween_callback(lbl.queue_free)
 

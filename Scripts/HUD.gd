@@ -64,10 +64,13 @@ func show_floating_gold(amount: int) -> void:
 	lbl.add_theme_font_size_override("font_size", 24)
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = Vector2(score_label.position.x + score_label.size.x * 0.5 - 30, score_label.position.y)
+	# top_level prevents VBoxContainer from including this label in layout.
+	lbl.top_level = true
+	var start_pos: Vector2 = score_label.global_position + Vector2(score_label.size.x * 0.5 - 30, 0)
+	lbl.global_position = start_pos
 	add_child(lbl)
 	var tween: Tween = lbl.create_tween()
-	tween.tween_property(lbl, "position:y", lbl.position.y - 50.0, GOLD_FLOAT_DURATION).set_ease(Tween.EASE_OUT)
+	tween.tween_property(lbl, "global_position:y", start_pos.y - 50.0, GOLD_FLOAT_DURATION).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(lbl, "modulate:a", 0.0, GOLD_FLOAT_DURATION).set_ease(Tween.EASE_IN).set_delay(0.3)
 	tween.tween_callback(lbl.queue_free)
 
