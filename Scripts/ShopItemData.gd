@@ -12,6 +12,7 @@ enum ItemType {
 	BUY_EXPLOSIVE_DIE,
 	BUY_BLANK_CANVAS_DIE,
 	BUY_PINK_DIE,
+	BUY_SIMPLE_DIE,
 	UPGRADE_DIE,
 }
 
@@ -90,6 +91,15 @@ static func make_buy_pink_die() -> ShopItemData:
 	item.description = "Multiplies ANY face on the die to its left. (←×2, ←×2, STOP×3, —)"
 	item.cost = 45
 	item.item_type = ItemType.BUY_PINK_DIE
+	return item
+
+
+static func make_buy_simple_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Simple Die"
+	item.description = "Cheap and safe. No stops! (1, 1, 1, —, —, —)"
+	item.cost = 8
+	item.item_type = ItemType.BUY_SIMPLE_DIE
 	return item
 
 

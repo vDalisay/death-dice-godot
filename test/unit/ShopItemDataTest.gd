@@ -36,3 +36,10 @@ func test_all_items_have_descriptions() -> void:
 func test_pink_die_description_mentions_any_face() -> void:
 	var item: ShopItemData = ShopItemData.make_buy_pink_die()
 	assert_str(item.description).contains("ANY")
+
+
+func test_simple_die_item() -> void:
+	var item: ShopItemData = ShopItemData.make_buy_simple_die()
+	assert_str(item.item_name).is_equal("Simple Die")
+	assert_int(item.cost).is_equal(8)
+	assert_int(item.item_type).is_equal(ShopItemData.ItemType.BUY_SIMPLE_DIE)

@@ -488,6 +488,8 @@ func _on_stage_cleared() -> void:
 func _open_shop(is_loop_complete: bool = false) -> void:
 	_loop_complete_pending = is_loop_complete
 	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
 	shop_panel.open(GameManager.current_stage, is_loop_complete)
 
 func _on_shop_closed() -> void:
@@ -498,6 +500,7 @@ func _on_shop_closed() -> void:
 		GameManager.advance_stage()
 	shop_panel.visible = false
 	_roll_content.visible = true
+	_update_streak_display()
 	_run_active = true
 	turn_number = 0
 	bank_streak = 0

@@ -270,3 +270,23 @@ static func make_blank_canvas_d6() -> DiceData:
 		face.value = config[1]
 		die.faces.append(face)
 	return die
+
+
+## Simple die — no stops, half numbers, half blanks. Safe filler.
+static func make_simple_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Simple D6"
+	var configs: Array = [
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.BLANK,  0],
+		[DiceFaceData.FaceType.BLANK,  0],
+		[DiceFaceData.FaceType.BLANK,  0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die

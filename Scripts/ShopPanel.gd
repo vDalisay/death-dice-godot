@@ -8,6 +8,8 @@ signal shop_closed()
 const ITEM_FONT_SIZE: int = 18
 const REFRESH_COST: int = 5
 
+const DICE_SLOTS: int = 4
+
 @onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var _gold_label: Label = $MarginContainer/VBoxContainer/GoldLabel
 @onready var _items_container: VBoxContainer = $MarginContainer/VBoxContainer/ItemsContainer
@@ -47,16 +49,26 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 
 func _generate_items() -> void:
 	_items.clear()
-	_items.append(ShopItemData.make_buy_standard_die())
-	_items.append(ShopItemData.make_buy_blank_canvas_die())
-	_items.append(ShopItemData.make_buy_lucky_die())
-	_items.append(ShopItemData.make_buy_pink_die())
-	# Unlock new dice types in loop 2+
+	# Build the pool of all available dice shop items.
+	var dice_pool: Array[ShopItemData] = [
+		ShopItemData.make_buy_simple_die(),
+		ShopItemData.make_buy_standard_die(),
+		ShopItemData.make_buy_blank_canvas_die(),
+		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_buy_pink_die(),
+	]
+	# Unlock additional dice in loop 2+.
 	if GameManager.current_loop >= 2:
-		_items.append(ShopItemData.make_buy_runner_die())
-		_items.append(ShopItemData.make_buy_golden_die())
-		_items.append(ShopItemData.make_buy_heavy_die())
-		_items.append(ShopItemData.make_buy_explosive_die())
+		dice_pool.append(ShopItemData.make_buy_runner_die())
+		dice_pool.append(ShopItemData.make_buy_golden_die())
+		dice_pool.append(ShopItemData.make_buy_heavy_die())
+		dice_pool.append(ShopItemData.make_buy_explosive_die())
+	# Shuffle and pick a random subset.
+	dice_pool.shuffle()
+	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
+	for i: int in pick_count:
+		_items.append(dice_pool[i])
+	# Empower Die is always available if the player has dice.
 	if not GameManager.dice_pool.is_empty():
 		_items.append(ShopItemData.make_upgrade_die())
 	_build_item_rows()
@@ -132,6 +144,8 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_blank_canvas_d6())
 		ShopItemData.ItemType.BUY_PINK_DIE:
 			GameManager.add_dice(DiceData.make_pink_d6())
+		ShopItemData.ItemType.BUY_SIMPLE_DIE:
+			GameManager.add_dice(DiceData.make_simple_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
 			_upgrade_random_die()
 	_refresh_display()

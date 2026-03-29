@@ -184,3 +184,26 @@ func test_blank_canvas_d6_is_mostly_blank() -> void:
 			blank_count += 1
 	assert_int(blank_count).is_equal(5)
 	assert_int(die._count_stop_faces()).is_equal(1)
+
+
+func test_simple_d6_has_six_faces() -> void:
+	var die: DiceData = DiceData.make_simple_d6()
+	assert_int(die.faces.size()).is_equal(6)
+
+
+func test_simple_d6_has_no_stops() -> void:
+	var die: DiceData = DiceData.make_simple_d6()
+	assert_int(die._count_stop_faces()).is_equal(0)
+
+
+func test_simple_d6_face_composition() -> void:
+	var die: DiceData = DiceData.make_simple_d6()
+	var number_count: int = 0
+	var blank_count: int = 0
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.NUMBER:
+			number_count += 1
+		elif face.type == DiceFaceData.FaceType.BLANK:
+			blank_count += 1
+	assert_int(number_count).is_equal(3)
+	assert_int(blank_count).is_equal(3)
