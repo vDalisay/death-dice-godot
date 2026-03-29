@@ -68,6 +68,7 @@ func _generate_items() -> void:
 	if GameManager.current_loop >= 2:
 		dice_pool.append(ShopItemData.make_buy_runner_die())
 		dice_pool.append(ShopItemData.make_buy_golden_die())
+		dice_pool.append(ShopItemData.make_buy_insurance_die())
 		dice_pool.append(ShopItemData.make_buy_heavy_die())
 		dice_pool.append(ShopItemData.make_buy_explosive_die())
 	# Shuffle and pick a random subset.
@@ -173,6 +174,8 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_gambler_d6())
 		ShopItemData.ItemType.BUY_GOLDEN_DIE:
 			GameManager.add_dice(DiceData.make_golden_d6())
+		ShopItemData.ItemType.BUY_INSURANCE_DIE:
+			GameManager.add_dice(DiceData.make_insurance_d6())
 		ShopItemData.ItemType.BUY_HEAVY_DIE:
 			GameManager.add_dice(DiceData.make_heavy_d6())
 		ShopItemData.ItemType.BUY_EXPLOSIVE_DIE:

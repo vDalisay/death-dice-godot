@@ -16,6 +16,13 @@ func test_lucky_die_item() -> void:
 	assert_int(item.item_type).is_equal(ShopItemData.ItemType.BUY_LUCKY_DIE)
 
 
+func test_insurance_die_item() -> void:
+	var item: ShopItemData = ShopItemData.make_buy_insurance_die()
+	assert_str(item.item_name).is_equal("Insurance Die")
+	assert_int(item.cost).is_equal(55)
+	assert_int(item.item_type).is_equal(ShopItemData.ItemType.BUY_INSURANCE_DIE)
+
+
 func test_upgrade_die_item() -> void:
 	var item: ShopItemData = ShopItemData.make_upgrade_die()
 	assert_str(item.item_name).is_equal("Empower Die")
@@ -27,6 +34,7 @@ func test_all_items_have_descriptions() -> void:
 	var items: Array[ShopItemData] = [
 		ShopItemData.make_buy_standard_die(),
 		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_buy_insurance_die(),
 		ShopItemData.make_upgrade_die(),
 	]
 	for item: ShopItemData in items:

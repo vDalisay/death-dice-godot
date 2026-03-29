@@ -333,3 +333,47 @@ func test_buttons_disabled_during_banked_state() -> void:
 
 	assert_bool(root.roll_button.disabled).is_true()
 	assert_bool(root.bank_button.disabled).is_true()
+
+
+func test_insurance_cancels_bust_forfeits_turn_and_burns_face() -> void:
+	## INSURANCE prevents life loss on bust, forfeits turn score, then reverts to BLANK.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	_force_clean_state(root)
+	root.turn_number = 4
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 9999
+
+	var insurance_face: DiceFaceData = GameManager.dice_pool[0].faces[0]
+	insurance_face.type = DiceFaceData.FaceType.INSURANCE
+	insurance_face.value = 0
+	root.current_results[0] = insurance_face
+
+	var stop_face: DiceFaceData = _make_face(DiceFaceData.FaceType.STOP, 0)
+	for i: int in range(1, mini(5, GameManager.dice_pool.size())):
+		root.current_results[i] = stop_face
+
+	var all_indices: Array[int] = []
+	for i: int in GameManager.dice_pool.size():
+		all_indices.append(i)
+
+	var lives_before: int = GameManager.lives
+	root._process_roll_results(all_indices)
+	await runner.simulate_frames(2)
+
+	assert_int(root.turn_state).is_equal(RollPhase.TurnState.BANKED)
+	assert_int(GameManager.lives).is_equal(lives_before)
+	assert_int(GameManager.total_score).is_equal(0)
+	assert_int(insurance_face.type).is_equal(DiceFaceData.FaceType.BLANK)
+	assert_str(root.hud.status_label.text).contains("INSURANCE")
+
+	for _i: int in 20:
+		await runner.simulate_frames(1, 100)
+	await runner.simulate_frames(5)
+	assert_int(root.turn_state).is_equal(RollPhase.TurnState.IDLE)

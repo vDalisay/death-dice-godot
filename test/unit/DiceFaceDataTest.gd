@@ -53,3 +53,9 @@ func test_multiply_face_display() -> void:
 	face.type = DiceFaceData.FaceType.MULTIPLY
 	face.value = 2
 	assert_str(face.get_display_text()).is_equal("x2")
+
+
+func test_insurance_face_display() -> void:
+	var face := DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.INSURANCE
+	assert_str(face.get_display_text()).is_equal("INS")

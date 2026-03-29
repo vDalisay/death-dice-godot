@@ -8,6 +8,7 @@ enum ItemType {
 	BUY_LUCKY_DIE,
 	BUY_GAMBLER_DIE,
 	BUY_GOLDEN_DIE,
+	BUY_INSURANCE_DIE,
 	BUY_HEAVY_DIE,
 	BUY_EXPLOSIVE_DIE,
 	BUY_BLANK_CANVAS_DIE,
@@ -59,6 +60,15 @@ static func make_buy_golden_die() -> ShopItemData:
 	item.description = "Auto-keep gold. Punishing stops. (★2, ★2, ★3, —, STOP, STOP)"
 	item.cost = 50
 	item.item_type = ItemType.BUY_GOLDEN_DIE
+	return item
+
+
+static func make_buy_insurance_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Insurance Die"
+	item.description = "Safety net. INS cancels one bust, then burns to —. (INS, 2, 2, —, STOP, STOP)"
+	item.cost = 55
+	item.item_type = ItemType.BUY_INSURANCE_DIE
 	return item
 
 

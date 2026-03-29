@@ -100,6 +100,9 @@ func upgrade_weakest_face() -> bool:
 			if face.value >= MAX_EXPLODE_VALUE:
 				return false
 			face.value += 1
+		DiceFaceData.FaceType.INSURANCE:
+			face.type = DiceFaceData.FaceType.SHIELD
+			face.value = 1
 		DiceFaceData.FaceType.MULTIPLY_LEFT:
 			if face.value >= MAX_MULTIPLY_LEFT_VALUE:
 				return false
@@ -119,6 +122,8 @@ func _face_power(face: DiceFaceData) -> int:
 			return 2 + face.value
 		DiceFaceData.FaceType.SHIELD:
 			return 8 + face.value
+		DiceFaceData.FaceType.INSURANCE:
+			return 10
 		DiceFaceData.FaceType.AUTO_KEEP:
 			return 12 + face.value
 		DiceFaceData.FaceType.MULTIPLY:
@@ -283,6 +288,27 @@ static func make_pink_d6() -> DiceData:
 	for config: Array in configs:
 		var face := DiceFaceData.new()
 		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+## Safety die. INS face prevents bust once, then burns into a blank.
+static func make_insurance_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Insurance D6"
+	die.rarity = Rarity.BLUE
+	var configs: Array = [
+		[DiceFaceData.FaceType.INSURANCE, 0],
+		[DiceFaceData.FaceType.NUMBER,    2],
+		[DiceFaceData.FaceType.NUMBER,    2],
+		[DiceFaceData.FaceType.BLANK,     0],
+		[DiceFaceData.FaceType.STOP,      0],
+		[DiceFaceData.FaceType.STOP,      0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type = config[0]
 		face.value = config[1]
 		die.faces.append(face)
 	return die

@@ -147,6 +147,7 @@ func test_all_dice_have_at_least_one_stop() -> void:
 		DiceData.make_lucky_d6(),
 		DiceData.make_gambler_d6(),
 		DiceData.make_golden_d6(),
+		DiceData.make_insurance_d6(),
 		DiceData.make_heavy_d6(),
 		DiceData.make_explosive_d6(),
 		DiceData.make_blank_canvas_d6(),
@@ -174,6 +175,17 @@ func test_explosive_d6_has_explode_faces() -> void:
 		if face.type == DiceFaceData.FaceType.EXPLODE:
 			explode_count += 1
 	assert_int(explode_count).is_equal(2)
+
+
+func test_insurance_d6_has_insurance_face() -> void:
+	var die: DiceData = DiceData.make_insurance_d6()
+	assert_int(die.faces.size()).is_equal(6)
+	var insurance_count: int = 0
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.INSURANCE:
+			insurance_count += 1
+	assert_int(insurance_count).is_equal(1)
+	assert_int(die._count_stop_faces()).is_equal(2)
 
 
 func test_blank_canvas_d6_is_mostly_blank() -> void:
@@ -223,6 +235,7 @@ func test_rarity_assignments_by_factory() -> void:
 
 	assert_int(DiceData.make_golden_d6().rarity).is_equal(DiceData.Rarity.BLUE)
 	assert_int(DiceData.make_gambler_d6().rarity).is_equal(DiceData.Rarity.BLUE)
+	assert_int(DiceData.make_insurance_d6().rarity).is_equal(DiceData.Rarity.BLUE)
 
 	assert_int(DiceData.make_explosive_d6().rarity).is_equal(DiceData.Rarity.PURPLE)
 	assert_int(DiceData.make_pink_d6().rarity).is_equal(DiceData.Rarity.PURPLE)

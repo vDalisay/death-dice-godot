@@ -228,7 +228,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 			DiceFaceData.FaceType.EXPLODE:
@@ -249,6 +249,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			continue
 		if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
 				or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
+				or face.type == DiceFaceData.FaceType.INSURANCE \
 				or face.type == DiceFaceData.FaceType.EXPLODE:
 			dice_tray.pop_die(i)
 
@@ -260,15 +261,27 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var immune_turns: int = 3 if GameManager.chosen_archetype == GameManager.Archetype.CAUTION else 1
 	var is_immune: bool = turn_number <= immune_turns and GameManager.current_stage == 1
 	if effective_stops >= threshold and not is_immune:
-		turn_state = TurnState.BUST
-		bank_streak = 0
-		_update_streak_display()
-		GameManager.lose_life()
-		AchievementManager.on_bust()
-		SFXManager.play_bust()
-		_show_bust_overlay(effective_stops)
-		_sync_buttons()
-		_schedule_auto_advance()
+		var insurance_index: int = _find_insurance_face_index()
+		if insurance_index >= 0:
+			_consume_insurance_face(insurance_index)
+			dice_tray.update_die(insurance_index, current_results[insurance_index], _die_visual_state(insurance_index))
+			turn_state = TurnState.BANKED
+			bank_streak = 0
+			_update_streak_display()
+			hud.show_status("INSURANCE TRIGGERED! Bust canceled; turn score forfeited.", Color(0.4, 0.8, 1.0))
+			SFXManager.play_close_call()
+			_sync_buttons()
+			_schedule_auto_advance()
+		else:
+			turn_state = TurnState.BUST
+			bank_streak = 0
+			_update_streak_display()
+			GameManager.lose_life()
+			AchievementManager.on_bust()
+			SFXManager.play_bust()
+			_show_bust_overlay(effective_stops)
+			_sync_buttons()
+			_schedule_auto_advance()
 	else:
 		turn_state = TurnState.ACTIVE
 
@@ -378,6 +391,24 @@ func _count_shields() -> int:
 			count += face.value * multiplier
 	return count
 
+
+func _find_insurance_face_index() -> int:
+	for i: int in GameManager.dice_pool.size():
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type == DiceFaceData.FaceType.INSURANCE:
+			return i
+	return -1
+
+
+func _consume_insurance_face(die_index: int) -> void:
+	var face: DiceFaceData = current_results[die_index]
+	if face == null:
+		return
+	face.type = DiceFaceData.FaceType.BLANK
+	face.value = 0
+	dice_keep[die_index] = true
+	dice_keep_locked[die_index] = true
+
 func _get_turn_multiplier() -> int:
 	var multiplier: int = 1
 	for i: int in GameManager.dice_pool.size():
@@ -415,7 +446,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_keep[i] = false
 				accumulated_stop_count += 2 if face.type == DiceFaceData.FaceType.CURSED_STOP else 1
 				dice_tray.tumble_die(i, face, _die_visual_state(i))
-			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
+			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				dice_tray.tumble_die(i, face, _die_visual_state(i))
@@ -439,7 +470,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			if extra_face.type == DiceFaceData.FaceType.STOP or extra_face.type == DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[extra_i] = true
 				accumulated_stop_count += 2 if extra_face.type == DiceFaceData.FaceType.CURSED_STOP else 1
-			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.EXPLODE]:
+			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE]:
 				dice_keep[extra_i] = true
 				dice_keep_locked[extra_i] = true
 			dice_tray.tumble_die(extra_i, extra_face, _die_visual_state(extra_i))
@@ -491,7 +522,7 @@ func _die_visual_state(index: int) -> DieButton.DieState:
 		return DieButton.DieState.UNROLLED
 	if dice_stopped[index]:
 		return DieButton.DieState.STOPPED
-	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
+	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE:
 		return DieButton.DieState.AUTO_KEPT
 	if dice_keep_locked[index]:
 		return DieButton.DieState.KEEP_LOCKED
