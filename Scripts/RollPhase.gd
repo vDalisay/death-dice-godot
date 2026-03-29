@@ -575,13 +575,21 @@ func _sync_buttons() -> void:
 			roll_button.disabled = false
 			bank_button.disabled = true
 		TurnState.ACTIVE:
-			roll_button.text     = "Reroll"
+			roll_button.text     = "Reroll %d" % _get_rerollable_count()
 			roll_button.disabled = false
 			bank_button.disabled = false
 		TurnState.BUST, TurnState.BANKED:
 			roll_button.text     = "Roll All"
 			roll_button.disabled = true
 			bank_button.disabled = true
+
+
+func _get_rerollable_count() -> int:
+	var count: int = 0
+	for i: int in GameManager.dice_pool.size():
+		if not dice_keep[i] and not dice_keep_locked[i]:
+			count += 1
+	return count
 
 # ---------------------------------------------------------------------------
 # Auto-advance & per-die score animation
