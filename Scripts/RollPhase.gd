@@ -57,6 +57,12 @@ func _ready() -> void:
 	add_child(_streak_display)
 	if GameManager.skip_archetype_picker:
 		_start_new_turn()
+	elif SaveManager.run_history.is_empty():
+		# First run ever — skip archetype picker, use default Caution.
+		GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+		GameManager.reset_run()
+		_run_active = true
+		_start_new_turn()
 	else:
 		_show_archetype_picker()
 
@@ -233,7 +239,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
 	var immune_turns: int = 3 if GameManager.chosen_archetype == GameManager.Archetype.CAUTION else 1
-	if effective_stops >= threshold and turn_number > immune_turns:
+	var is_immune: bool = turn_number <= immune_turns and GameManager.current_stage == 1
+	if effective_stops >= threshold and not is_immune:
 		turn_state = TurnState.BUST
 		bank_streak = 0
 		_update_streak_display()
@@ -254,7 +261,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	# Status messages based on roll outcome.
 	if turn_state == TurnState.BUST:
 		pass  # Bust overlay handles messaging.
-	elif turn_number <= immune_turns and effective_stops >= threshold:
+	elif is_immune and effective_stops >= threshold:
 		hud.show_status("CLOSE CALL! Turn %d — no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
 		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
@@ -568,7 +575,7 @@ func _sync_buttons() -> void:
 			roll_button.disabled = false
 			bank_button.disabled = true
 		TurnState.ACTIVE:
-			roll_button.text     = "Reroll Selected"
+			roll_button.text     = "Reroll"
 			roll_button.disabled = false
 			bank_button.disabled = false
 		TurnState.BUST, TurnState.BANKED:

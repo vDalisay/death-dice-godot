@@ -11,6 +11,8 @@ const POP_SCALE: Vector2 = Vector2(1.3, 1.3)
 const POP_DURATION: float = 0.25
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
+const KEPT_OPACITY: float = 0.6
+const KEPT_OFFSET_Y: float = 5.0
 
 ## All possible display strings cycled during the tumble animation.
 const TUMBLE_GLYPHS: Array[String] = ["1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "💥3"]
@@ -130,6 +132,7 @@ func _on_pressed() -> void:
 	# All other states are non-interactive — ignore.
 
 func _apply_visual() -> void:
+	var is_kept_state: bool = die_state in [DieState.KEPT, DieState.KEEP_LOCKED, DieState.AUTO_KEPT]
 	match die_state:
 		DieState.UNROLLED:
 			modulate = COLOR_UNROLLED
@@ -151,3 +154,10 @@ func _apply_visual() -> void:
 			disabled = false
 	if custom_color != Color.TRANSPARENT:
 		modulate = custom_color
+	# Kept dice: lower opacity and shift down; unkept: restore.
+	if is_kept_state:
+		modulate.a = KEPT_OPACITY
+		position.y = KEPT_OFFSET_Y
+	else:
+		modulate.a = 1.0
+		position.y = 0.0

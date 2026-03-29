@@ -122,11 +122,19 @@ func test_bust_threshold_standard_turn_4_plus() -> void:
 
 
 func test_turn1_immune_to_bust() -> void:
-	## Turn 1 never busts regardless of stop count.
+	## Turn 1 of stage 1 never busts regardless of stop count.
 	var turn: int = 1
 	var stops: int = 10
 	var threshold: int = _get_bust_threshold(turn)
-	assert_bool(_should_bust(turn, stops, threshold)).is_false()
+	assert_bool(_should_bust(turn, stops, threshold, 1)).is_false()
+
+
+func test_turn1_stage2_can_bust() -> void:
+	## Turn 1 of stage 2+ is NOT immune.
+	var turn: int = 1
+	var stops: int = 10
+	var threshold: int = _get_bust_threshold(turn)
+	assert_bool(_should_bust(turn, stops, threshold, 2)).is_true()
 
 
 func test_turn2_busts_at_threshold() -> void:
@@ -210,8 +218,9 @@ func _get_bust_threshold(turn: int) -> int:
 	return RollPhase.BASE_BUST_THRESHOLD
 
 
-func _should_bust(turn: int, stops: int, threshold: int) -> bool:
-	return stops >= threshold and turn > 1
+func _should_bust(turn: int, stops: int, threshold: int, stage: int = 2) -> bool:
+	var immune: bool = turn <= 1 and stage == 1
+	return stops >= threshold and not immune
 
 
 # ---------------------------------------------------------------------------
