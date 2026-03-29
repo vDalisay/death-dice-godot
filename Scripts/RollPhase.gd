@@ -43,6 +43,7 @@ var _loop_complete_pending: bool = false
 var bank_streak: int = 0
 var _reroll_count: int = 0
 var _streak_display: Control = null
+var _run_snapshot_recorded: bool = false
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 
@@ -67,6 +68,7 @@ func _ready() -> void:
 		# First run ever — skip archetype picker, use default Caution.
 		GameManager.chosen_archetype = GameManager.Archetype.CAUTION
 		GameManager.reset_run()
+		_run_snapshot_recorded = false
 		_run_active = true
 		_start_new_turn()
 	else:
@@ -519,6 +521,7 @@ func _sync_ui() -> void:
 			pass  # Already set in _on_bank_pressed
 
 func _on_run_ended() -> void:
+	_record_run_snapshot_if_needed()
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
@@ -568,9 +571,7 @@ func _on_shop_closed() -> void:
 	_start_new_turn()
 
 func _on_new_run_pressed() -> void:
-	var snapshot: Resource = SaveManager.make_run_snapshot()
-	SaveManager.record_run(snapshot)
-	AchievementManager.on_run_recorded(snapshot as RunSaveData)
+	_record_run_snapshot_if_needed()
 	new_run_button.visible = false
 	career_button.visible = false
 	shop_panel.visible = false
@@ -885,9 +886,19 @@ func _show_archetype_picker() -> void:
 func _on_archetype_chosen(arch: GameManager.Archetype, overlay: ColorRect) -> void:
 	GameManager.chosen_archetype = arch
 	GameManager.reset_run()
+	_run_snapshot_recorded = false
 	overlay.queue_free()
 	_run_active = true
 	turn_number = 0
 	bank_streak = 0
 	_update_streak_display()
 	_start_new_turn()
+
+
+func _record_run_snapshot_if_needed() -> void:
+	if _run_snapshot_recorded:
+		return
+	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
+	SaveManager.record_run(snapshot)
+	AchievementManager.on_run_recorded(snapshot)
+	_run_snapshot_recorded = true
