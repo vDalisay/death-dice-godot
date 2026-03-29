@@ -7,6 +7,7 @@ func before_test() -> void:
 	GameManager.skip_archetype_picker = true
 	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
 	GameManager.active_modifiers.clear()
+	GameManager.reset_run()
 
 
 # ---------------------------------------------------------------------------

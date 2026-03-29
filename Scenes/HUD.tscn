@@ -31,6 +31,19 @@ text = "Target: 30"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 22
 
+[node name="ProgressBar" type="ProgressBar" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 18)
+show_percentage = false
+max_value = 100.0
+
+[node name="ProgressHintLabel" type="Label" parent="."]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1, 0.8, 0.2, 1)
+
 [node name="ScoreLabel" type="Label" parent="."]
 layout_mode = 2
 text = "Total Score: 0"

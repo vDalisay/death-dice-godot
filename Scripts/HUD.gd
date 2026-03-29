@@ -4,11 +4,14 @@ extends VBoxContainer
 
 const SCORE_COUNT_DURATION: float = 0.5
 const GOLD_FLOAT_DURATION: float = 1.0
+const ALMOST_THERE_THRESHOLD: float = 0.9
 
 @onready var stage_label: Label      = $StageLabel
 @onready var lives_label: Label      = $LivesLabel
 @onready var gold_label: Label       = $GoldLabel
 @onready var target_label: Label     = $TargetLabel
+@onready var progress_bar: ProgressBar = $ProgressBar
+@onready var progress_hint_label: Label = $ProgressHintLabel
 @onready var score_label: Label      = $ScoreLabel
 @onready var turn_score_label: Label = $TurnScoreLabel
 @onready var stop_label: Label       = $StopLabel
@@ -17,6 +20,7 @@ const GOLD_FLOAT_DURATION: float = 1.0
 @onready var modifier_label: Label   = $ModifierLabel
 
 var _score_tween: Tween = null
+var _progress_pulse_tween: Tween = null
 
 func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
@@ -32,6 +36,7 @@ func _ready() -> void:
 	_on_gold_changed(GameManager.gold)
 	_refresh_stage_display()
 	_refresh_modifier_display()
+	_refresh_progress_display()
 	highscore_label.text = "Highscore: %d" % SaveManager.highscore
 
 # ---------------------------------------------------------------------------
@@ -83,6 +88,7 @@ func show_floating_gold(amount: int) -> void:
 
 func _on_score_changed(new_total: int) -> void:
 	score_label.text = "Total Score: %d" % new_total
+	_refresh_progress_display()
 
 func _on_lives_changed(new_lives: int) -> void:
 	lives_label.text = "Lives: %d" % new_lives
@@ -92,6 +98,7 @@ func _on_gold_changed(new_gold: int) -> void:
 
 func _on_stage_advanced(_new_stage: int) -> void:
 	_refresh_stage_display()
+	_refresh_progress_display()
 
 func _on_run_ended() -> void:
 	show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
@@ -101,6 +108,7 @@ func _on_stage_cleared() -> void:
 
 func _on_loop_advanced(_new_loop: int) -> void:
 	_refresh_stage_display()
+	_refresh_progress_display()
 
 func _on_highscore_changed(new_highscore: int) -> void:
 	highscore_label.text = "Highscore: %d" % new_highscore
@@ -109,6 +117,34 @@ func _refresh_stage_display() -> void:
 	var loop_text: String = " (Loop %d)" % GameManager.current_loop if GameManager.current_loop > 1 else ""
 	stage_label.text = "Stage: %d / %d%s" % [GameManager.current_stage, GameManager.get_stages_in_current_loop(), loop_text]
 	target_label.text = "Target: %d" % GameManager.stage_target_score
+
+
+func _refresh_progress_display() -> void:
+	var target: int = maxi(1, GameManager.stage_target_score)
+	var ratio: float = clampf(float(GameManager.total_score) / float(target), 0.0, 1.0)
+	progress_bar.value = ratio * 100.0
+	var almost_there: bool = ratio >= ALMOST_THERE_THRESHOLD and ratio < 1.0
+	progress_hint_label.text = "ALMOST THERE" if almost_there else ""
+	if almost_there:
+		_start_progress_pulse()
+	else:
+		_stop_progress_pulse()
+
+
+func _start_progress_pulse() -> void:
+	if _progress_pulse_tween != null and _progress_pulse_tween.is_valid():
+		return
+	progress_bar.modulate = Color.WHITE
+	_progress_pulse_tween = create_tween().set_loops()
+	_progress_pulse_tween.tween_property(progress_bar, "modulate", Color(1.0, 0.88, 0.6), 0.25)
+	_progress_pulse_tween.tween_property(progress_bar, "modulate", Color.WHITE, 0.25)
+
+
+func _stop_progress_pulse() -> void:
+	if _progress_pulse_tween != null and _progress_pulse_tween.is_valid():
+		_progress_pulse_tween.kill()
+	_progress_pulse_tween = null
+	progress_bar.modulate = Color.WHITE
 
 
 func _refresh_modifier_display() -> void:

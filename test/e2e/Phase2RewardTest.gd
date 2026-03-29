@@ -7,6 +7,7 @@ func before_test() -> void:
 	GameManager.skip_archetype_picker = true
 	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
 	GameManager.active_modifiers.clear()
+	GameManager.reset_run()
 
 
 func _setup_scene(runner: GdUnitSceneRunner) -> RollPhase:
@@ -84,7 +85,8 @@ func test_streak_resets_on_bust() -> void:
 	if root.turn_state != RollPhase.TurnState.ACTIVE:
 		return
 	_force_clean_state(root)
-	root.turn_number = 2
+	# Caution archetype is immune on turns 1-3 at stage 1, so force turn 4.
+	root.turn_number = 4
 	var stop_face := _make_face(DiceFaceData.FaceType.STOP, 0)
 	for i: int in mini(4, GameManager.dice_pool.size()):
 		root.current_results[i] = stop_face

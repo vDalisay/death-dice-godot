@@ -7,6 +7,7 @@ func before_test() -> void:
 	GameManager.skip_archetype_picker = true
 	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
 	GameManager.active_modifiers.clear()
+	GameManager.reset_run()
 
 
 func test_scene_loads_with_correct_structure() -> void:
@@ -95,6 +96,29 @@ func test_hud_shows_correct_target() -> void:
 	await runner.simulate_frames(2)
 	var root: RollPhase = runner.scene() as RollPhase
 	assert_str(root.hud.target_label.text).contains("30")
+
+
+func test_hud_progress_bar_starts_at_zero() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+	GameManager.total_score = 0
+	GameManager.score_changed.emit(0)
+	await runner.simulate_frames(1)
+	assert_int(int(root.hud.progress_bar.value)).is_equal(0)
+	assert_str(root.hud.progress_hint_label.text).is_equal("")
+
+
+func test_hud_progress_shows_almost_there_near_target() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = runner.scene() as RollPhase
+	var near_target: int = int(float(GameManager.stage_target_score) * 0.9)
+	GameManager.total_score = near_target
+	GameManager.score_changed.emit(near_target)
+	await runner.simulate_frames(1)
+	assert_str(root.hud.progress_hint_label.text).is_equal("ALMOST THERE")
+	assert_int(int(root.hud.progress_bar.value)).is_greater_equal(90)
 
 
 func test_banking_adds_score_to_total() -> void:
