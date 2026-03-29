@@ -3,6 +3,12 @@ extends GdUnitTestSuite
 ## Tests the full game loop: rolling, banking, busting, and new runs.
 
 
+func before_test() -> void:
+	GameManager.skip_archetype_picker = true
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.active_modifiers.clear()
+
+
 func test_scene_loads_with_correct_structure() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
@@ -22,10 +28,11 @@ func test_initial_state_is_idle() -> void:
 	assert_int(root.turn_state).is_equal(RollPhase.TurnState.IDLE)
 
 
-func test_dice_pool_starts_with_five_dice() -> void:
+func test_dice_pool_starts_with_six_dice() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	assert_int(GameManager.dice_pool.size()).is_equal(GameManager.STARTING_DICE_COUNT)
+	# Caution archetype starts with 6 Standard dice.
+	assert_int(GameManager.dice_pool.size()).is_equal(6)
 
 
 func test_roll_button_starts_enabled() -> void:

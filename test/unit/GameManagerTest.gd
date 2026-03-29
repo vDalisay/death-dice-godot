@@ -92,7 +92,7 @@ func test_reset_run_restores_defaults() -> void:
 	assert_int(_gm.current_stage).is_equal(1)
 	assert_int(_gm.gold).is_equal(0)
 	assert_int(_gm.stage_target_score).is_equal(30)
-	assert_int(_gm.dice_pool.size()).is_equal(5)
+	assert_int(_gm.dice_pool.size()).is_equal(6)
 
 
 func test_reset_run_emits_signals() -> void:

@@ -24,7 +24,7 @@ func roll() -> DiceFaceData:
 ## Returns true if this die has at least one STOP face (balance invariant).
 func has_stop_face() -> bool:
 	for face: DiceFaceData in faces:
-		if face.type == DiceFaceData.FaceType.STOP:
+		if face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
 			return true
 	return false
 
@@ -46,6 +46,8 @@ func upgrade_weakest_face() -> bool:
 		return false
 	var face: DiceFaceData = faces[worst_index]
 	match face.type:
+		DiceFaceData.FaceType.CURSED_STOP:
+			face.type = DiceFaceData.FaceType.STOP
 		DiceFaceData.FaceType.STOP:
 			face.type = DiceFaceData.FaceType.BLANK
 			face.value = 0
@@ -82,6 +84,8 @@ func upgrade_weakest_face() -> bool:
 
 func _face_power(face: DiceFaceData) -> int:
 	match face.type:
+		DiceFaceData.FaceType.CURSED_STOP:
+			return -1
 		DiceFaceData.FaceType.STOP:
 			return 0
 		DiceFaceData.FaceType.BLANK:
@@ -104,7 +108,7 @@ func _face_power(face: DiceFaceData) -> int:
 func _count_stop_faces() -> int:
 	var count: int = 0
 	for face: DiceFaceData in faces:
-		if face.type == DiceFaceData.FaceType.STOP:
+		if face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
 			count += 1
 	return count
 

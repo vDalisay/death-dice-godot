@@ -3,6 +3,12 @@ extends GdUnitTestSuite
 ## Hot Streak, Jackpot, Personal Best, Bust Risk, Shop Refresh, Upgrade Preview.
 
 
+func before_test() -> void:
+	GameManager.skip_archetype_picker = true
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.active_modifiers.clear()
+
+
 func _setup_scene(runner: GdUnitSceneRunner) -> RollPhase:
 	var root: RollPhase = runner.scene() as RollPhase
 	return root
@@ -175,9 +181,9 @@ func test_no_jackpot_with_rerolls() -> void:
 	root.bank_button.pressed.emit()
 	await runner.simulate_frames(2)
 
-	# Without jackpot: gold gained = just the score (5 dice × 1 = 5).
+	# Without jackpot: gold gained = just the score (pool_size dice × 1).
 	var gold_gained: int = GameManager.gold - gold_before
-	assert_int(gold_gained).is_equal(5)
+	assert_int(gold_gained).is_equal(GameManager.dice_pool.size())
 
 
 func test_no_jackpot_with_stops() -> void:
@@ -205,7 +211,7 @@ func test_no_jackpot_with_stops() -> void:
 	await runner.simulate_frames(2)
 
 	var gold_gained: int = GameManager.gold - gold_before
-	assert_int(gold_gained).is_equal(5)
+	assert_int(gold_gained).is_equal(GameManager.dice_pool.size())
 
 
 # ---------------------------------------------------------------------------
@@ -233,8 +239,8 @@ func test_personal_best_updates() -> void:
 	root.bank_button.pressed.emit()
 	await runner.simulate_frames(2)
 
-	# Score = 5 × 5 = 25. Should be new best.
-	assert_int(GameManager.best_turn_score).is_equal(25)
+	# Score = pool_size × 5. Should be new best.
+	assert_int(GameManager.best_turn_score).is_equal(5 * GameManager.dice_pool.size())
 
 
 func test_personal_best_not_overwritten_by_lower() -> void:
@@ -390,7 +396,7 @@ func test_streak_display_hidden_after_bust() -> void:
 	if root.turn_state != RollPhase.TurnState.ACTIVE:
 		return
 	_force_clean_state(root)
-	root.turn_number = 2
+	root.turn_number = 4
 	var stop_face := _make_face(DiceFaceData.FaceType.STOP, 0)
 	for i: int in mini(4, GameManager.dice_pool.size()):
 		root.current_results[i] = stop_face

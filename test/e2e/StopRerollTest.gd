@@ -3,6 +3,13 @@ extends GdUnitTestSuite
 ##
 ## Bug fixed: STOP faces were not included in rerolls — they stayed frozen
 ## even when the player pressed "Reroll Selected". Now stopped dice that
+
+
+func before_test() -> void:
+	GameManager.skip_archetype_picker = true
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.active_modifiers.clear()
+
 ## are NOT kept/locked ARE rerolled alongside other free dice.
 ##
 ## Also covers the "pick up a stopped die" toggle interaction.
@@ -470,7 +477,7 @@ func test_accumulated_stops_cause_bust_on_turn_2() -> void:
 		root.dice_keep_locked[i] = false
 	root._sync_all_dice()
 
-	# Force 4 dice to STOP (threshold is 4 for turn 2-3).
+	# Force 4 dice to STOP (threshold is 3 for turn 4+; Caution immune through 3).
 	var stops_needed: int = mini(4, pool_size)
 	for i: int in stops_needed:
 		var stop_face := DiceFaceData.new()
@@ -480,8 +487,8 @@ func test_accumulated_stops_cause_bust_on_turn_2() -> void:
 		root.dice_stopped[i] = true
 		root.dice_keep[i] = false
 
-	# Ensure we're past turn 1
-	root.turn_number = 2
+	# Ensure we're past Caution archetype immunity (turns 1-3)
+	root.turn_number = 4
 
 	# Process results with accumulated stops — should bust.
 	var rolled: Array[int] = []

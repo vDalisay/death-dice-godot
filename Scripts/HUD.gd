@@ -14,6 +14,7 @@ const GOLD_FLOAT_DURATION: float = 1.0
 @onready var stop_label: Label       = $StopLabel
 @onready var status_label: Label     = $StatusLabel
 @onready var highscore_label: Label  = $HighscoreLabel
+@onready var modifier_label: Label   = $ModifierLabel
 
 var _score_tween: Tween = null
 
@@ -30,6 +31,7 @@ func _ready() -> void:
 	_on_lives_changed(GameManager.lives)
 	_on_gold_changed(GameManager.gold)
 	_refresh_stage_display()
+	_refresh_modifier_display()
 	highscore_label.text = "Highscore: %d" % SaveManager.highscore
 
 # ---------------------------------------------------------------------------
@@ -40,6 +42,7 @@ func update_turn(turn_score: int, stop_count: int, bust_threshold: int) -> void:
 	turn_score_label.text = "This turn: %d" % turn_score
 	stop_label.text       = "Stops: %d / %d" % [stop_count, bust_threshold]
 	stop_label.modulate   = Color(0.9, 0.2, 0.2) if stop_count > 0 else Color.WHITE
+	_refresh_modifier_display()
 
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.text     = message
@@ -106,3 +109,13 @@ func _refresh_stage_display() -> void:
 	var loop_text: String = " (Loop %d)" % GameManager.current_loop if GameManager.current_loop > 1 else ""
 	stage_label.text = "Stage: %d / %d%s" % [GameManager.current_stage, GameManager.get_stages_in_current_loop(), loop_text]
 	target_label.text = "Target: %d" % GameManager.stage_target_score
+
+
+func _refresh_modifier_display() -> void:
+	if GameManager.active_modifiers.is_empty():
+		modifier_label.text = ""
+		return
+	var names: Array[String] = []
+	for m: RunModifier in GameManager.active_modifiers:
+		names.append(m.modifier_name)
+	modifier_label.text = "Modifiers: %s" % ", ".join(names)

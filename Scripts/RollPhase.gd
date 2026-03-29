@@ -55,7 +55,10 @@ func _ready() -> void:
 	new_run_button.visible = false
 	_streak_display = StreakDisplayScript.new()
 	add_child(_streak_display)
-	_start_new_turn()
+	if GameManager.skip_archetype_picker:
+		_start_new_turn()
+	else:
+		_show_archetype_picker()
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -98,11 +101,18 @@ func _on_bank_pressed() -> void:
 	bank_streak += 1
 	_update_streak_display()
 	var base_banked: int = _calculate_turn_score()
+	# Iron Bank: +50% score if no rerolls.
+	if GameManager.has_modifier(RunModifier.ModifierType.IRON_BANK) and _reroll_count == 0:
+		base_banked = int(base_banked * 1.5)
 	# Hot Streak multiplier: 3+ consecutive banks = x1.1, 5+ = x1.2.
 	var streak_mult: float = _get_streak_multiplier()
 	var banked: int = int(base_banked * streak_mult)
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
+	# Gambler's Rush: +1g per survived stop.
+	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
+		var rush_gold: int = accumulated_stop_count
+		GameManager.add_gold(rush_gold)
 	# Jackpot check: first roll only (no rerolls), 5+ dice, 0 stops.
 	var is_jackpot: bool = _reroll_count == 0 and GameManager.dice_pool.size() >= JACKPOT_MIN_DICE and accumulated_stop_count == 0
 	if is_jackpot:
@@ -190,7 +200,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		if face == null:
 			continue
 		match face.type:
-			DiceFaceData.FaceType.STOP:
+			DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
 			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
@@ -222,7 +232,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var shield_count: int = _count_shields()
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
-	if effective_stops >= threshold and turn_number > 1:
+	var immune_turns: int = 3 if GameManager.chosen_archetype == GameManager.Archetype.CAUTION else 1
+	if effective_stops >= threshold and turn_number > immune_turns:
 		turn_state = TurnState.BUST
 		bank_streak = 0
 		_update_streak_display()
@@ -243,8 +254,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	# Status messages based on roll outcome.
 	if turn_state == TurnState.BUST:
 		pass  # Bust overlay handles messaging.
-	elif turn_number == 1 and effective_stops >= threshold:
-		hud.show_status("CLOSE CALL! Turn 1 — no bust this time.", Color(1.0, 0.6, 0.0))
+	elif turn_number <= immune_turns and effective_stops >= threshold:
+		hud.show_status("CLOSE CALL! Turn %d — no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
 		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
 		SFXManager.play_close_call()
@@ -277,6 +288,7 @@ func _all_dice_resolved() -> bool:
 
 func _calculate_turn_score() -> int:
 	var pool_size: int = GameManager.dice_pool.size()
+	var glass_cannon: bool = GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON)
 	# Pass 1: compute per-die base scores
 	var base_scores: Array[int] = []
 	base_scores.resize(pool_size)
@@ -289,7 +301,9 @@ func _calculate_turn_score() -> int:
 		if face == null:
 			continue
 		match face.type:
-			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+			DiceFaceData.FaceType.NUMBER:
+				base_scores[i] = face.value + (2 if glass_cannon else 0)
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
 				base_scores[i] = face.value
 			DiceFaceData.FaceType.MULTIPLY:
 				multiplier *= face.value
@@ -316,19 +330,25 @@ func _count_stops() -> int:
 	return count
 
 ## Count stops only among the specified dice indices (per-roll bust check).
+## CURSED_STOP counts as 2 stops.
 func _count_stops_in(indices: Array[int]) -> int:
 	var count: int = 0
 	for i: int in indices:
 		if dice_stopped[i]:
-			count += 1
+			var face: DiceFaceData = current_results[i]
+			if face != null and face.type == DiceFaceData.FaceType.CURSED_STOP:
+				count += 2
+			else:
+				count += 1
 	return count
 
 func _count_shields() -> int:
 	var count: int = 0
+	var multiplier: int = 2 if GameManager.has_modifier(RunModifier.ModifierType.SHIELD_WALL) else 1
 	for i: int in GameManager.dice_pool.size():
 		var face: DiceFaceData = current_results[i]
 		if face != null and face.type == DiceFaceData.FaceType.SHIELD:
-			count += face.value
+			count += face.value * multiplier
 	return count
 
 func _get_turn_multiplier() -> int:
@@ -363,10 +383,10 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_tray.pop_die(i)
 				dice_tray.show_chain_label(i, chain_depth)
 				next_chain.append(i)
-			elif face.type == DiceFaceData.FaceType.STOP:
+			elif face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-				accumulated_stop_count += 1
+				accumulated_stop_count += 2 if face.type == DiceFaceData.FaceType.CURSED_STOP else 1
 				dice_tray.tumble_die(i, face, _die_visual_state(i))
 			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
 				dice_keep[i] = true
@@ -379,6 +399,24 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_tray.tumble_die(i, face, _die_visual_state(i))
 		to_reroll = next_chain
 
+	# Explosophile: after chains end, reroll 1 extra un-resolved die for free.
+	if chain_depth > 0 and GameManager.has_modifier(RunModifier.ModifierType.EXPLOSOPHILE):
+		var candidates: Array[int] = []
+		for i: int in GameManager.dice_pool.size():
+			if not dice_keep[i] and not dice_keep_locked[i] and not dice_stopped[i]:
+				candidates.append(i)
+		if not candidates.is_empty():
+			var extra_i: int = candidates[randi() % candidates.size()]
+			current_results[extra_i] = GameManager.dice_pool[extra_i].roll()
+			var extra_face: DiceFaceData = current_results[extra_i]
+			if extra_face.type == DiceFaceData.FaceType.STOP or extra_face.type == DiceFaceData.FaceType.CURSED_STOP:
+				dice_stopped[extra_i] = true
+				accumulated_stop_count += 2 if extra_face.type == DiceFaceData.FaceType.CURSED_STOP else 1
+			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.EXPLODE]:
+				dice_keep[extra_i] = true
+				dice_keep_locked[extra_i] = true
+			dice_tray.tumble_die(extra_i, extra_face, _die_visual_state(extra_i))
+
 	_sync_all_dice()
 	_sync_ui()
 
@@ -390,9 +428,13 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 		_on_bank_pressed()
 
 func _get_bust_threshold() -> int:
+	var base: int = BASE_BUST_THRESHOLD
 	if turn_number <= 3:
-		return BASE_BUST_THRESHOLD + 1   # Lenient: 4
-	return BASE_BUST_THRESHOLD           # Standard: 3
+		base += 1   # Lenient: 4
+	# Glass Cannon: threshold -1
+	if GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON):
+		base = maxi(1, base - 1)
+	return base
 
 
 func _get_streak_multiplier() -> float:
@@ -494,6 +536,8 @@ func _on_shop_closed() -> void:
 	if _loop_complete_pending:
 		GameManager.advance_loop()
 		_loop_complete_pending = false
+		# Curse event: ~20% chance on loop transition.
+		_maybe_apply_curse()
 	else:
 		GameManager.advance_stage()
 	shop_panel.visible = false
@@ -508,15 +552,10 @@ func _on_shop_closed() -> void:
 func _on_new_run_pressed() -> void:
 	var snapshot: Resource = SaveManager.make_run_snapshot()
 	SaveManager.record_run(snapshot)
-	GameManager.reset_run()
-	_run_active = true
-	turn_number = 0
-	bank_streak = 0
-	_update_streak_display()
 	new_run_button.visible = false
 	shop_panel.visible = false
 	_roll_content.visible = true
-	_start_new_turn()
+	_show_archetype_picker()
 
 func _sync_buttons() -> void:
 	if not _run_active:
@@ -593,6 +632,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 ## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).
 func _get_per_die_scores() -> Array[int]:
 	var pool_size: int = GameManager.dice_pool.size()
+	var glass_cannon: bool = GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON)
 	var base_scores: Array[int] = []
 	base_scores.resize(pool_size)
 	base_scores.fill(0)
@@ -604,7 +644,9 @@ func _get_per_die_scores() -> Array[int]:
 		if face == null:
 			continue
 		match face.type:
-			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+			DiceFaceData.FaceType.NUMBER:
+				base_scores[i] = face.value + (2 if glass_cannon else 0)
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
 				base_scores[i] = face.value
 			DiceFaceData.FaceType.MULTIPLY:
 				multiplier *= face.value
@@ -705,3 +747,107 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 		proceed_btn.modulate.a = 1.0
 		overlay.mouse_filter = Control.MOUSE_FILTER_PASS
 	)
+
+
+# ---------------------------------------------------------------------------
+# Curse event
+# ---------------------------------------------------------------------------
+
+const CURSE_CHANCE: float = 0.2
+
+func _maybe_apply_curse() -> void:
+	if randf() >= CURSE_CHANCE:
+		return
+	if GameManager.dice_pool.is_empty():
+		return
+	# Pick a random die and replace one non-CURSED_STOP face with CURSED_STOP.
+	var die: DiceData = GameManager.dice_pool[randi() % GameManager.dice_pool.size()]
+	var candidates: Array[int] = []
+	for i: int in die.faces.size():
+		if die.faces[i].type != DiceFaceData.FaceType.CURSED_STOP:
+			candidates.append(i)
+	if candidates.is_empty():
+		return
+	var target: int = candidates[randi() % candidates.size()]
+	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
+	die.faces[target].value = 0
+	hud.show_status("CURSED! %s gained a ☠STOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
+
+# ---------------------------------------------------------------------------
+# Archetype picker
+# ---------------------------------------------------------------------------
+
+func _show_archetype_picker() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = Color(0.1, 0.1, 0.15, 0.92)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 16)
+	var title: Label = Label.new()
+	title.text = "Choose Your Archetype"
+	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+	var card_row: HBoxContainer = HBoxContainer.new()
+	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_row.add_theme_constant_override("separation", 24)
+	var archetypes: Array = [
+		GameManager.Archetype.CAUTION,
+		GameManager.Archetype.RISK_IT,
+		GameManager.Archetype.BLANK_SLATE,
+	]
+	for arch: GameManager.Archetype in archetypes:
+		var unlock_req: int = GameManager.ARCHETYPE_UNLOCK_LOOPS[arch]
+		var unlocked: bool = SaveManager.max_loops_completed >= unlock_req
+		var card: PanelContainer = PanelContainer.new()
+		card.custom_minimum_size = Vector2(200, 160)
+		var card_vbox: VBoxContainer = VBoxContainer.new()
+		card_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		card_vbox.add_theme_constant_override("separation", 8)
+		var name_lbl: Label = Label.new()
+		name_lbl.text = GameManager.ARCHETYPE_NAMES[arch]
+		name_lbl.add_theme_font_size_override("font_size", 22)
+		name_lbl.add_theme_color_override("font_color", Color.WHITE if unlocked else Color(0.4, 0.4, 0.4))
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_vbox.add_child(name_lbl)
+		var desc_lbl: Label = Label.new()
+		if unlocked:
+			desc_lbl.text = GameManager.ARCHETYPE_DESCRIPTIONS[arch]
+		else:
+			desc_lbl.text = "Locked — complete %d loop(s)" % unlock_req
+		desc_lbl.add_theme_font_size_override("font_size", 14)
+		desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7) if unlocked else Color(0.35, 0.35, 0.35))
+		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		card_vbox.add_child(desc_lbl)
+		var pick_btn: Button = Button.new()
+		pick_btn.text = "Select" if unlocked else "Locked"
+		pick_btn.disabled = not unlocked
+		pick_btn.add_theme_font_size_override("font_size", 18)
+		pick_btn.pressed.connect(_on_archetype_chosen.bind(arch, overlay))
+		card_vbox.add_child(pick_btn)
+		card.add_child(card_vbox)
+		card_row.add_child(card)
+	vbox.add_child(card_row)
+	center.add_child(vbox)
+	overlay.add_child(center)
+	add_child(overlay)
+
+
+func _on_archetype_chosen(arch: GameManager.Archetype, overlay: ColorRect) -> void:
+	GameManager.chosen_archetype = arch
+	GameManager.reset_run()
+	overlay.queue_free()
+	_run_active = true
+	turn_number = 0
+	bank_streak = 0
+	_update_streak_display()
+	_start_new_turn()

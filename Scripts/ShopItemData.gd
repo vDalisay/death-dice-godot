@@ -14,12 +14,16 @@ enum ItemType {
 	BUY_PINK_DIE,
 	BUY_SIMPLE_DIE,
 	UPGRADE_DIE,
+	BUY_MODIFIER,
+	CLEANSE_CURSE,
 }
 
 @export var item_name: String = ""
 @export var description: String = ""
 @export var cost: int = 0
 @export var item_type: ItemType = ItemType.BUY_STANDARD_DIE
+## For BUY_MODIFIER items, the modifier resource to grant on purchase.
+var modifier: RunModifier = null
 
 
 static func make_buy_standard_die() -> ShopItemData:
@@ -109,4 +113,24 @@ static func make_upgrade_die() -> ShopItemData:
 	item.description = "Upgrade the weakest face on a random die."
 	item.cost = 30
 	item.item_type = ItemType.UPGRADE_DIE
+	return item
+
+
+## Create a shop item for purchasing a passive modifier.
+static func make_buy_modifier(mod: RunModifier) -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = mod.modifier_name
+	item.description = mod.description
+	item.cost = mod.cost
+	item.item_type = ItemType.BUY_MODIFIER
+	item.modifier = mod
+	return item
+
+
+static func make_cleanse_curse() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Cleanse Curse"
+	item.description = "Remove a CURSED STOP face from a random die."
+	item.cost = 15
+	item.item_type = ItemType.CLEANSE_CURSE
 	return item

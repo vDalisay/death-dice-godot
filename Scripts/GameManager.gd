@@ -9,6 +9,27 @@ const BASE_STAGE_TARGET: int = 30
 const STAGE_TARGET_STEP: int = 25
 const STAGE_CLEAR_GOLD_BONUS: int = 20
 const LOOP_BONUS_GOLD_STEP: int = 10
+const MAX_MODIFIERS: int = 3
+const MISER_SPEND_THRESHOLD: int = 15
+const MISER_BONUS_GOLD: int = 20
+
+enum Archetype { CAUTION, RISK_IT, BLANK_SLATE }
+const ARCHETYPE_NAMES: Dictionary = {
+	Archetype.CAUTION: "Caution",
+	Archetype.RISK_IT: "Risk It",
+	Archetype.BLANK_SLATE: "Blank Slate",
+}
+const ARCHETYPE_DESCRIPTIONS: Dictionary = {
+	Archetype.CAUTION: "6 Standard dice, bust immunity to turn 3.",
+	Archetype.RISK_IT: "5 Gambler dice, 2x gold per turn.",
+	Archetype.BLANK_SLATE: "8 Blank Canvas dice, shop gold doubled.",
+}
+## Loops required to unlock each archetype (0 = always available).
+const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
+	Archetype.CAUTION: 0,
+	Archetype.RISK_IT: 1,
+	Archetype.BLANK_SLATE: 3,
+}
 
 signal score_changed(new_total: int)
 signal turn_banked(points: int, new_total: int)
@@ -28,6 +49,15 @@ var stage_target_score: int = BASE_STAGE_TARGET
 var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
 var best_turn_score: int = 0
+var active_modifiers: Array[RunModifier] = []
+var chosen_archetype: Archetype = Archetype.CAUTION
+## Tracks gold spent in the current shop visit (for Miser modifier).
+var _shop_gold_spent: int = 0
+## Whether the Miser bonus is pending for the next shop.
+var _miser_bonus_pending: bool = false
+## When true, RollPhase skips the archetype picker and starts immediately.
+## Set by tests to avoid UI blocking.
+var skip_archetype_picker: bool = false
 
 
 func _ready() -> void:
@@ -40,8 +70,16 @@ func _ready() -> void:
 
 func _build_starting_pool() -> void:
 	dice_pool.clear()
-	for i: int in STARTING_DICE_COUNT:
-		dice_pool.append(DiceData.make_standard_d6())
+	match chosen_archetype:
+		Archetype.CAUTION:
+			for i: int in 6:
+				dice_pool.append(DiceData.make_standard_d6())
+		Archetype.RISK_IT:
+			for i: int in 5:
+				dice_pool.append(DiceData.make_gambler_d6())
+		Archetype.BLANK_SLATE:
+			for i: int in 8:
+				dice_pool.append(DiceData.make_blank_canvas_d6())
 
 
 func add_dice(die: DiceData) -> void:
@@ -54,7 +92,10 @@ func add_dice(die: DiceData) -> void:
 
 func add_score(points: int) -> void:
 	total_score += points
-	add_gold(points)
+	var gold_earned: int = points
+	if chosen_archetype == Archetype.RISK_IT:
+		gold_earned *= 2
+	add_gold(gold_earned)
 	score_changed.emit(total_score)
 	turn_banked.emit(points, total_score)
 	if total_score >= stage_target_score:
@@ -118,7 +159,10 @@ func is_final_stage() -> bool:
 
 
 func get_stage_clear_bonus() -> int:
-	return STAGE_CLEAR_GOLD_BONUS + LOOP_BONUS_GOLD_STEP * (current_loop - 1)
+	var base: int = STAGE_CLEAR_GOLD_BONUS + LOOP_BONUS_GOLD_STEP * (current_loop - 1)
+	if chosen_archetype == Archetype.BLANK_SLATE:
+		base *= 2
+	return base
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +188,9 @@ func reset_run() -> void:
 	lives = MAX_LIVES
 	gold = 0
 	best_turn_score = 0
+	active_modifiers.clear()
+	_shop_gold_spent = 0
+	_miser_bonus_pending = false
 	stage_target_score = _calculate_stage_target(current_stage)
 	_build_starting_pool()
 	score_changed.emit(total_score)
@@ -151,3 +198,46 @@ func reset_run() -> void:
 	gold_changed.emit(gold)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
+
+
+# ---------------------------------------------------------------------------
+# Modifier helpers
+# ---------------------------------------------------------------------------
+
+func has_modifier(mod_type: RunModifier.ModifierType) -> bool:
+	for m: RunModifier in active_modifiers:
+		if m.modifier_type == mod_type:
+			return true
+	return false
+
+
+func add_modifier(modifier: RunModifier) -> bool:
+	if active_modifiers.size() >= MAX_MODIFIERS:
+		return false
+	active_modifiers.append(modifier)
+	return true
+
+
+func can_add_modifier() -> bool:
+	return active_modifiers.size() < MAX_MODIFIERS
+
+
+## Called when entering the shop. Awards Miser bonus if pending.
+func on_shop_entered() -> void:
+	_shop_gold_spent = 0
+	if _miser_bonus_pending:
+		_miser_bonus_pending = false
+		add_gold(MISER_BONUS_GOLD)
+
+
+## Called when leaving the shop. Checks Miser condition for next shop.
+func on_shop_exited() -> void:
+	if has_modifier(RunModifier.ModifierType.MISER) and _shop_gold_spent < MISER_SPEND_THRESHOLD:
+		_miser_bonus_pending = true
+	else:
+		_miser_bonus_pending = false
+
+
+## Track gold spent in shop (for Miser modifier).
+func track_shop_spend(amount: int) -> void:
+	_shop_gold_spent += amount

@@ -9,6 +9,7 @@ const ITEM_FONT_SIZE: int = 18
 const REFRESH_COST: int = 5
 
 const DICE_SLOTS: int = 4
+const MODIFIER_SLOTS: int = 2
 
 @onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var _gold_label: Label = $MarginContainer/VBoxContainer/GoldLabel
@@ -32,6 +33,7 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
+	GameManager.on_shop_entered()
 	if is_loop_complete:
 		_title_label.text = "Loop %d Complete!" % (GameManager.current_loop - 1)
 		_continue_button.text = "Start Loop %d" % GameManager.current_loop
@@ -71,6 +73,22 @@ func _generate_items() -> void:
 	# Empower Die is always available if the player has dice.
 	if not GameManager.dice_pool.is_empty():
 		_items.append(ShopItemData.make_upgrade_die())
+	# Modifier items: offer 1-2 random modifiers the player doesn't already own.
+	if GameManager.can_add_modifier():
+		var mod_factories: Array[Callable] = RunModifier.all_factories()
+		var available_mods: Array[Callable] = []
+		for factory: Callable in mod_factories:
+			var sample: RunModifier = factory.call() as RunModifier
+			if not GameManager.has_modifier(sample.modifier_type):
+				available_mods.append(factory)
+		available_mods.shuffle()
+		var mod_count: int = mini(MODIFIER_SLOTS, available_mods.size())
+		for i: int in mod_count:
+			var mod: RunModifier = available_mods[i].call() as RunModifier
+			_items.append(ShopItemData.make_buy_modifier(mod))
+	# Cleanse Curse: available if any die has a CURSED_STOP face.
+	if _any_die_has_cursed_stop():
+		_items.append(ShopItemData.make_cleanse_curse())
 	_build_item_rows()
 
 
@@ -126,6 +144,7 @@ func _build_item_rows() -> void:
 func _on_buy_pressed(item: ShopItemData) -> void:
 	if not GameManager.spend_gold(item.cost):
 		return
+	GameManager.track_shop_spend(item.cost)
 	SFXManager.play_shop_purchase()
 	match item.item_type:
 		ShopItemData.ItemType.BUY_STANDARD_DIE:
@@ -148,6 +167,11 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_simple_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
 			_upgrade_random_die()
+		ShopItemData.ItemType.BUY_MODIFIER:
+			if item.modifier != null:
+				GameManager.add_modifier(item.modifier)
+		ShopItemData.ItemType.CLEANSE_CURSE:
+			_cleanse_random_cursed_die()
 	_refresh_display()
 
 
@@ -163,6 +187,7 @@ func _upgrade_random_die() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_continue_pressed() -> void:
+	GameManager.on_shop_exited()
 	visible = false
 	shop_closed.emit()
 
@@ -174,14 +199,24 @@ func _on_gold_changed(_new_gold: int) -> void:
 
 func _refresh_display() -> void:
 	_gold_label.text = "Gold: %d" % GameManager.gold
-	_pool_label.text = "Your Dice: %d" % GameManager.dice_pool.size()
+	var mod_text: String = ""
+	if not GameManager.active_modifiers.is_empty():
+		var names: Array[String] = []
+		for m: RunModifier in GameManager.active_modifiers:
+			names.append(m.modifier_name)
+		mod_text = "  |  Modifiers: %s" % ", ".join(names)
+	_pool_label.text = "Your Dice: %d%s" % [GameManager.dice_pool.size(), mod_text]
 	_refresh_buy_buttons()
 
 
 func _refresh_buy_buttons() -> void:
 	for i: int in _buy_buttons.size():
 		if i < _items.size():
-			_buy_buttons[i].disabled = GameManager.gold < _items[i].cost
+			var item: ShopItemData = _items[i]
+			var too_expensive: bool = GameManager.gold < item.cost
+			var mod_full: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and not GameManager.can_add_modifier()
+			var already_owned: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type)
+			_buy_buttons[i].disabled = too_expensive or mod_full or already_owned
 	if _refresh_button != null:
 		_refresh_button.disabled = GameManager.gold < REFRESH_COST
 
@@ -219,3 +254,27 @@ func _get_upgrade_preview() -> String:
 	if previews.is_empty():
 		return "No upgradeable faces."
 	return "Will upgrade a random die. Candidates: %s" % ", ".join(previews)
+
+
+func _any_die_has_cursed_stop() -> bool:
+	for die: DiceData in GameManager.dice_pool:
+		for face: DiceFaceData in die.faces:
+			if face.type == DiceFaceData.FaceType.CURSED_STOP:
+				return true
+	return false
+
+
+func _cleanse_random_cursed_die() -> void:
+	var cursed_dice: Array[DiceData] = []
+	for die: DiceData in GameManager.dice_pool:
+		for face: DiceFaceData in die.faces:
+			if face.type == DiceFaceData.FaceType.CURSED_STOP:
+				cursed_dice.append(die)
+				break
+	if cursed_dice.is_empty():
+		return
+	var die: DiceData = cursed_dice[randi() % cursed_dice.size()]
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.CURSED_STOP:
+			face.type = DiceFaceData.FaceType.STOP
+			break

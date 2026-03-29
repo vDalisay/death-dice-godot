@@ -7,6 +7,7 @@ const RunSaveDataScript: GDScript = preload("res://Scripts/RunSaveData.gd")
 signal highscore_changed(new_highscore: int)
 
 var highscore: int = 0
+var max_loops_completed: int = 0
 var run_history: Array = []
 
 func _ready() -> void:
@@ -21,6 +22,8 @@ func record_run(run: Resource) -> void:
 	if run.score > highscore:
 		highscore = run.score
 		highscore_changed.emit(highscore)
+	if run.loops_completed > max_loops_completed:
+		max_loops_completed = run.loops_completed
 	_save()
 
 func make_run_snapshot() -> Resource:
@@ -41,6 +44,7 @@ func _save() -> void:
 		runs_array.append(run.to_dict())
 	var data: Dictionary = {
 		"highscore": highscore,
+		"max_loops_completed": max_loops_completed,
 		"runs": runs_array,
 	}
 	var file: FileAccess = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -61,6 +65,7 @@ func _load() -> void:
 		return
 	var data: Dictionary = json.data as Dictionary
 	highscore = data.get("highscore", 0) as int
+	max_loops_completed = data.get("max_loops_completed", 0) as int
 	var runs: Array = data.get("runs", []) as Array
 	run_history.clear()
 	for entry: Variant in runs:

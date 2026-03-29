@@ -3,6 +3,12 @@ extends GdUnitTestSuite
 ## and auto-advance behavior.
 
 
+func before_test() -> void:
+	GameManager.skip_archetype_picker = true
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.active_modifiers.clear()
+
+
 # ---------------------------------------------------------------------------
 # Per-die score breakdown (_get_per_die_scores via scene)
 # ---------------------------------------------------------------------------
@@ -284,9 +290,9 @@ func test_auto_advance_after_bust() -> void:
 	if root.turn_state != RollPhase.TurnState.ACTIVE:
 		return
 
-	# Force bust: turn 2 with 4 stops (threshold = 4).
+	# Force bust: turn 4 with 4 stops (Caution archetype immune through turn 3).
 	_force_clean_state(root)
-	root.turn_number = 2
+	root.turn_number = 4
 	root.accumulated_stop_count = 0
 	var stop_face := _make_face(DiceFaceData.FaceType.STOP, 0)
 	for i: int in mini(4, GameManager.dice_pool.size()):
