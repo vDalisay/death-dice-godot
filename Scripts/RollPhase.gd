@@ -657,8 +657,11 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int) -> void:
 	overlay.color = Color(0.2, 0.8, 0.3, 0.0)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# CenterContainer fills the overlay and centers its child at any resolution.
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_CENTER)
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	var title_lbl: Label = Label.new()
 	title_lbl.text = "STAGE CLEARED!"
@@ -680,7 +683,8 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int) -> void:
 	if surplus > 0:
 		vbox.add_child(surplus_lbl)
 	vbox.modulate.a = 0.0
-	overlay.add_child(vbox)
+	center.add_child(vbox)
+	overlay.add_child(center)
 	add_child(overlay)
 	var tween: Tween = create_tween()
 	tween.tween_property(overlay, "color:a", 0.35, 0.2)
