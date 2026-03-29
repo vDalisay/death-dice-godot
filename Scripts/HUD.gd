@@ -21,6 +21,7 @@ const ALMOST_THERE_THRESHOLD: float = 0.9
 
 var _score_tween: Tween = null
 var _progress_pulse_tween: Tween = null
+var _combo_flash_tween: Tween = null
 
 func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
@@ -52,6 +53,17 @@ func update_turn(turn_score: int, stop_count: int, bust_threshold: int) -> void:
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.text     = message
 	status_label.modulate = colour
+
+
+func flash_combo(combo_name: String, colour: Color) -> void:
+	show_status("COMBO: %s!" % combo_name, colour)
+	status_label.pivot_offset = status_label.size * 0.5
+	if _combo_flash_tween != null and _combo_flash_tween.is_valid():
+		_combo_flash_tween.kill()
+	status_label.scale = Vector2.ONE
+	_combo_flash_tween = create_tween()
+	_combo_flash_tween.tween_property(status_label, "scale", Vector2(1.1, 1.1), 0.12)
+	_combo_flash_tween.tween_property(status_label, "scale", Vector2.ONE, 0.18)
 
 
 ## Animate the score label counting from old_value to new_value over time.

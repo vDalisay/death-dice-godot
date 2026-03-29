@@ -21,6 +21,7 @@ GameManager="*res://Scripts/GameManager.gd"
 SaveManager="*res://Scripts/SaveManager.gd"
 SFXManager="*res://Scripts/SFXManager.gd"
 AchievementManager="*res://Scripts/AchievementManager.gd"
+RollComboRegistry="*res://Scripts/RollComboRegistry.gd"
 
 [dotnet]
 

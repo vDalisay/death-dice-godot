@@ -47,6 +47,7 @@ var _streak_display: Control = null
 var _run_snapshot_recorded: bool = false
 var _is_roll_animating: bool = false
 var _roll_anim_nonce: int = 0
+var _triggered_combo_ids: Dictionary = {}
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -89,6 +90,7 @@ func _start_new_turn() -> void:
 	turn_number += 1
 	accumulated_stop_count = 0
 	_reroll_count = 0
+	_triggered_combo_ids.clear()
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
@@ -313,6 +315,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		_process_explode_chains(chain_reroll)
 		return
 
+	_check_roll_combos()
+
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
 
@@ -482,8 +486,21 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 		SFXManager.play_explode()
 		hud.show_status("CHAIN x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
 
+	_check_roll_combos()
+
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
+
+
+func _check_roll_combos() -> void:
+	if turn_state != TurnState.ACTIVE:
+		return
+	var combos: Array[RollCombo] = RollComboRegistry.get_triggered_combos(current_results, dice_stopped)
+	for combo: RollCombo in combos:
+		if combo == null or combo.combo_id.is_empty() or _triggered_combo_ids.has(combo.combo_id):
+			continue
+		_triggered_combo_ids[combo.combo_id] = true
+		hud.flash_combo(combo.display_name, combo.flash_color)
 
 func _get_bust_threshold() -> int:
 	var base: int = BASE_BUST_THRESHOLD

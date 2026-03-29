@@ -251,6 +251,29 @@ func test_clean_roll_on_zero_stops() -> void:
 	assert_str(root.hud.status_label.text).contains("CLEAN ROLL")
 
 
+func test_combo_flash_when_shield_wall_detected() -> void:
+	## Named combos should flash in the HUD when requirements are met.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	_force_clean_state(root)
+	root.current_results[0] = _make_face(DiceFaceData.FaceType.SHIELD, 1)
+	root.current_results[1] = _make_face(DiceFaceData.FaceType.SHIELD, 1)
+
+	var all_indices: Array[int] = []
+	for i: int in GameManager.dice_pool.size():
+		all_indices.append(i)
+	root._process_roll_results(all_indices)
+	await runner.simulate_frames(2)
+
+	assert_str(root.hud.status_label.text).contains("COMBO: Shield Wall")
+
+
 # ---------------------------------------------------------------------------
 # Auto-advance after bank / bust
 # ---------------------------------------------------------------------------
