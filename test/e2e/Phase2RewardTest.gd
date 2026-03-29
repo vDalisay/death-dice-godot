@@ -330,3 +330,74 @@ func test_reroll_count_increments_on_reroll() -> void:
 
 func test_shop_refresh_cost() -> void:
 	assert_int(ShopPanel.REFRESH_COST).is_equal(5)
+
+
+# ---------------------------------------------------------------------------
+# Streak Display (#10 visual)
+# ---------------------------------------------------------------------------
+
+func test_streak_display_hidden_at_zero() -> void:
+	## StreakDisplay should be invisible when streak is 0.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+	assert_bool(root._streak_display.visible).is_false()
+
+
+func test_streak_display_visible_after_bank() -> void:
+	## StreakDisplay should become visible after banking (streak = 1).
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+
+	_force_clean_state(root)
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 9999
+	root.bank_button.pressed.emit()
+	await runner.simulate_frames(2)
+
+	assert_bool(root._streak_display.visible).is_true()
+
+
+func test_streak_display_hidden_after_bust() -> void:
+	## StreakDisplay should hide when streak resets to 0 on bust.
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+
+	# Bank once to get streak visible.
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+	_force_clean_state(root)
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 9999
+	root.bank_button.pressed.emit()
+	await runner.simulate_frames(2)
+	# Wait for auto-advance.
+	for _i: int in 20:
+		await runner.simulate_frames(1, 100)
+	await runner.simulate_frames(5)
+
+	# Now force a bust.
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(2)
+	if root.turn_state != RollPhase.TurnState.ACTIVE:
+		return
+	_force_clean_state(root)
+	root.turn_number = 2
+	var stop_face := _make_face(DiceFaceData.FaceType.STOP, 0)
+	for i: int in mini(4, GameManager.dice_pool.size()):
+		root.current_results[i] = stop_face
+	var all_indices: Array[int] = []
+	for i: int in GameManager.dice_pool.size():
+		all_indices.append(i)
+	root._process_roll_results(all_indices)
+	await runner.simulate_frames(2)
+
+	assert_bool(root._streak_display.visible).is_false()

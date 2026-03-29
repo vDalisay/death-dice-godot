@@ -40,6 +40,9 @@ var _run_active: bool = true
 var _loop_complete_pending: bool = false
 var bank_streak: int = 0
 var _reroll_count: int = 0
+var _streak_display: Control = null
+
+const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 
 func _ready() -> void:
 	roll_button.pressed.connect(_on_roll_pressed)
@@ -50,6 +53,8 @@ func _ready() -> void:
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	new_run_button.visible = false
+	_streak_display = StreakDisplayScript.new()
+	add_child(_streak_display)
 	_start_new_turn()
 
 # ---------------------------------------------------------------------------
@@ -91,6 +96,7 @@ func _on_bank_pressed() -> void:
 		return
 	turn_state = TurnState.BANKED
 	bank_streak += 1
+	_update_streak_display()
 	var base_banked: int = _calculate_turn_score()
 	# Hot Streak multiplier: 3+ consecutive banks = x1.1, 5+ = x1.2.
 	var streak_mult: float = _get_streak_multiplier()
@@ -219,6 +225,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if effective_stops >= threshold and turn_number > 1:
 		turn_state = TurnState.BUST
 		bank_streak = 0
+		_update_streak_display()
 		GameManager.lose_life()
 		SFXManager.play_bust()
 		_show_bust_overlay(effective_stops)
@@ -396,6 +403,11 @@ func _get_streak_multiplier() -> float:
 	return 1.0
 
 
+func _update_streak_display() -> void:
+	if _streak_display != null:
+		_streak_display.update_streak(bank_streak, _get_streak_multiplier())
+
+
 func _get_bust_risk_text(effective_stops: int, threshold: int) -> String:
 	if effective_stops == 0:
 		return "Bust risk: LOW"
@@ -489,6 +501,7 @@ func _on_shop_closed() -> void:
 	_run_active = true
 	turn_number = 0
 	bank_streak = 0
+	_update_streak_display()
 	_start_new_turn()
 
 func _on_new_run_pressed() -> void:
@@ -498,6 +511,7 @@ func _on_new_run_pressed() -> void:
 	_run_active = true
 	turn_number = 0
 	bank_streak = 0
+	_update_streak_display()
 	new_run_button.visible = false
 	shop_panel.visible = false
 	_roll_content.visible = true
