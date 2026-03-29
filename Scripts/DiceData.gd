@@ -12,9 +12,34 @@ const MAX_EXPLODE_VALUE: int = 5
 const MAX_MULTIPLY_LEFT_VALUE: int = 4
 const MAX_CHAIN_ROLLS: int = 10
 
+enum Rarity { GREY, GREEN, BLUE, PURPLE }
+
+const RARITY_GREY_COLOR: Color = Color(0.62, 0.62, 0.62)
+const RARITY_GREEN_COLOR: Color = Color(0.34, 0.78, 0.34)
+const RARITY_BLUE_COLOR: Color = Color(0.32, 0.58, 0.95)
+const RARITY_PURPLE_COLOR: Color = Color(0.67, 0.42, 0.92)
+
 @export var dice_name: String = "Standard D6"
 @export var faces: Array[DiceFaceData] = []
 @export var custom_color: Color = Color.TRANSPARENT
+@export var rarity: Rarity = Rarity.GREY
+
+
+static func get_rarity_color(tier: Rarity) -> Color:
+	match tier:
+		Rarity.GREY:
+			return RARITY_GREY_COLOR
+		Rarity.GREEN:
+			return RARITY_GREEN_COLOR
+		Rarity.BLUE:
+			return RARITY_BLUE_COLOR
+		Rarity.PURPLE:
+			return RARITY_PURPLE_COLOR
+	return RARITY_GREY_COLOR
+
+
+func get_rarity_color_value() -> Color:
+	return DiceData.get_rarity_color(rarity)
 
 
 func roll() -> DiceFaceData:
@@ -120,6 +145,7 @@ func _count_stop_faces() -> int:
 static func make_standard_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Standard D6"
+	die.rarity = Rarity.GREY
 	var configs: Array = [
 		[DiceFaceData.FaceType.NUMBER,    1],
 		[DiceFaceData.FaceType.NUMBER,    1],
@@ -139,6 +165,7 @@ static func make_standard_d6() -> DiceData:
 static func make_lucky_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Lucky D6"
+	die.rarity = Rarity.GREEN
 	var configs: Array = [
 		[DiceFaceData.FaceType.NUMBER,    2],
 		[DiceFaceData.FaceType.NUMBER,    2],
@@ -159,6 +186,7 @@ static func make_lucky_d6() -> DiceData:
 static func make_gambler_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Gambler D6"
+	die.rarity = Rarity.BLUE
 	var configs: Array = [
 		[DiceFaceData.FaceType.NUMBER, 3],
 		[DiceFaceData.FaceType.NUMBER, 4],
@@ -179,6 +207,7 @@ static func make_gambler_d6() -> DiceData:
 static func make_golden_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Golden D6"
+	die.rarity = Rarity.BLUE
 	var configs: Array = [
 		[DiceFaceData.FaceType.AUTO_KEEP, 2],
 		[DiceFaceData.FaceType.AUTO_KEEP, 2],
@@ -199,6 +228,7 @@ static func make_golden_d6() -> DiceData:
 static func make_heavy_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Heavy D6"
+	die.rarity = Rarity.GREEN
 	var configs: Array = [
 		[DiceFaceData.FaceType.NUMBER, 4],
 		[DiceFaceData.FaceType.NUMBER, 5],
@@ -219,6 +249,7 @@ static func make_heavy_d6() -> DiceData:
 static func make_explosive_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Explosive D6"
+	die.rarity = Rarity.PURPLE
 	var configs: Array = [
 		[DiceFaceData.FaceType.EXPLODE, 2],
 		[DiceFaceData.FaceType.EXPLODE, 2],
@@ -240,6 +271,7 @@ static func make_pink_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Pink D6"
 	die.custom_color = Color(1.0, 0.4, 0.7)
+	die.rarity = Rarity.PURPLE
 	var configs: Array = [
 		[DiceFaceData.FaceType.MULTIPLY_LEFT, 2],
 		[DiceFaceData.FaceType.MULTIPLY_LEFT, 2],
@@ -260,6 +292,7 @@ static func make_pink_d6() -> DiceData:
 static func make_blank_canvas_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Blank Canvas D6"
+	die.rarity = Rarity.GREY
 	var configs: Array = [
 		[DiceFaceData.FaceType.BLANK, 0],
 		[DiceFaceData.FaceType.BLANK, 0],
@@ -280,6 +313,7 @@ static func make_blank_canvas_d6() -> DiceData:
 static func make_simple_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Simple D6"
+	die.rarity = Rarity.GREY
 	var configs: Array = [
 		[DiceFaceData.FaceType.NUMBER, 1],
 		[DiceFaceData.FaceType.NUMBER, 1],

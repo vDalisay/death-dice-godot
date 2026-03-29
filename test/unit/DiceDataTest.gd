@@ -207,3 +207,29 @@ func test_simple_d6_face_composition() -> void:
 			blank_count += 1
 	assert_int(number_count).is_equal(3)
 	assert_int(blank_count).is_equal(3)
+
+
+# ---------------------------------------------------------------------------
+# Rarity tiers (Phase 5)
+# ---------------------------------------------------------------------------
+
+func test_rarity_assignments_by_factory() -> void:
+	assert_int(DiceData.make_simple_d6().rarity).is_equal(DiceData.Rarity.GREY)
+	assert_int(DiceData.make_blank_canvas_d6().rarity).is_equal(DiceData.Rarity.GREY)
+	assert_int(DiceData.make_standard_d6().rarity).is_equal(DiceData.Rarity.GREY)
+
+	assert_int(DiceData.make_lucky_d6().rarity).is_equal(DiceData.Rarity.GREEN)
+	assert_int(DiceData.make_heavy_d6().rarity).is_equal(DiceData.Rarity.GREEN)
+
+	assert_int(DiceData.make_golden_d6().rarity).is_equal(DiceData.Rarity.BLUE)
+	assert_int(DiceData.make_gambler_d6().rarity).is_equal(DiceData.Rarity.BLUE)
+
+	assert_int(DiceData.make_explosive_d6().rarity).is_equal(DiceData.Rarity.PURPLE)
+	assert_int(DiceData.make_pink_d6().rarity).is_equal(DiceData.Rarity.PURPLE)
+
+
+func test_rarity_color_mapping_returns_expected_values() -> void:
+	assert_bool(DiceData.get_rarity_color(DiceData.Rarity.GREY) == DiceData.RARITY_GREY_COLOR).is_true()
+	assert_bool(DiceData.get_rarity_color(DiceData.Rarity.GREEN) == DiceData.RARITY_GREEN_COLOR).is_true()
+	assert_bool(DiceData.get_rarity_color(DiceData.Rarity.BLUE) == DiceData.RARITY_BLUE_COLOR).is_true()
+	assert_bool(DiceData.get_rarity_color(DiceData.Rarity.PURPLE) == DiceData.RARITY_PURPLE_COLOR).is_true()

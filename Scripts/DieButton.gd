@@ -27,6 +27,7 @@ const COLOR_STOPPED: Color    = Color(0.9, 0.2, 0.2)    # Red
 var die_index: int = -1
 var die_state: DieState = DieState.UNROLLED
 var custom_color: Color = Color.TRANSPARENT
+var rarity_color: Color = Color.TRANSPARENT
 var _tumble_tween: Tween = null
 
 func _ready() -> void:
@@ -152,6 +153,7 @@ func _apply_visual() -> void:
 		DieState.STOPPED:
 			modulate = COLOR_STOPPED
 			disabled = false
+	_apply_rarity_border()
 	if custom_color != Color.TRANSPARENT:
 		modulate = custom_color
 	# Kept dice: lower opacity and shift down; unkept: restore.
@@ -161,3 +163,31 @@ func _apply_visual() -> void:
 	else:
 		modulate.a = 1.0
 		position.y = 0.0
+
+
+func _apply_rarity_border() -> void:
+	var style_names: Array[String] = ["normal", "hover", "pressed", "disabled", "focus"]
+	for style_name: String in style_names:
+		var base_style: StyleBox = get_theme_stylebox(style_name)
+		var style_flat: StyleBoxFlat = null
+		if base_style is StyleBoxFlat:
+			style_flat = (base_style as StyleBoxFlat).duplicate() as StyleBoxFlat
+		else:
+			style_flat = StyleBoxFlat.new()
+			style_flat.bg_color = Color(0.15, 0.15, 0.15, 0.95)
+			style_flat.corner_radius_top_left = 6
+			style_flat.corner_radius_top_right = 6
+			style_flat.corner_radius_bottom_left = 6
+			style_flat.corner_radius_bottom_right = 6
+		if rarity_color == Color.TRANSPARENT:
+			style_flat.border_width_left = 0
+			style_flat.border_width_top = 0
+			style_flat.border_width_right = 0
+			style_flat.border_width_bottom = 0
+		else:
+			style_flat.border_color = rarity_color
+			style_flat.border_width_left = 2
+			style_flat.border_width_top = 2
+			style_flat.border_width_right = 2
+			style_flat.border_width_bottom = 2
+		add_theme_stylebox_override(style_name, style_flat)
