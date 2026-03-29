@@ -323,6 +323,9 @@ func test_reroll_count_increments_on_reroll() -> void:
 		return
 
 	_force_clean_state(root)
+	# Wait past the roll animation lock before clicking reroll.
+	for _i: int in 10:
+		await runner.simulate_frames(1, 100)
 	# Reroll (some dice must be un-kept for reroll to proceed).
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)

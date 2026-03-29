@@ -12,6 +12,7 @@ const HOT_STREAK_MULT_1: float = 1.1
 const HOT_STREAK_MULT_2: float = 1.2
 const JACKPOT_MIN_DICE: int = 5
 const JACKPOT_GOLD_BONUS: float = 0.25
+const ROLL_ANIMATION_LOCK_DURATION: float = 0.9
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -44,6 +45,8 @@ var bank_streak: int = 0
 var _reroll_count: int = 0
 var _streak_display: Control = null
 var _run_snapshot_recorded: bool = false
+var _is_roll_animating: bool = false
+var _roll_anim_nonce: int = 0
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 
@@ -101,6 +104,8 @@ func _start_new_turn() -> void:
 
 func _on_roll_pressed() -> void:
 	if not _run_active:
+		return
+	if _is_roll_animating:
 		return
 	match turn_state:
 		TurnState.IDLE:
@@ -207,6 +212,8 @@ func _reroll_selected_dice() -> void:
 	_process_roll_results(rerolled)
 
 func _process_roll_results(rolled_indices: Array[int]) -> void:
+	if not rolled_indices.is_empty():
+		_begin_roll_animation_lock()
 	# Track which dice need chain re-rolls (EXPLODE faces)
 	var chain_reroll: Array[int] = []
 
@@ -598,16 +605,29 @@ func _sync_buttons() -> void:
 	match turn_state:
 		TurnState.IDLE:
 			roll_button.text     = "Roll All"
-			roll_button.disabled = false
+			roll_button.disabled = _is_roll_animating
 			bank_button.disabled = true
 		TurnState.ACTIVE:
 			roll_button.text     = "Reroll %d" % _get_rerollable_count()
-			roll_button.disabled = false
+			roll_button.disabled = _is_roll_animating
 			bank_button.disabled = false
 		TurnState.BUST, TurnState.BANKED:
 			roll_button.text     = "Roll All"
 			roll_button.disabled = true
 			bank_button.disabled = true
+
+
+func _begin_roll_animation_lock() -> void:
+	_is_roll_animating = true
+	_roll_anim_nonce += 1
+	var nonce: int = _roll_anim_nonce
+	_sync_buttons()
+	get_tree().create_timer(ROLL_ANIMATION_LOCK_DURATION).timeout.connect(func() -> void:
+		if nonce != _roll_anim_nonce:
+			return
+		_is_roll_animating = false
+		_sync_buttons()
+	)
 
 
 func _get_rerollable_count() -> int:

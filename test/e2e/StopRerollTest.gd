@@ -188,6 +188,10 @@ func test_kept_dice_stay_locked_after_reroll() -> void:
 	root.dice_keep_locked[0] = false
 	root.dice_stopped[0] = false
 
+	# Wait past the roll animation lock before clicking reroll.
+	for _i: int in 10:
+		await runner.simulate_frames(1, 100)
+
 	# Reroll — die 0 should get locked, not re-rolled.
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -313,6 +317,10 @@ func test_auto_bank_when_all_dice_kept_and_reroll_pressed() -> void:
 
 	var score_before: int = GameManager.total_score
 
+	# Wait past the roll animation lock before clicking reroll.
+	for _i: int in 10:
+		await runner.simulate_frames(1, 100)
+
 	# Press Reroll — should auto-bank since nothing can be rerolled.
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -344,6 +352,9 @@ func test_auto_bank_score_correct_when_all_kept() -> void:
 	root._sync_ui()
 
 	GameManager.total_score = 0
+	# Wait past the roll animation lock before clicking reroll.
+	for _i: int in 10:
+		await runner.simulate_frames(1, 100)
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
 
