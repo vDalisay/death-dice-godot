@@ -27,6 +27,9 @@ const BUMP_BOOST_MIN_SPEED: float = 80.0
 const BUMP_BOOST_IMPULSE_MIN: float = 80.0
 const BUMP_BOOST_IMPULSE_MAX: float = 220.0
 const BUMP_BOOST_MULTIPLIER: float = 0.1
+const SETTLE_POP_SCALE: float = 1.08
+const SETTLE_POP_DURATION: float = 0.12
+const IMPACT_FLASH_DURATION: float = 0.08
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -328,6 +331,7 @@ func _physics_process(delta: float) -> void:
 			if _settle_timer >= SETTLE_TIME_REQUIRED:
 				physics_state = DiePhysicsState.SETTLED
 				freeze = true
+				_play_settle_accent()
 				settled.emit()
 		else:
 			_settle_timer = 0.0
@@ -358,6 +362,8 @@ func _on_body_entered(other: Node) -> void:
 			apply_central_impulse(collision_dir * bump_impulse)
 		if not other_die.freeze:
 			other_die.apply_central_impulse(-collision_dir * bump_impulse)
+		_play_impact_accent()
+		other_die._play_impact_accent()
 
 	# Both must be moving fast enough
 	if my_speed < REROLL_VELOCITY_THRESHOLD:
@@ -530,3 +536,21 @@ func _apply_visual() -> void:
 func _set_random_glyph() -> void:
 	if _face_label:
 		_face_label.text = TUMBLE_GLYPHS[randi() % TUMBLE_GLYPHS.size()]
+
+
+func _play_settle_accent() -> void:
+	if _scale_tween and _scale_tween.is_valid():
+		_scale_tween.kill()
+	_scale_tween = create_tween()
+	_scale_tween.tween_property(self, "scale", Vector2(SETTLE_POP_SCALE, SETTLE_POP_SCALE), SETTLE_POP_DURATION * 0.45) \
+		.set_ease(Tween.EASE_OUT)
+	_scale_tween.tween_property(self, "scale", Vector2.ONE, SETTLE_POP_DURATION * 0.55) \
+		.set_ease(Tween.EASE_IN)
+
+
+func _play_impact_accent() -> void:
+	if not _bg_panel:
+		return
+	var tween: Tween = create_tween()
+	tween.tween_property(_bg_panel, "modulate", Color(1.22, 1.22, 1.22, 1.0), IMPACT_FLASH_DURATION)
+	tween.tween_property(_bg_panel, "modulate", Color.WHITE, IMPACT_FLASH_DURATION)

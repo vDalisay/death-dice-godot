@@ -13,6 +13,7 @@ const HOT_STREAK_MULT_2: float = 1.2
 const JACKPOT_MIN_DICE: int = 5
 const JACKPOT_GOLD_BONUS: float = 0.25
 const ROLL_ANIMATION_LOCK_DURATION: float = 0.9
+const BANK_CASCADE_STEP_DELAY: float = 0.22
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -173,8 +174,8 @@ func _on_bank_pressed() -> void:
 		GameManager.best_turn_score = banked
 		hud.show_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
 		SFXManager.play_personal_best()
-	# Per-die score count-up animation, then total score tween.
-	_play_score_count_animation(old_total, GameManager.total_score)
+	# Per-die score count-up followed by cascade checkpoints.
+	_play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
 	_sync_buttons()
 	# Auto-advance to next turn after a delay.
 	_schedule_auto_advance()
@@ -790,6 +791,13 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 	for i: int in pool_size:
 		if per_die[i] > 0:
 			scoring_indices.append(i)
+	scoring_indices.sort_custom(func(a: int, b: int) -> bool:
+		var die_a: PhysicsDie = dice_arena.get_die(a)
+		var die_b: PhysicsDie = dice_arena.get_die(b)
+		var a_x: float = die_a.global_position.x if die_a else float(a)
+		var b_x: float = die_b.global_position.x if die_b else float(b)
+		return a_x < b_x
+	)
 
 	if scoring_indices.is_empty():
 		hud.animate_score_count(old_total, new_total)
@@ -819,6 +827,28 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 	tween.tween_callback(func() -> void:
 		hud.show_floating_gold(new_total - old_total)
 	).set_delay(interval)
+
+
+## Structured bank cascade checkpoints layered on top of per-die tally.
+func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: int, streak_multiplier: float) -> void:
+	_play_score_count_animation(old_total, new_total)
+	var checkpoint_tween: Tween = create_tween()
+	if _triggered_combo_ids.size() > 0:
+		checkpoint_tween.tween_callback(func() -> void:
+			hud.show_status("COMBO BONUS!", _UITheme.ROSE_ACCENT)
+		).set_delay(BANK_CASCADE_STEP_DELAY)
+	if multiplier > 1:
+		checkpoint_tween.tween_callback(func() -> void:
+			hud.show_status("MULTIPLIER x%d!" % multiplier, _UITheme.SCORE_GOLD)
+			SFXManager.play_score_tick()
+		).set_delay(BANK_CASCADE_STEP_DELAY)
+	if streak_multiplier > 1.0:
+		checkpoint_tween.tween_callback(func() -> void:
+			hud.show_status("HOT STREAK x%.1f!" % streak_multiplier, _UITheme.EXPLOSION_ORANGE)
+		).set_delay(BANK_CASCADE_STEP_DELAY)
+	checkpoint_tween.tween_callback(func() -> void:
+		hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
+	).set_delay(BANK_CASCADE_STEP_DELAY)
 
 
 ## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).

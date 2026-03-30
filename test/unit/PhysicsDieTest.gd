@@ -57,6 +57,9 @@ func test_constants_are_reasonable() -> void:
 	assert_float(PhysicsDie.COLLISION_RADIUS).is_equal(45.0)
 	assert_float(PhysicsDie.SETTLE_VELOCITY_THRESHOLD).is_greater(0.0)
 	assert_float(PhysicsDie.REROLL_VELOCITY_THRESHOLD).is_greater(PhysicsDie.SETTLE_VELOCITY_THRESHOLD)
+	assert_float(PhysicsDie.SETTLE_POP_SCALE).is_greater(1.0)
+	assert_float(PhysicsDie.SETTLE_POP_DURATION).is_greater(0.0)
+	assert_float(PhysicsDie.IMPACT_FLASH_DURATION).is_greater(0.0)
 
 
 func test_face_type_glyphs_cover_all_types() -> void:
