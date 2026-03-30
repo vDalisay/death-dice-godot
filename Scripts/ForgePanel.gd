@@ -7,12 +7,25 @@ signal forge_closed()
 
 const MIN_DICE_FOR_FORGE: int = 4
 const FORGE_CHANCE: float = 0.25
+const _UITheme := preload("res://Scripts/UITheme.gd")
 
-@onready var _instruction_label: Label = $MarginContainer/VBoxContainer/InstructionLabel
-@onready var _grid: GridContainer = $MarginContainer/VBoxContainer/ScrollContainer/GridContainer
-@onready var _result_label: Label = $MarginContainer/VBoxContainer/ResultLabel
-@onready var _forge_button: Button = $MarginContainer/VBoxContainer/ButtonRow/ForgeButton
-@onready var _skip_button: Button = $MarginContainer/VBoxContainer/ButtonRow/SkipButton
+const DICE_BUTTON_WIDTH: int = 208
+const DICE_BUTTON_HEIGHT: int = 76
+
+const RARITY_NAMES: Array[String] = ["Common", "Uncommon", "Rare", "Epic"]
+
+@onready var _modal: PanelContainer = $CenterContainer/Modal
+@onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
+@onready var _cost_badge: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CostBadge
+@onready var _cost_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CostBadge/CostMargin/CostLabel
+@onready var _instruction_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/InstructionLabel
+@onready var _grid: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/DiceFlow
+@onready var _result_card: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ResultCard
+@onready var _result_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ResultCard/ResultMargin/ResultLabel
+@onready var _forge_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow/ForgeButton
+@onready var _skip_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow/SkipButton
+@onready var _selection_sparks: CPUParticles2D = $CenterContainer/Modal/SelectionSparks
+@onready var _forge_burst: CPUParticles2D = $CenterContainer/Modal/ForgeBurst
 
 var _selected_indices: Array[int] = []
 var _die_buttons: Array[Button] = []
@@ -23,15 +36,18 @@ func _ready() -> void:
 	visible = false
 	_forge_button.pressed.connect(_on_forge_pressed)
 	_skip_button.pressed.connect(_on_skip_pressed)
+	_apply_theme_styling()
 
 
 func open() -> void:
 	_selected_indices.clear()
 	_forging_done = false
 	_result_label.text = ""
+	_result_card.visible = false
 	_forge_button.disabled = true
 	_forge_button.text = "Forge!"
 	_skip_button.text = "Skip"
+	_skip_button.visible = true
 	_refresh_grid()
 	_update_instruction()
 	visible = true
@@ -50,6 +66,13 @@ func _on_forge_pressed() -> void:
 
 	if _selected_indices.size() != 2:
 		return
+	if not _can_forge_selection():
+		_result_label.text = "Cannot forge two Epic dice!"
+		_result_label.modulate = _UITheme.DANGER_RED
+		_result_card.visible = true
+		return
+
+	await _play_sacrifice_animation()
 
 	# Sort descending so removal doesn't shift earlier indices.
 	var sorted: Array[int] = _selected_indices.duplicate()
@@ -72,14 +95,16 @@ func _on_forge_pressed() -> void:
 	GameManager.add_dice(result_die)
 	SaveManager.discover_die(result_die.dice_name)
 
-	var rarity_names: Array[String] = ["Common", "Uncommon", "Rare", "Epic"]
-	_result_label.text = "Forged: %s (%s)" % [result_die.dice_name, rarity_names[result_die.rarity]]
+	_result_label.text = "Forged: %s (%s)" % [result_die.dice_name, RARITY_NAMES[result_die.rarity]]
 	_result_label.modulate = result_die.get_rarity_color_value()
+	_result_card.visible = true
+	_animate_result_card()
 
 	_forging_done = true
 	_forge_button.text = "Continue"
 	_forge_button.disabled = false
 	_skip_button.visible = false
+	_selected_indices.clear()
 	_refresh_grid()
 
 
@@ -89,41 +114,37 @@ func _update_instruction() -> void:
 
 func _refresh_grid() -> void:
 	for child: Node in _grid.get_children():
+		_grid.remove_child(child)
 		child.queue_free()
 	_die_buttons.clear()
 
 	for i: int in GameManager.dice_pool.size():
 		var die: DiceData = GameManager.dice_pool[i]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(160, 60)
-		btn.text = die.dice_name
-		var rarity_names: Array[String] = ["Common", "Uncommon", "Rare", "Epic"]
-		btn.tooltip_text = rarity_names[die.rarity]
+		btn.custom_minimum_size = Vector2(DICE_BUTTON_WIDTH, DICE_BUTTON_HEIGHT)
+		btn.text = "%s\n%s" % [die.dice_name, RARITY_NAMES[die.rarity]]
+		btn.tooltip_text = "%s\nFaces: %s" % [
+			RARITY_NAMES[die.rarity],
+			_face_summary(die)
+		]
+		btn.add_theme_font_override("font", _UITheme.font_stats())
+		btn.add_theme_font_size_override("font_size", 14)
 
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.12, 0.12, 0.16)
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_width_bottom = 3
-		style.border_color = die.get_rarity_color_value()
-		style.corner_radius_top_left = 4
-		style.corner_radius_top_right = 4
-		style.corner_radius_bottom_left = 4
-		style.corner_radius_bottom_right = 4
-		btn.add_theme_stylebox_override("normal", style)
+		var selected: bool = i in _selected_indices
+		var normal := _build_button_style(die.get_rarity_color_value(), selected)
+		var hover := _build_button_style(die.get_rarity_color_value(), selected)
+		hover.bg_color = hover.bg_color.lightened(0.08)
+		var pressed := _build_button_style(die.get_rarity_color_value(), selected)
+		pressed.bg_color = pressed.bg_color.darkened(0.08)
+		btn.add_theme_stylebox_override("normal", normal)
+		btn.add_theme_stylebox_override("hover", hover)
+		btn.add_theme_stylebox_override("pressed", pressed)
 
 		if _forging_done:
 			btn.disabled = true
 		else:
 			var idx: int = i
 			btn.pressed.connect(func() -> void: _toggle_die(idx))
-
-		if i in _selected_indices:
-			var sel_style := style.duplicate() as StyleBoxFlat
-			sel_style.bg_color = Color(0.25, 0.25, 0.35)
-			sel_style.border_color = Color(1.0, 0.85, 0.0)
-			btn.add_theme_stylebox_override("normal", sel_style)
 
 		_die_buttons.append(btn)
 		_grid.add_child(btn)
@@ -133,6 +154,7 @@ func _toggle_die(index: int) -> void:
 	if _forging_done:
 		return
 
+	var was_selected: bool = index in _selected_indices
 	if index in _selected_indices:
 		_selected_indices.erase(index)
 	elif _selected_indices.size() < 2:
@@ -142,16 +164,133 @@ func _toggle_die(index: int) -> void:
 
 	# Check if purple + purple (cannot forge).
 	if _selected_indices.size() == 2:
-		var r1: DiceData.Rarity = GameManager.dice_pool[_selected_indices[0]].rarity
-		var r2: DiceData.Rarity = GameManager.dice_pool[_selected_indices[1]].rarity
-		if r1 == DiceData.Rarity.PURPLE and r2 == DiceData.Rarity.PURPLE:
+		if not _can_forge_selection():
 			_forge_button.disabled = true
 			_result_label.text = "Cannot forge two Epic dice!"
+			_result_label.modulate = _UITheme.DANGER_RED
+			_result_card.visible = true
 		else:
 			_result_label.text = ""
+			_result_card.visible = false
+	else:
+		_result_label.text = ""
+		_result_card.visible = false
 
 	_update_instruction()
 	_refresh_grid()
+
+	if not was_selected and index in _selected_indices:
+		_emit_selection_sparks(index)
+
+
+func _can_forge_selection() -> bool:
+	if _selected_indices.size() != 2:
+		return false
+	var r1: DiceData.Rarity = GameManager.dice_pool[_selected_indices[0]].rarity
+	var r2: DiceData.Rarity = GameManager.dice_pool[_selected_indices[1]].rarity
+	return not (r1 == DiceData.Rarity.PURPLE and r2 == DiceData.Rarity.PURPLE)
+
+
+func _play_sacrifice_animation() -> void:
+	var tween: Tween = create_tween()
+	for idx: int in _selected_indices:
+		if idx >= 0 and idx < _die_buttons.size():
+			var btn: Button = _die_buttons[idx]
+			_emit_particles_at(btn.get_global_rect().get_center())
+			tween.parallel().tween_property(btn, "scale", Vector2(0.2, 0.2), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+			tween.parallel().tween_property(btn, "modulate:a", 0.0, 0.2)
+	await tween.finished
+	_emit_forge_burst()
+	await get_tree().create_timer(0.14).timeout
+
+
+func _emit_selection_sparks(index: int) -> void:
+	if index < 0 or index >= _die_buttons.size():
+		return
+	_emit_particles_at(_die_buttons[index].get_global_rect().get_center())
+
+
+func _emit_particles_at(global_center: Vector2) -> void:
+	_selection_sparks.global_position = global_center
+	_selection_sparks.restart()
+	_selection_sparks.emitting = true
+
+
+func _emit_forge_burst() -> void:
+	_forge_burst.global_position = _modal.get_global_rect().get_center()
+	_forge_burst.restart()
+	_forge_burst.emitting = true
+
+
+func _animate_result_card() -> void:
+	_result_card.scale = Vector2(1.25, 1.25)
+	_result_card.modulate = Color(1, 1, 1, 0.0)
+	var tween: Tween = create_tween()
+	tween.tween_property(_result_card, "modulate:a", 1.0, 0.12)
+	tween.parallel().tween_property(_result_card, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _apply_theme_styling() -> void:
+	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color.TRANSPARENT, 0))
+	_modal.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.SCORE_GOLD, 2)
+	)
+	_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_title_label.add_theme_font_size_override("font_size", 18)
+	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_cost_badge.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_BADGE, _UITheme.ACTION_CYAN, 1)
+	)
+	_cost_label.add_theme_font_override("font", _UITheme.font_body())
+	_cost_label.add_theme_font_size_override("font_size", 14)
+	_cost_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_instruction_label.add_theme_font_override("font", _UITheme.font_stats())
+	_instruction_label.add_theme_font_size_override("font_size", 16)
+	_result_card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 1)
+	)
+	_result_label.add_theme_font_override("font", _UITheme.font_stats())
+	_result_label.add_theme_font_size_override("font_size", 24)
+	_forge_button.add_theme_font_override("font", _UITheme.font_display())
+	_forge_button.add_theme_font_size_override("font_size", 12)
+	_skip_button.add_theme_font_override("font", _UITheme.font_display())
+	_skip_button.add_theme_font_size_override("font_size", 12)
+
+
+func _build_button_style(rarity_color: Color, selected: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = _UITheme.PANEL_SURFACE
+	style.corner_radius_top_left = _UITheme.CORNER_RADIUS_CARD
+	style.corner_radius_top_right = _UITheme.CORNER_RADIUS_CARD
+	style.corner_radius_bottom_left = _UITheme.CORNER_RADIUS_CARD
+	style.corner_radius_bottom_right = _UITheme.CORNER_RADIUS_CARD
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_color = rarity_color
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	if selected:
+		style.bg_color = Color("#2D240E")
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 3
+		style.border_width_bottom = 3
+		style.border_color = _UITheme.SCORE_GOLD
+	return style
+
+
+func _face_summary(die: DiceData) -> String:
+	var faces: Array[String] = []
+	for face: DiceFaceData in die.faces:
+		faces.append(face.get_display_text())
+	return ", ".join(faces)
 
 
 ## Roll the forge outcome based on two sacrifice rarity tiers.
