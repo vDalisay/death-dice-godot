@@ -38,7 +38,7 @@ func test_explode_face_display() -> void:
 	var face := DiceFaceData.new()
 	face.type = DiceFaceData.FaceType.EXPLODE
 	face.value = 2
-	assert_str(face.get_display_text()).is_equal("💥2")
+	assert_str(face.get_display_text()).is_equal("✦2")
 
 
 func test_shield_face_display() -> void:

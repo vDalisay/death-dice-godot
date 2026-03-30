@@ -21,7 +21,7 @@ func get_display_text() -> String:
 		FaceType.MULTIPLY:
 			return "x%d" % value
 		FaceType.EXPLODE:
-			return "💥%d" % value
+			return "✦%d" % value
 		FaceType.MULTIPLY_LEFT:
 			return "←×%d" % value
 		FaceType.CURSED_STOP:
