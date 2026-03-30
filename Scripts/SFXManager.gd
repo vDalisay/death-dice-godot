@@ -29,12 +29,15 @@ func play_bank() -> void:
 	_play_tone_delayed(1047.0, 0.18, 0.9, 0.20)
 
 
-func play_score_tick() -> void:
-	_play_tone(880.0, 0.04, 0.35)
+func play_score_tick(step: int = 0) -> void:
+	var scale: Array[float] = [880.0, 920.0, 960.0, 1000.0]
+	var tone: float = scale[step % scale.size()]
+	_play_tone(tone, 0.05, 0.38)
 
 
 func play_bust() -> void:
-	_play_tone(150.0, 0.25, 0.9)
+	_play_tone(80.0, 0.2, 0.7)
+	_play_tone_delayed(1200.0, 0.1, 0.55, 0.05)
 
 
 func play_stage_clear() -> void:
@@ -43,8 +46,10 @@ func play_stage_clear() -> void:
 	_play_tone_delayed(784.0, 0.15, 0.8, 0.2)
 
 
-func play_explode() -> void:
-	_play_tone(440.0, 0.06, 0.5)
+func play_explode(chain_depth: int = 1) -> void:
+	var base: float = 360.0 + float(mini(chain_depth, 6) * 18)
+	_play_tone(base, 0.07, 0.5)
+	_play_tone_delayed(base + 120.0, 0.05, 0.42, 0.03)
 
 
 func play_close_call() -> void:
@@ -99,6 +104,10 @@ func play_dice_collide() -> void:
 	_play_tone(180.0, 0.04, 0.3)
 
 
+func play_dice_settle() -> void:
+	_play_tone(100.0, 0.05, 0.2)
+
+
 func play_stop_face() -> void:
 	_play_tone(210.0, 0.08, 0.45)
 
@@ -109,8 +118,9 @@ func play_cursed_stop() -> void:
 
 
 func play_insurance_trigger() -> void:
-	_play_tone(880.0, 0.08, 0.55)
-	_play_tone_delayed(740.0, 0.12, 0.5, 0.06)
+	_play_tone(523.0, 0.09, 0.5)
+	_play_tone_delayed(440.0, 0.1, 0.45, 0.05)
+	_play_tone_delayed(392.0, 0.11, 0.4, 0.1)
 
 
 # ---------------------------------------------------------------------------

@@ -566,7 +566,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 	_sync_ui()
 
 	if chain_depth > 0:
-		SFXManager.play_explode()
+		SFXManager.play_explode(chain_depth)
 		hud.show_status("CHAIN x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
 
 	_check_roll_combos()
@@ -847,6 +847,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 	for idx: int in scoring_indices.size():
 		var die_i: int = scoring_indices[idx]
 		var die_score: int = per_die[die_i]
+		var tick_step: int = idx
 		var new_running: int = running + die_score
 		var _old: int = running
 		var _new: int = new_running
@@ -855,7 +856,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 			if score_die:
 				score_die.show_score_popup(die_score)
 				score_die.pop()
-			SFXManager.play_score_tick()
+			SFXManager.play_score_tick(tick_step)
 			hud.animate_score_count(_old, _new)
 		).set_delay(interval)
 		running = new_running

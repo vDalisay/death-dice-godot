@@ -622,6 +622,7 @@ func _play_settle_accent() -> void:
 		.set_ease(Tween.EASE_OUT)
 	_scale_tween.tween_property(self, "scale", Vector2.ONE, SETTLE_POP_DURATION * 0.55) \
 		.set_ease(Tween.EASE_IN)
+	SFXManager.play_dice_settle()
 
 
 func _play_impact_accent() -> void:
