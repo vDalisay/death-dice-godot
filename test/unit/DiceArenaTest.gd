@@ -84,3 +84,5 @@ func test_constants_are_sensible() -> void:
 	assert_float(DiceArena.ARENA_HEIGHT).is_greater(0.0)
 	assert_float(DiceArena.THROW_IMPULSE_MAX).is_greater(DiceArena.THROW_IMPULSE_MIN)
 	assert_float(DiceArena.WALL_THICKNESS).is_greater(0.0)
+	assert_float(DiceArena.BOUNDARY_GLOW_HIT_GAIN).is_greater(0.0)
+	assert_float(DiceArena.BOUNDARY_GLOW_DECAY_PER_SEC).is_greater(0.0)

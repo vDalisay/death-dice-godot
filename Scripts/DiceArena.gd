@@ -33,8 +33,8 @@ const SPAWN_MARGIN: float = 80.0
 const BOTTOM_SPAWN_LIFT: float = 92.0
 const CONTAINMENT_BOUNCE_DAMP: float = 0.45
 const REROLL_LIFT_DELAY: float = 0.06
-const BOUNDARY_FLASH_COOLDOWN: float = 0.08
-const BOUNDARY_FLASH_DURATION: float = 0.09
+const BOUNDARY_GLOW_HIT_GAIN: float = 0.22
+const BOUNDARY_GLOW_DECAY_PER_SEC: float = 2.1
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -51,7 +51,7 @@ var _dice: Array[PhysicsDie] = []
 var _settle_check_active: bool = false
 var _bg_panel: Panel = null
 var _bg_style: StyleBoxFlat = null
-var _boundary_flash_timer: float = 0.0
+var _boundary_glow_energy: float = 0.0
 ## When true, dice settle instantly (no physics). Set by tests.
 var instant_mode: bool = false
 
@@ -65,8 +65,9 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if _boundary_flash_timer > 0.0:
-		_boundary_flash_timer = maxf(0.0, _boundary_flash_timer - _delta)
+	if _boundary_glow_energy > 0.0:
+		_boundary_glow_energy = maxf(0.0, _boundary_glow_energy - BOUNDARY_GLOW_DECAY_PER_SEC * _delta)
+	_apply_boundary_glow()
 	_enforce_arena_containment()
 	if not _settle_check_active:
 		return
@@ -198,6 +199,8 @@ func get_die_count() -> int:
 func reset() -> void:
 	_clear_dice()
 	_settle_check_active = false
+	_boundary_glow_energy = 0.0
+	_apply_boundary_glow()
 
 
 ## Immediately settle all dice (skip physics). Used by tests.
@@ -390,6 +393,7 @@ func _enforce_arena_containment() -> void:
 	var max_x: float = rect.end.x - PhysicsDie.COLLISION_RADIUS
 	var min_y: float = rect.position.y + PhysicsDie.COLLISION_RADIUS
 	var max_y: float = rect.end.y - PhysicsDie.COLLISION_RADIUS
+	var hit_count: int = 0
 	for die: PhysicsDie in _dice:
 		if die == null or die.freeze:
 			continue
@@ -413,15 +417,19 @@ func _enforce_arena_containment() -> void:
 			corrected = true
 		if corrected:
 			die.global_position = p
-			_flash_boundary()
+			hit_count += 1
+	if hit_count > 0:
+		_accumulate_boundary_glow(hit_count)
 
 
-func _flash_boundary() -> void:
-	if _bg_panel == null or _bg_style == null:
+func _accumulate_boundary_glow(hit_count: int) -> void:
+	var gain: float = float(hit_count) * BOUNDARY_GLOW_HIT_GAIN
+	_boundary_glow_energy = clampf(_boundary_glow_energy + gain, 0.0, 1.0)
+	_apply_boundary_glow()
+
+
+func _apply_boundary_glow() -> void:
+	if _bg_style == null:
 		return
-	if _boundary_flash_timer > 0.0:
-		return
-	_boundary_flash_timer = BOUNDARY_FLASH_COOLDOWN
-	var tween: Tween = create_tween()
-	tween.tween_property(_bg_style, "border_color", _UITheme.DANGER_RED, BOUNDARY_FLASH_DURATION * 0.45)
-	tween.tween_property(_bg_style, "border_color", ARENA_BORDER_COLOR, BOUNDARY_FLASH_DURATION * 0.55)
+	var t: float = clampf(_boundary_glow_energy, 0.0, 1.0)
+	_bg_style.border_color = ARENA_BORDER_COLOR.lerp(_UITheme.DANGER_RED, t)
