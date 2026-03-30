@@ -4,6 +4,7 @@ extends VBoxContainer
 ## Redesigned as a compact 3-zone dashboard with themed panels and risk pips.
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
 
 const SCORE_COUNT_DURATION: float = 0.5
 const GOLD_FLOAT_DURATION: float = 1.0
@@ -15,7 +16,13 @@ const RISK_PIP_COUNT: int = 5
 @onready var lives_label: Label      = $TopBar/TopBarMargin/TopBarRow/LivesLabel
 @onready var gold_label: Label       = $TopBar/TopBarMargin/TopBarRow/GoldLabel
 @onready var highscore_label: Label  = $TopBar/TopBarMargin/TopBarRow/HighscoreLabel
-@onready var modifier_label: Label   = $TopBar/TopBarMargin/TopBarRow/ModifierLabel
+
+# -- Modifier row --
+@onready var _modifier_title: Label = $ModifierRow/ModifierTitle
+@onready var _modifier_bar: HBoxContainer = $ModifierRow/ModifierBar
+@onready var _modifier_tooltip: PanelContainer = $ModifierTooltip
+@onready var _modifier_tooltip_name_label: Label = $ModifierTooltip/MarginContainer/TooltipVBox/TooltipNameLabel
+@onready var _modifier_tooltip_desc_label: Label = $ModifierTooltip/MarginContainer/TooltipVBox/TooltipDescLabel
 
 # -- Score row --
 @onready var turn_score_label: Label   = $ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox/TurnScoreLabel
@@ -41,10 +48,13 @@ var _score_tween: Tween = null
 var _progress_pulse_tween: Tween = null
 var _combo_flash_tween: Tween = null
 var _risk_pips: Array[Label] = []
+var _modifier_badges: Array[PanelContainer] = []
+var _last_modifier_types: Array[int] = []
 
 
 func _ready() -> void:
 	_create_risk_pips()
+	_cache_modifier_badges()
 	_apply_theme_styling()
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.lives_changed.connect(_on_lives_changed)
@@ -81,8 +91,19 @@ func _apply_theme_styling() -> void:
 	gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	highscore_label.add_theme_font_size_override("font_size", 16)
 	highscore_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-	modifier_label.add_theme_font_size_override("font_size", 14)
-	modifier_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+
+	# Modifier row + tooltip
+	_modifier_title.add_theme_font_override("font", _UITheme.font_display())
+	_modifier_title.add_theme_font_size_override("font_size", 10)
+	_modifier_title.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_modifier_tooltip.add_theme_stylebox_override("panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.ACTION_CYAN, 1))
+	_modifier_tooltip_name_label.add_theme_font_override("font", _UITheme.font_display())
+	_modifier_tooltip_name_label.add_theme_font_size_override("font_size", 10)
+	_modifier_tooltip_name_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_modifier_tooltip_desc_label.add_theme_font_override("font", _UITheme.font_body())
+	_modifier_tooltip_desc_label.add_theme_font_size_override("font_size", 14)
+	_modifier_tooltip_desc_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 
 	# Turn score panel (HERO element)
 	_turn_score_panel.add_theme_stylebox_override("panel",
@@ -120,6 +141,17 @@ func _create_risk_pips() -> void:
 		pip.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 		_risk_container.add_child(pip)
 		_risk_pips.append(pip)
+
+
+func _cache_modifier_badges() -> void:
+	_modifier_badges.clear()
+	for child: Node in _modifier_bar.get_children():
+		var badge: PanelContainer = child as PanelContainer
+		if badge == null or not badge.has_method("setup_modifier"):
+			continue
+		badge.tooltip_requested.connect(_on_modifier_badge_tooltip_requested)
+		badge.tooltip_hidden.connect(_on_modifier_badge_tooltip_hidden)
+		_modifier_badges.append(badge)
 
 
 # ---------------------------------------------------------------------------
@@ -272,10 +304,60 @@ func _stop_progress_pulse() -> void:
 
 
 func _refresh_modifier_display() -> void:
-	if GameManager.active_modifiers.is_empty():
-		modifier_label.text = ""
-		return
-	var names: Array[String] = []
-	for m: RunModifier in GameManager.active_modifiers:
-		names.append(m.modifier_name)
-	modifier_label.text = ", ".join(names)
+	var active: Array[RunModifier] = GameManager.active_modifiers
+	var current_types: Array[int] = []
+	for mod: RunModifier in active:
+		current_types.append(int(mod.modifier_type))
+
+	# Ensure we have enough badge slots if max changes in future.
+	while _modifier_badges.size() < GameManager.MAX_MODIFIERS:
+		var badge := _ModifierBadgeScene.instantiate() as PanelContainer
+		_modifier_bar.add_child(badge)
+		badge.tooltip_requested.connect(_on_modifier_badge_tooltip_requested)
+		badge.tooltip_hidden.connect(_on_modifier_badge_tooltip_hidden)
+		_modifier_badges.append(badge)
+
+	for i: int in _modifier_badges.size():
+		if i < active.size():
+			var modifier: RunModifier = active[i]
+			_modifier_badges[i].setup_modifier(modifier)
+			if int(modifier.modifier_type) not in _last_modifier_types:
+				_animate_badge_acquire(_modifier_badges[i])
+		else:
+			_modifier_badges[i].setup_empty()
+
+	_last_modifier_types = current_types
+	_on_modifier_badge_tooltip_hidden()
+
+
+func _animate_badge_acquire(badge: PanelContainer) -> void:
+	badge.scale = Vector2(1.25, 1.25)
+	badge.modulate = Color(1, 1, 1, 0.75)
+	var tween: Tween = create_tween()
+	tween.tween_property(badge, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(badge, "modulate", Color.WHITE, 0.2)
+
+
+func _on_modifier_badge_tooltip_requested(modifier: RunModifier, badge_rect: Rect2) -> void:
+	_modifier_tooltip_name_label.text = modifier.modifier_name
+	_modifier_tooltip_name_label.add_theme_color_override("font_color", modifier.get_badge_color())
+	_modifier_tooltip_desc_label.text = modifier.description
+	_modifier_tooltip.visible = true
+	var tooltip_size: Vector2 = _modifier_tooltip.get_combined_minimum_size()
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var pad: float = 8.0
+	var x: float = clampf(
+		badge_rect.position.x + badge_rect.size.x * 0.5 - tooltip_size.x * 0.5,
+		pad,
+		viewport_size.x - tooltip_size.x - pad
+	)
+	var above_y: float = badge_rect.position.y - tooltip_size.y - 10.0
+	var below_y: float = badge_rect.position.y + badge_rect.size.y + 10.0
+	var y: float = above_y
+	if y < pad:
+		y = minf(below_y, viewport_size.y - tooltip_size.y - pad)
+	_modifier_tooltip.global_position = Vector2(x, y)
+
+
+func _on_modifier_badge_tooltip_hidden() -> void:
+	_modifier_tooltip.visible = false

@@ -4,6 +4,8 @@ extends Resource
 ## Each modifier has a unique ID, display info, and typed effect that
 ## game systems query to alter scoring, bust logic, or gold economy.
 
+const _UITheme := preload("res://Scripts/UITheme.gd")
+
 enum ModifierType {
 	GAMBLERS_RUSH,    ## +1g per survived stop when banking
 	EXPLOSOPHILE,     ## Explode chains get +1 extra chain-reroll die
@@ -18,6 +20,52 @@ enum ModifierType {
 @export var modifier_name: String = ""
 @export var description: String = ""
 @export var cost: int = 0
+
+
+func get_badge_glyph() -> String:
+	return RunModifier.badge_glyph_for_type(modifier_type)
+
+
+func get_badge_color() -> Color:
+	return RunModifier.badge_color_for_type(modifier_type)
+
+
+static func badge_glyph_for_type(mod_type: ModifierType) -> String:
+	match mod_type:
+		ModifierType.GAMBLERS_RUSH:
+			return "$"
+		ModifierType.EXPLOSOPHILE:
+			return "☆"
+		ModifierType.IRON_BANK:
+			return "Fe"
+		ModifierType.GLASS_CANNON:
+			return "!!"
+		ModifierType.SHIELD_WALL:
+			return _UITheme.GLYPH_SHIELD
+		ModifierType.MISER:
+			return "¢"
+		ModifierType.DOUBLE_DOWN:
+			return "⇅"
+	return "?"
+
+
+static func badge_color_for_type(mod_type: ModifierType) -> Color:
+	match mod_type:
+		ModifierType.GAMBLERS_RUSH:
+			return _UITheme.SCORE_GOLD
+		ModifierType.EXPLOSOPHILE:
+			return _UITheme.EXPLOSION_ORANGE
+		ModifierType.IRON_BANK:
+			return _UITheme.ACTION_CYAN
+		ModifierType.GLASS_CANNON:
+			return _UITheme.DANGER_RED
+		ModifierType.SHIELD_WALL:
+			return _UITheme.ACTION_CYAN
+		ModifierType.MISER:
+			return _UITheme.NEON_PURPLE
+		ModifierType.DOUBLE_DOWN:
+			return _UITheme.SUCCESS_GREEN
+	return _UITheme.MUTED_TEXT
 
 
 # ---------------------------------------------------------------------------

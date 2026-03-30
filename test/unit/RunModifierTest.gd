@@ -48,3 +48,16 @@ func test_miser_properties() -> void:
 	var mod: RunModifier = RunModifier.make_miser()
 	assert_str(mod.modifier_name).is_equal("Miser")
 	assert_int(mod.modifier_type).is_equal(RunModifier.ModifierType.MISER)
+
+
+func test_badge_glyph_helpers() -> void:
+	assert_str(RunModifier.badge_glyph_for_type(RunModifier.ModifierType.GAMBLERS_RUSH)).is_equal("$")
+	assert_str(RunModifier.badge_glyph_for_type(RunModifier.ModifierType.IRON_BANK)).is_equal("Fe")
+	assert_str(RunModifier.badge_glyph_for_type(RunModifier.ModifierType.DOUBLE_DOWN)).is_equal("⇅")
+
+
+func test_badge_color_helpers_return_valid_colors() -> void:
+	var color_a: Color = RunModifier.badge_color_for_type(RunModifier.ModifierType.SHIELD_WALL)
+	var color_b: Color = RunModifier.badge_color_for_type(RunModifier.ModifierType.GLASS_CANNON)
+	assert_float(color_a.a).is_equal(1.0)
+	assert_float(color_b.a).is_equal(1.0)

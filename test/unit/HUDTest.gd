@@ -158,3 +158,37 @@ func test_stage_label_uses_display_font() -> void:
 	await await_idle_frame()
 	var font: Font = hud.stage_label.get_theme_font("font")
 	assert_object(font).is_not_null()
+
+
+func test_modifier_bar_has_max_slots() -> void:
+	GameManager.active_modifiers.clear()
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._refresh_modifier_display()
+	var bar: HBoxContainer = hud.get_node("ModifierRow/ModifierBar") as HBoxContainer
+	assert_int(bar.get_child_count()).is_equal(GameManager.MAX_MODIFIERS)
+
+
+func test_modifier_bar_renders_active_modifier_glyph() -> void:
+	GameManager.active_modifiers.clear()
+	GameManager.active_modifiers.append(RunModifier.make_iron_bank())
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._refresh_modifier_display()
+	var bar: HBoxContainer = hud.get_node("ModifierRow/ModifierBar") as HBoxContainer
+	var first_badge: PanelContainer = bar.get_child(0) as PanelContainer
+	assert_object(first_badge).is_not_null()
+	var glyph: Label = first_badge.get_node("CenterContainer/BadgeBody/GlyphLabel") as Label
+	assert_str(glyph.text).is_equal("Fe")
+	GameManager.active_modifiers.clear()
+
+
+func test_modifier_tooltip_node_exists_and_starts_hidden() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	var tooltip: PanelContainer = hud.get_node("ModifierTooltip") as PanelContainer
+	assert_object(tooltip).is_not_null()
+	assert_bool(tooltip.visible).is_false()
