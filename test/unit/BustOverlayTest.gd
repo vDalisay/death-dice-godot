@@ -22,3 +22,17 @@ func test_play_shows_game_over_when_out_of_lives() -> void:
 	overlay.call("play", 1)
 	var message_label: Label = overlay.get_node("CenterContainer/Card/MarginContainer/Content/MessageLabel") as Label
 	assert_str(message_label.text).is_equal("GAME OVER")
+
+
+func test_play_sets_drop_from_top_card_state() -> void:
+	GameManager.lives = 2
+	var overlay: ColorRect = auto_free(BustOverlayScene.instantiate()) as ColorRect
+	add_child(overlay)
+	# play() awaits one process_frame internally, so we await two to be past it.
+	await await_idle_frame()
+	overlay.call("play", 1)
+	await await_idle_frame()
+	var card: PanelContainer = overlay.get_node("CenterContainer/Card") as PanelContainer
+	# Card should be positioned above its resting point (negative Y offset).
+	var rest_y: float = overlay.get("_card_rest_position").y
+	assert_float(card.position.y).is_less(rest_y)
