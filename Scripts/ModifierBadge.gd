@@ -22,6 +22,10 @@ var _is_empty: bool = true
 func _ready() -> void:
 	custom_minimum_size = Vector2(TARGET_SIZE, TARGET_SIZE)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# Route hover from all inner controls to the 44x44 slot root.
+	$CenterContainer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_glyph_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tooltip_text = ""
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
