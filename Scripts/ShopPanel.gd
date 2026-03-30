@@ -29,6 +29,7 @@ var _buy_buttons: Array[Button] = []
 var _refresh_button: Button = null
 var _double_down_overlay: DoubleDownOverlay = null
 var _dd_used_this_shop: bool = false
+var _dd_desc_label: Label = null
 
 
 func _ready() -> void:
@@ -62,6 +63,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 func _generate_items() -> void:
 	_dice_items.clear()
 	_modifier_items.clear()
+	_dd_desc_label = null
 	# Build the pool of all available dice shop items.
 	var dice_pool: Array[ShopItemData] = [
 		ShopItemData.make_buy_simple_die(),
@@ -148,7 +150,8 @@ func _make_item_row(item: ShopItemData) -> HBoxContainer:
 	if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
 		desc_label.text = _get_upgrade_preview()
 	elif item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
-		desc_label.text = "Wager all %dg — even doubles, odd loses!" % GameManager.gold
+		desc_label.text = _dd_desc_text()
+		_dd_desc_label = desc_label
 	else:
 		desc_label.text = item.description
 	desc_label.add_theme_font_size_override("font_size", 14)
@@ -262,6 +265,8 @@ func _refresh_buy_buttons() -> void:
 			var mod_full: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and not GameManager.can_add_modifier()
 			var already_owned: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type)
 			_buy_buttons[i].disabled = too_expensive or mod_full or already_owned
+	if _dd_desc_label != null and is_instance_valid(_dd_desc_label):
+		_dd_desc_label.text = _dd_desc_text()
 	if _refresh_button != null:
 		_refresh_button.disabled = GameManager.gold < REFRESH_COST
 
@@ -323,6 +328,10 @@ func _cleanse_random_cursed_die() -> void:
 		if face.type == DiceFaceData.FaceType.CURSED_STOP:
 			face.type = DiceFaceData.FaceType.STOP
 			break
+
+
+static func _dd_desc_text() -> String:
+	return "Wager all %dg — win = %dg!" % [GameManager.gold, GameManager.gold * 2]
 
 
 func _open_double_down() -> void:
