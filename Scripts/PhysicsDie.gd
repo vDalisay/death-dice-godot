@@ -125,6 +125,7 @@ func _ready() -> void:
 	_face_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_face_label.size = Vector2(DIE_SIZE, DIE_SIZE)
 	_face_label.position = Vector2(-DIE_SIZE / 2.0, -DIE_SIZE / 2.0)
+	_face_label.pivot_offset = Vector2(DIE_SIZE / 2.0, DIE_SIZE / 2.0)
 	_face_label.add_theme_font_override("font", _UITheme.font_stats())
 	_face_label.add_theme_font_size_override("font_size", 26)
 	_face_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
@@ -137,6 +138,7 @@ func _ready() -> void:
 	_glyph_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_glyph_label.size = Vector2(DIE_SIZE - 8, 20)
 	_glyph_label.position = Vector2(-DIE_SIZE / 2.0 + 4, -DIE_SIZE / 2.0 + 4)
+	_glyph_label.pivot_offset = Vector2((DIE_SIZE - 8) / 2.0, 10.0)
 	_glyph_label.add_theme_font_size_override("font_size", 13)
 	_glyph_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 	_glyph_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -147,6 +149,7 @@ func _ready() -> void:
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_name_label.size = Vector2(DIE_SIZE, 16)
 	_name_label.position = Vector2(-DIE_SIZE / 2.0, DIE_SIZE / 2.0 - 18)
+	_name_label.pivot_offset = Vector2(DIE_SIZE / 2.0, 8.0)
 	_name_label.add_theme_font_override("font", _UITheme.font_mono())
 	_name_label.add_theme_font_size_override("font_size", 10)
 	_name_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
@@ -281,6 +284,15 @@ func _stop_glow_pulse() -> void:
 # ---------------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	# Keep text labels upright regardless of body rotation (dice body rotates freely)
+	var neg_rot: float = -rotation
+	if _face_label:
+		_face_label.rotation = neg_rot
+	if _glyph_label:
+		_glyph_label.rotation = neg_rot
+	if _name_label:
+		_name_label.rotation = neg_rot
+
 	# Update collision cooldowns
 	var expired: Array[RID] = []
 	for rid: RID in _collision_cooldowns:

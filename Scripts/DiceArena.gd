@@ -24,12 +24,19 @@ const ARENA_BORDER_COLOR: Color = Color("#333355")
 const ARENA_BORDER_WIDTH: int = 2
 
 # Throw parameters
-const THROW_IMPULSE_MIN: float = 800.0
-const THROW_IMPULSE_MAX: float = 1500.0
+const THROW_IMPULSE_MIN: float = 1000.0
+const THROW_IMPULSE_MAX: float = 1800.0
 const THROW_ANGULAR_MIN: float = -8.0
 const THROW_ANGULAR_MAX: float = 8.0
 const THROW_STAGGER_DELAY: float = 0.03
 const SPAWN_MARGIN: float = 80.0
+
+## Spawn origin presets for dice throwing.
+## Items can override per-die spawn origins in the future.
+enum SpawnOrigin { CENTER_BOTTOM, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, CENTER_TOP }
+
+## Default spawn origin for all dice.
+var default_spawn_origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM
 
 # ---------------------------------------------------------------------------
 # State
@@ -78,8 +85,8 @@ func throw_dice(pool: Array[DiceData]) -> void:
 		die.toggled_keep.connect(_on_die_toggled)
 		die.collision_rerolled.connect(_on_die_collision_rerolled)
 
-		# Random spawn position along arena edges
-		var spawn_pos: Vector2 = _random_edge_position()
+		# Spawn at the default origin (items can override per-die in the future)
+		var spawn_pos: Vector2 = _spawn_position_for_origin(default_spawn_origin)
 		die.global_position = spawn_pos
 
 		# Roll the die face
@@ -106,15 +113,18 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			die.freeze = true
 			die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
 		else:
-			# Unfreeze and re-throw
+			# Move to spawn origin and re-throw
+			var origin: SpawnOrigin = default_spawn_origin
+			die.global_position = _spawn_position_for_origin(origin)
 			die.physics_state = PhysicsDie.DiePhysicsState.FLYING
 			die.freeze = false
 			die._settle_timer = 0.0
 			die.tumble(face)
-			# Apply impulse from current position toward a random arena point
-			var target: Vector2 = _random_interior_position()
+			var target: Vector2 = _throw_target_for_origin(origin)
 			var direction: Vector2 = (target - die.global_position).normalized()
-			var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.6, THROW_IMPULSE_MAX * 0.8)
+			var spread: float = randf_range(-0.4, 0.4)
+			direction = direction.rotated(spread)
+			var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.7, THROW_IMPULSE_MAX * 0.9)
 			die.apply_central_impulse(direction * magnitude)
 			die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
 
@@ -211,19 +221,19 @@ func _stagger_throw() -> void:
 		var die: PhysicsDie = _dice[i]
 		# Stagger: use a timer callback
 		if i == 0:
-			_launch_die(die)
+			_launch_die(die, default_spawn_origin)
 		else:
 			var timer: SceneTreeTimer = get_tree().create_timer(THROW_STAGGER_DELAY * i)
-			timer.timeout.connect(_launch_die.bind(die))
+			timer.timeout.connect(_launch_die.bind(die, default_spawn_origin))
 
 
-func _launch_die(die: PhysicsDie) -> void:
+func _launch_die(die: PhysicsDie, origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM) -> void:
 	die.tumble(die.current_face)
-	# Impulse toward arena center
-	var center: Vector2 = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
-	var direction: Vector2 = (center - die.global_position).normalized()
+	# Impulse away from spawn origin toward arena interior
+	var target: Vector2 = _throw_target_for_origin(origin)
+	var direction: Vector2 = (target - die.global_position).normalized()
 	# Add some random spread
-	var spread: float = randf_range(-0.5, 0.5)
+	var spread: float = randf_range(-0.4, 0.4)
 	direction = direction.rotated(spread)
 	var magnitude: float = randf_range(THROW_IMPULSE_MIN, THROW_IMPULSE_MAX)
 	die.apply_central_impulse(direction * magnitude)
@@ -231,27 +241,61 @@ func _launch_die(die: PhysicsDie) -> void:
 	SFXManager.play_roll()
 
 
-func _random_edge_position() -> Vector2:
-	var edge: int = randi() % 4
+## Returns a spawn position for the given origin with slight random jitter.
+func _spawn_position_for_origin(origin: SpawnOrigin) -> Vector2:
 	var margin: float = SPAWN_MARGIN
-	match edge:
-		0:  # Top
-			return Vector2(randf_range(margin, ARENA_WIDTH - margin), margin)
-		1:  # Bottom
-			return Vector2(randf_range(margin, ARENA_WIDTH - margin), ARENA_HEIGHT - margin)
-		2:  # Left
-			return Vector2(margin, randf_range(margin, ARENA_HEIGHT - margin))
-		3:  # Right
-			return Vector2(ARENA_WIDTH - margin, randf_range(margin, ARENA_HEIGHT - margin))
-	return Vector2(ARENA_WIDTH / 2.0, margin)
+	var cx: float = ARENA_WIDTH / 2.0
+	var cy: float = ARENA_HEIGHT / 2.0
+	var jitter_x: float = randf_range(-40.0, 40.0)
+	var jitter_y: float = randf_range(-20.0, 20.0)
+	match origin:
+		SpawnOrigin.CENTER_BOTTOM:
+			return Vector2(cx + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+		SpawnOrigin.CENTER_TOP:
+			return Vector2(cx + jitter_x, margin + jitter_y)
+		SpawnOrigin.TOP_LEFT:
+			return Vector2(margin + jitter_x, margin + jitter_y)
+		SpawnOrigin.TOP_RIGHT:
+			return Vector2(ARENA_WIDTH - margin + jitter_x, margin + jitter_y)
+		SpawnOrigin.BOTTOM_LEFT:
+			return Vector2(margin + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+		SpawnOrigin.BOTTOM_RIGHT:
+			return Vector2(ARENA_WIDTH - margin + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+		SpawnOrigin.LEFT:
+			return Vector2(margin + jitter_x, cy + jitter_y)
+		SpawnOrigin.RIGHT:
+			return Vector2(ARENA_WIDTH - margin + jitter_x, cy + jitter_y)
+		SpawnOrigin.TOP:
+			return Vector2(cx + jitter_x, margin + jitter_y)
+	return Vector2(cx + jitter_x, ARENA_HEIGHT - margin + jitter_y)
 
 
-func _random_interior_position() -> Vector2:
-	var margin: float = SPAWN_MARGIN * 2
-	return Vector2(
-		randf_range(margin, ARENA_WIDTH - margin),
-		randf_range(margin, ARENA_HEIGHT - margin),
-	)
+## Returns a target point for the throw impulse based on spawn origin.
+func _throw_target_for_origin(origin: SpawnOrigin) -> Vector2:
+	var cx: float = ARENA_WIDTH / 2.0
+	var cy: float = ARENA_HEIGHT / 2.0
+	var jitter_x: float = randf_range(-100.0, 100.0)
+	var jitter_y: float = randf_range(-60.0, 60.0)
+	match origin:
+		SpawnOrigin.CENTER_BOTTOM:
+			return Vector2(cx + jitter_x, cy * 0.4 + jitter_y)
+		SpawnOrigin.CENTER_TOP:
+			return Vector2(cx + jitter_x, cy * 1.6 + jitter_y)
+		SpawnOrigin.TOP_LEFT:
+			return Vector2(cx * 1.4 + jitter_x, cy * 1.4 + jitter_y)
+		SpawnOrigin.TOP_RIGHT:
+			return Vector2(cx * 0.6 + jitter_x, cy * 1.4 + jitter_y)
+		SpawnOrigin.BOTTOM_LEFT:
+			return Vector2(cx * 1.4 + jitter_x, cy * 0.6 + jitter_y)
+		SpawnOrigin.BOTTOM_RIGHT:
+			return Vector2(cx * 0.6 + jitter_x, cy * 0.6 + jitter_y)
+		SpawnOrigin.LEFT:
+			return Vector2(cx * 1.4 + jitter_x, cy + jitter_y)
+		SpawnOrigin.RIGHT:
+			return Vector2(cx * 0.6 + jitter_x, cy + jitter_y)
+		SpawnOrigin.TOP:
+			return Vector2(cx + jitter_x, cy * 1.4 + jitter_y)
+	return Vector2(cx + jitter_x, cy * 0.4 + jitter_y)
 
 
 # ---------------------------------------------------------------------------

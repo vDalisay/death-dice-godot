@@ -44,6 +44,7 @@ stretch = true
 
 [node name="ArenaViewport" type="SubViewport" parent="MarginContainer/VBoxContainer/ArenaViewportContainer"]
 handle_input_locally = true
+physics_object_picking = true
 size = Vector2i(1840, 520)
 render_target_update_mode = 4
 
