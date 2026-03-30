@@ -143,6 +143,20 @@ text = "RISK:"
 layout_mode = 2
 theme_override_constants/separation = 4
 
+[node name="ComboRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ComboLabel" type="Label" parent="ComboRow"]
+layout_mode = 2
+text = "COMBOS:"
+
+[node name="ComboContainer" type="HFlowContainer" parent="ComboRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
 [node name="StatusLabel" type="Label" parent="."]
 layout_mode = 2
 text = "Press 'Roll All' to begin your turn!"

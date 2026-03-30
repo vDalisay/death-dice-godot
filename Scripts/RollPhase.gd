@@ -102,6 +102,7 @@ func _start_new_turn() -> void:
 	accumulated_stop_count = 0
 	_reroll_count = 0
 	_triggered_combo_ids.clear()
+	hud.set_active_combos([])
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
@@ -510,7 +511,17 @@ func _check_roll_combos() -> void:
 		if combo == null or combo.combo_id.is_empty() or _triggered_combo_ids.has(combo.combo_id):
 			continue
 		_triggered_combo_ids[combo.combo_id] = true
-		hud.flash_combo(combo.display_name, combo.flash_color)
+		hud.flash_combo(combo.display_name, combo.flash_color, combo.combo_id)
+	_update_combo_hud()
+
+
+func _update_combo_hud() -> void:
+	var active_combos: Array[RollCombo] = []
+	var all_combos: Array[RollCombo] = RollComboRegistry.get_all_combos()
+	for combo: RollCombo in all_combos:
+		if combo != null and not combo.combo_id.is_empty() and _triggered_combo_ids.has(combo.combo_id):
+			active_combos.append(combo)
+	hud.set_active_combos(active_combos)
 
 
 func _get_bust_threshold() -> int:

@@ -192,3 +192,27 @@ func test_modifier_tooltip_node_exists_and_starts_hidden() -> void:
 	var tooltip: PanelContainer = hud.get_node("ModifierTooltip") as PanelContainer
 	assert_object(tooltip).is_not_null()
 	assert_bool(tooltip.visible).is_false()
+
+
+func test_set_active_combos_renders_combo_badges() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	var combos: Array[RollCombo] = [
+		RollCombo.make("shield_wall", "Shield Wall", {}, Color(0.35, 0.75, 1.0)),
+		RollCombo.make("chain_reaction", "Chain Reaction", {}, Color(1.0, 0.55, 0.15)),
+	]
+	hud.set_active_combos(combos)
+	var combo_container: HFlowContainer = hud.get_node("ComboRow/ComboContainer") as HFlowContainer
+	assert_int(combo_container.get_child_count()).is_equal(2)
+
+
+func test_flash_combo_updates_status_text() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	var combo: RollCombo = RollCombo.make("power_pair", "Power Pair", {}, Color(0.95, 0.5, 0.8))
+	hud.set_active_combos([combo])
+	hud.flash_combo(combo.display_name, combo.flash_color, combo.combo_id)
+	assert_str(hud.status_label.text).contains("COMBO")
+	assert_str(hud.status_label.text).contains("Power Pair")

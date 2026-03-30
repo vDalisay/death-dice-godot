@@ -10,6 +10,7 @@ const SCORE_COUNT_DURATION: float = 0.5
 const GOLD_FLOAT_DURATION: float = 1.0
 const ALMOST_THERE_THRESHOLD: float = 0.9
 const RISK_PIP_COUNT: int = 5
+const COMBO_BADGE_HEIGHT: int = 26
 
 # -- Top bar labels --
 @onready var stage_label: Label      = $TopBar/TopBarMargin/TopBarRow/StageLabel
@@ -36,6 +37,10 @@ const RISK_PIP_COUNT: int = 5
 @onready var _risk_label: Label           = $InfoRow/RiskLabel
 @onready var _risk_container: HBoxContainer = $InfoRow/RiskContainer
 
+# -- Combo row --
+@onready var _combo_label: Label = $ComboRow/ComboLabel
+@onready var _combo_container: HFlowContainer = $ComboRow/ComboContainer
+
 # -- Status --
 @onready var status_label: Label = $StatusLabel
 
@@ -50,6 +55,7 @@ var _combo_flash_tween: Tween = null
 var _risk_pips: Array[Label] = []
 var _modifier_badges: Array[PanelContainer] = []
 var _last_modifier_types: Array[int] = []
+var _combo_badges_by_id: Dictionary = {}
 
 
 func _ready() -> void:
@@ -69,6 +75,7 @@ func _ready() -> void:
 	_on_gold_changed(GameManager.gold)
 	_refresh_stage_display()
 	_refresh_modifier_display()
+	set_active_combos([])
 	_refresh_progress_display()
 	highscore_label.text = "HI: %d" % SaveManager.highscore
 
@@ -128,6 +135,9 @@ func _apply_theme_styling() -> void:
 	_risk_label.add_theme_font_override("font", _UITheme.font_display())
 	_risk_label.add_theme_font_size_override("font_size", 10)
 	_risk_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_combo_label.add_theme_font_override("font", _UITheme.font_display())
+	_combo_label.add_theme_font_size_override("font_size", 10)
+	_combo_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 
 	# Status
 	status_label.add_theme_font_size_override("font_size", 18)
@@ -173,7 +183,7 @@ func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.modulate = colour
 
 
-func flash_combo(combo_name: String, colour: Color) -> void:
+func flash_combo(combo_name: String, colour: Color, combo_id: String = "") -> void:
 	show_status("COMBO: %s!" % combo_name, colour)
 	status_label.pivot_offset = status_label.size * 0.5
 	if _combo_flash_tween != null and _combo_flash_tween.is_valid():
@@ -182,6 +192,67 @@ func flash_combo(combo_name: String, colour: Color) -> void:
 	_combo_flash_tween = create_tween()
 	_combo_flash_tween.tween_property(status_label, "scale", Vector2(1.1, 1.1), 0.12)
 	_combo_flash_tween.tween_property(status_label, "scale", Vector2.ONE, 0.18)
+	if not combo_id.is_empty():
+		_pulse_combo_badge(combo_id)
+
+
+func set_active_combos(combos: Array[RollCombo]) -> void:
+	for child: Node in _combo_container.get_children():
+		_combo_container.remove_child(child)
+		child.queue_free()
+	_combo_badges_by_id.clear()
+
+	for combo: RollCombo in combos:
+		if combo == null or combo.combo_id.is_empty():
+			continue
+		var badge: PanelContainer = _build_combo_badge(combo)
+		_combo_container.add_child(badge)
+		_combo_badges_by_id[combo.combo_id] = badge
+
+
+func _build_combo_badge(combo: RollCombo) -> PanelContainer:
+	var badge := PanelContainer.new()
+	badge.custom_minimum_size = Vector2(96, COMBO_BADGE_HEIGHT)
+	badge.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(
+			Color(combo.flash_color.r, combo.flash_color.g, combo.flash_color.b, 0.3),
+			_UITheme.CORNER_RADIUS_BADGE,
+			combo.flash_color,
+			1
+		)
+	)
+	badge.pivot_offset = Vector2(48, COMBO_BADGE_HEIGHT * 0.5)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 3)
+	margin.add_theme_constant_override("margin_bottom", 3)
+	badge.add_child(margin)
+
+	var name_label := Label.new()
+	name_label.text = combo.display_name
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_override("font", _UITheme.font_mono())
+	name_label.add_theme_font_size_override("font_size", 18)
+	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	margin.add_child(name_label)
+
+	return badge
+
+
+func _pulse_combo_badge(combo_id: String) -> void:
+	if not _combo_badges_by_id.has(combo_id):
+		return
+	var badge: PanelContainer = _combo_badges_by_id[combo_id] as PanelContainer
+	if badge == null:
+		return
+	badge.scale = Vector2.ONE
+	var tween: Tween = create_tween()
+	tween.tween_property(badge, "scale", Vector2(1.08, 1.08), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(badge, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func animate_score_count(old_value: int, new_value: int) -> void:
