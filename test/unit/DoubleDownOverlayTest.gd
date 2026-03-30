@@ -1,0 +1,34 @@
+extends GdUnitTestSuite
+## Unit tests for themed Double Down overlay behavior.
+
+const DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
+
+
+func test_open_shows_overlay_and_buttons() -> void:
+	var overlay: DoubleDownOverlay = auto_free(DoubleDownScene.instantiate()) as DoubleDownOverlay
+	add_child(overlay)
+	await await_idle_frame()
+	overlay.open(30)
+	var even_button: Button = overlay.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow/EvenButton") as Button
+	var odd_button: Button = overlay.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow/OddButton") as Button
+	assert_bool(overlay.visible).is_true()
+	assert_bool(even_button.visible).is_true()
+	assert_bool(odd_button.visible).is_true()
+
+
+func test_open_updates_wager_prompt() -> void:
+	var overlay: DoubleDownOverlay = auto_free(DoubleDownScene.instantiate()) as DoubleDownOverlay
+	add_child(overlay)
+	await await_idle_frame()
+	overlay.open(42)
+	var prompt_label: Label = overlay.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/PromptLabel") as Label
+	assert_str(prompt_label.text).contains("42")
+
+
+func test_close_button_hidden_on_open() -> void:
+	var overlay: DoubleDownOverlay = auto_free(DoubleDownScene.instantiate()) as DoubleDownOverlay
+	add_child(overlay)
+	await await_idle_frame()
+	overlay.open(12)
+	var close_button: Button = overlay.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/CloseButton") as Button
+	assert_bool(close_button.visible).is_false()

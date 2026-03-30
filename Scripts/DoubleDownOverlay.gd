@@ -10,12 +10,14 @@ const START_INTERVAL: float = 0.06
 const DIE_FACES: Array[int] = [1, 2, 3, 4, 5, 6]
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
-@onready var _die_label: Label = $MarginContainer/VBoxContainer/DieLabel
-@onready var _prompt_label: Label = $MarginContainer/VBoxContainer/PromptLabel
-@onready var _result_label: Label = $MarginContainer/VBoxContainer/ResultLabel
-@onready var _even_button: Button = $MarginContainer/VBoxContainer/ButtonRow/EvenButton
-@onready var _odd_button: Button = $MarginContainer/VBoxContainer/ButtonRow/OddButton
-@onready var _close_button: Button = $MarginContainer/VBoxContainer/CloseButton
+@onready var _modal: PanelContainer = $CenterContainer/Modal
+@onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/TitleLabel
+@onready var _die_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/DieLabel
+@onready var _prompt_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/PromptLabel
+@onready var _result_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ResultLabel
+@onready var _even_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow/EvenButton
+@onready var _odd_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow/OddButton
+@onready var _close_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/CloseButton
 
 var _gold_at_stake: int = 0
 var _player_picked_even: bool = true
@@ -25,6 +27,7 @@ var _confetti_nodes: Array[Node] = []
 
 
 func _ready() -> void:
+	_apply_theme_styling()
 	visible = false
 	_even_button.pressed.connect(_on_even_pressed)
 	_odd_button.pressed.connect(_on_odd_pressed)
@@ -33,17 +36,43 @@ func _ready() -> void:
 	_result_label.text = ""
 
 
+func _apply_theme_styling() -> void:
+	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
+	_modal.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+	)
+	_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_title_label.add_theme_font_size_override("font_size", 20)
+	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_die_label.add_theme_font_override("font", _UITheme.font_stats())
+	_die_label.add_theme_font_size_override("font_size", 120)
+	_die_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+
+	_prompt_label.add_theme_font_override("font", _UITheme.font_body())
+	_prompt_label.add_theme_font_size_override("font_size", 20)
+	_result_label.add_theme_font_override("font", _UITheme.font_stats())
+	_result_label.add_theme_font_size_override("font_size", 24)
+
+	for button: Button in [_even_button, _odd_button, _close_button]:
+		button.add_theme_font_override("font", _UITheme.font_display())
+		button.add_theme_font_size_override("font_size", 13)
+
+
 func open(gold_at_stake: int) -> void:
 	_gold_at_stake = gold_at_stake
 	_rolling = false
 	_die_label.text = _UITheme.GLYPH_DIE
 	_prompt_label.text = "Wager: %dg — pick your side!" % gold_at_stake
 	_result_label.text = ""
+	_result_label.modulate = _UITheme.BRIGHT_TEXT
 	_even_button.visible = true
 	_even_button.disabled = false
 	_odd_button.visible = true
 	_odd_button.disabled = false
 	_close_button.visible = false
+	_modal.position = Vector2.ZERO
 	_clear_confetti()
 	visible = true
 
@@ -65,37 +94,24 @@ func _start_roll() -> void:
 	_even_button.disabled = true
 	_odd_button.disabled = true
 	_prompt_label.text = "Rolling..."
-	# Pre-determine final result.
 	_final_roll = (randi() % 6) + 1
 	_animate_roll()
 
 
 func _animate_roll() -> void:
-	var elapsed: float = 0.0
-	var step_count: int = 0
-	_roll_step(elapsed, step_count)
+	_roll_step(0.0)
 
 
-func _roll_step(elapsed: float, step_count: int) -> void:
+func _roll_step(elapsed: float) -> void:
 	if elapsed >= ROLL_DURATION:
 		_finish_roll()
 		return
-	# Interval increases from START_INTERVAL to MIN_INTERVAL (slowing down).
 	var progress: float = elapsed / ROLL_DURATION
 	var interval: float = lerpf(START_INTERVAL, MIN_INTERVAL, progress * progress)
-	# Show random face (biased toward final near the end).
-	var display_face: int
-	if progress > 0.85:
-		display_face = _final_roll
-	else:
-		display_face = DIE_FACES[randi() % DIE_FACES.size()]
+	var display_face: int = _final_roll if progress > 0.85 else DIE_FACES[randi() % DIE_FACES.size()]
 	_die_label.text = str(display_face)
 	SFXManager.play_roll()
-	var next_elapsed: float = elapsed + interval
-	var next_step: int = step_count + 1
-	get_tree().create_timer(interval).timeout.connect(
-		func() -> void: _roll_step(next_elapsed, next_step)
-	)
+	get_tree().create_timer(interval).timeout.connect(func() -> void: _roll_step(elapsed + interval))
 
 
 func _finish_roll() -> void:
@@ -107,19 +123,27 @@ func _finish_roll() -> void:
 	var won: bool = (_player_picked_even and is_even) or (not _player_picked_even and not is_even)
 	if won:
 		GameManager.add_gold(_gold_at_stake)
-		_result_label.text = "Rolled %d (%s) — YOU WIN! +%dg!" % [
-			_final_roll, "even" if is_even else "odd", _gold_at_stake]
-		_result_label.modulate = Color(0.2, 1.0, 0.4)
+		_result_label.text = "Rolled %d (%s) — YOU WIN! +%dg!" % [_final_roll, "even" if is_even else "odd", _gold_at_stake]
+		_result_label.modulate = _UITheme.SUCCESS_GREEN
 		SFXManager.play_double_down_win()
 		_spawn_confetti()
 	else:
 		var loss: int = mini(_gold_at_stake, GameManager.gold)
 		GameManager.add_gold(-loss)
-		_result_label.text = "Rolled %d (%s) — LOST! -%dg" % [
-			_final_roll, "even" if is_even else "odd", loss]
-		_result_label.modulate = Color(1.0, 0.4, 0.2)
+		_result_label.text = "Rolled %d (%s) — LOST! -%dg" % [_final_roll, "even" if is_even else "odd", loss]
+		_result_label.modulate = _UITheme.DANGER_RED
 		SFXManager.play_bust()
+		_play_loss_shake()
 	_close_button.visible = true
+
+
+func _play_loss_shake() -> void:
+	var tween: Tween = create_tween()
+	tween.tween_property(_modal, "position", Vector2(-12, 0), 0.04)
+	tween.tween_property(_modal, "position", Vector2(12, 0), 0.05)
+	tween.tween_property(_modal, "position", Vector2(-8, 0), 0.04)
+	tween.tween_property(_modal, "position", Vector2(8, 0), 0.04)
+	tween.tween_property(_modal, "position", Vector2.ZERO, 0.05)
 
 
 func _on_close_pressed() -> void:
@@ -130,7 +154,6 @@ func _on_close_pressed() -> void:
 
 func _spawn_confetti() -> void:
 	_clear_confetti()
-	# Simple particle confetti using CPUParticles2D.
 	var particles := CPUParticles2D.new()
 	particles.emitting = true
 	particles.one_shot = true
@@ -144,18 +167,17 @@ func _spawn_confetti() -> void:
 	particles.initial_velocity_max = 500.0
 	particles.scale_amount_min = 3.0
 	particles.scale_amount_max = 6.0
-	particles.color = Color(1.0, 0.85, 0.0)
+	particles.color = _UITheme.SCORE_GOLD
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(1.0, 0.3, 0.3))
-	gradient.add_point(0.25, Color(0.3, 1.0, 0.3))
-	gradient.add_point(0.5, Color(0.3, 0.5, 1.0))
-	gradient.add_point(0.75, Color(1.0, 0.85, 0.0))
-	gradient.set_color(1, Color(1.0, 0.5, 0.8))
+	gradient.add_point(0.25, _UITheme.SUCCESS_GREEN)
+	gradient.add_point(0.5, _UITheme.ACTION_CYAN)
+	gradient.add_point(0.75, _UITheme.SCORE_GOLD)
+	gradient.set_color(1, _UITheme.NEON_PURPLE)
 	particles.color_ramp = gradient
-	particles.position = Vector2(size.x / 2.0, size.y * 0.5)
-	add_child(particles)
+	particles.position = Vector2(_modal.size.x / 2.0, _modal.size.y * 0.5)
+	_modal.add_child(particles)
 	_confetti_nodes.append(particles)
-	# Auto-cleanup after lifetime.
 	get_tree().create_timer(particles.lifetime + 0.5).timeout.connect(
 		func() -> void:
 			if is_instance_valid(particles):
