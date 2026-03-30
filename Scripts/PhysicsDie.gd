@@ -23,6 +23,10 @@ const SETTLE_VELOCITY_THRESHOLD: float = 15.0
 const SETTLE_TIME_REQUIRED: float = 0.3
 const REROLL_VELOCITY_THRESHOLD: float = 150.0
 const COLLISION_COOLDOWN: float = 0.2
+const BUMP_BOOST_MIN_SPEED: float = 80.0
+const BUMP_BOOST_IMPULSE_MIN: float = 80.0
+const BUMP_BOOST_IMPULSE_MAX: float = 220.0
+const BUMP_BOOST_MULTIPLIER: float = 0.1
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -90,12 +94,14 @@ var _is_hovered: bool = false
 var _bg_panel: Panel = null
 var _face_label: Label = null
 var _glyph_label: Label = null
-var _name_label: Label = null
+var _name_popup: Panel = null
+var _name_popup_label: Label = null
 var _collision_shape: CollisionShape2D = null
 
 
 func _ready() -> void:
 	# Physics setup: top-down (no gravity), damped sliding
+	input_pickable = true
 	gravity_scale = 0.0
 	linear_damp = 3.5
 	angular_damp = 4.0
@@ -144,17 +150,30 @@ func _ready() -> void:
 	_glyph_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_glyph_label)
 
-	# Die name label (bottom center)
-	_name_label = Label.new()
-	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name_label.size = Vector2(DIE_SIZE, 16)
-	_name_label.position = Vector2(-DIE_SIZE / 2.0, DIE_SIZE / 2.0 - 18)
-	_name_label.pivot_offset = Vector2(DIE_SIZE / 2.0, 8.0)
-	_name_label.add_theme_font_override("font", _UITheme.font_mono())
-	_name_label.add_theme_font_size_override("font_size", 10)
-	_name_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_name_label)
+	# Hover popup for die name (hidden by default)
+	_name_popup = Panel.new()
+	_name_popup.size = Vector2(140, 24)
+	_name_popup.position = Vector2(-70, -DIE_SIZE / 2.0 - 34)
+	_name_popup.pivot_offset = _name_popup.size * 0.5
+	_name_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_name_popup.visible = false
+	var popup_style := StyleBoxFlat.new()
+	popup_style.bg_color = Color(0.05, 0.07, 0.12, 0.92)
+	popup_style.border_color = _UITheme.ACTION_CYAN
+	popup_style.set_border_width_all(1)
+	popup_style.set_corner_radius_all(6)
+	_name_popup.add_theme_stylebox_override("panel", popup_style)
+	add_child(_name_popup)
+
+	_name_popup_label = Label.new()
+	_name_popup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_popup_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_name_popup_label.size = _name_popup.size
+	_name_popup_label.add_theme_font_override("font", _UITheme.font_mono())
+	_name_popup_label.add_theme_font_size_override("font_size", 11)
+	_name_popup_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_name_popup_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_name_popup.add_child(_name_popup_label)
 
 	# Signals
 	body_entered.connect(_on_body_entered)
@@ -178,8 +197,8 @@ func setup(index: int, data: DiceData) -> void:
 	is_stopped = false
 	physics_state = DiePhysicsState.FLYING
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
-	if _name_label:
-		_name_label.text = data.dice_name if data else ""
+	if _name_popup_label:
+		_name_popup_label.text = data.dice_name if data else ""
 	if _face_label:
 		_face_label.text = "?"
 	if _glyph_label:
@@ -290,8 +309,8 @@ func _physics_process(delta: float) -> void:
 		_face_label.rotation = neg_rot
 	if _glyph_label:
 		_glyph_label.rotation = neg_rot
-	if _name_label:
-		_name_label.rotation = neg_rot
+	if _name_popup:
+		_name_popup.rotation = neg_rot
 
 	# Update collision cooldowns
 	var expired: Array[RID] = []
@@ -322,10 +341,28 @@ func _on_body_entered(other: Node) -> void:
 	if not other is PhysicsDie:
 		return
 	var other_die: PhysicsDie = other as PhysicsDie
+
+	# Add a small extra bump so collisions feel punchier.
+	var my_speed: float = linear_velocity.length()
+	var other_speed: float = other_die.linear_velocity.length()
+	if my_speed >= BUMP_BOOST_MIN_SPEED and other_speed >= BUMP_BOOST_MIN_SPEED:
+		var collision_dir: Vector2 = (global_position - other_die.global_position).normalized()
+		if collision_dir == Vector2.ZERO:
+			collision_dir = Vector2.RIGHT.rotated(randf() * TAU)
+		var bump_impulse: float = clamp(
+			(my_speed + other_speed) * BUMP_BOOST_MULTIPLIER,
+			BUMP_BOOST_IMPULSE_MIN,
+			BUMP_BOOST_IMPULSE_MAX
+		)
+		if not freeze:
+			apply_central_impulse(collision_dir * bump_impulse)
+		if not other_die.freeze:
+			other_die.apply_central_impulse(-collision_dir * bump_impulse)
+
 	# Both must be moving fast enough
-	if linear_velocity.length() < REROLL_VELOCITY_THRESHOLD:
+	if my_speed < REROLL_VELOCITY_THRESHOLD:
 		return
-	if other_die.linear_velocity.length() < REROLL_VELOCITY_THRESHOLD:
+	if other_speed < REROLL_VELOCITY_THRESHOLD:
 		return
 
 	# Cooldown check (use other's RID)
@@ -387,12 +424,17 @@ func _press_bounce() -> void:
 
 func _on_mouse_entered() -> void:
 	_is_hovered = true
+	if _name_popup and _name_popup_label and die_data:
+		_name_popup_label.text = die_data.dice_name
+		_name_popup.visible = true
 	if physics_state in [DiePhysicsState.SETTLED, DiePhysicsState.KEPT] and not is_keep_locked:
 		_animate_hover(Vector2(HOVER_SCALE, HOVER_SCALE))
 
 
 func _on_mouse_exited() -> void:
 	_is_hovered = false
+	if _name_popup:
+		_name_popup.visible = false
 	_animate_hover(Vector2.ONE)
 
 

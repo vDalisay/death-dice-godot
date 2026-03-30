@@ -63,3 +63,17 @@ func test_face_type_glyphs_cover_all_types() -> void:
 	# Verify glyphs exist for all face types we use
 	for face_type: int in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
 		assert_bool(PhysicsDie.FACE_TYPE_GLYPHS.has(face_type)).is_true()
+
+
+func test_die_is_input_pickable() -> void:
+	assert_bool(_die.input_pickable).is_true()
+
+
+func test_hover_popup_visibility_changes() -> void:
+	var data: DiceData = DiceData.make_standard_d6()
+	_die.setup(0, data)
+	assert_bool(_die._name_popup.visible).is_false()
+	_die._on_mouse_entered()
+	assert_bool(_die._name_popup.visible).is_true()
+	_die._on_mouse_exited()
+	assert_bool(_die._name_popup.visible).is_false()
