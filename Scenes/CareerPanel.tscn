@@ -4,74 +4,128 @@
 
 [node name="CareerPanel" type="PanelContainer"]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.2
-anchor_top = 0.12
-anchor_right = 0.8
-anchor_bottom = 0.88
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 script = ExtResource("1")
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="Backdrop" type="ColorRect" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+color = Color(0, 0, 0, 0.8)
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 2
-theme_override_constants/separation = 10
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="Card" type="PanelContainer" parent="CenterContainer"]
 layout_mode = 2
-text = "Career Stats"
+custom_minimum_size = Vector2(700, 0)
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 28
+
+[node name="Content" type="VBoxContainer" parent="CenterContainer/Card/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content"]
+layout_mode = 2
+text = "CAREER STATS"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 32
 
-[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+[node name="TitleSeparator" type="HSeparator" parent="CenterContainer/Card/MarginContainer/Content"]
 layout_mode = 2
 
-[node name="BestLoopLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="StatsGrid" type="GridContainer" parent="CenterContainer/Card/MarginContainer/Content"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 10
+
+[node name="LoopIcon" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
+layout_mode = 2
+text = "▲"
+horizontal_alignment = 2
+
+[node name="BestLoopLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
 layout_mode = 2
 text = "Best Loop: 0"
-theme_override_font_sizes/font_size = 20
 
-[node name="BestTurnLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="TurnIcon" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
+layout_mode = 2
+text = "★"
+horizontal_alignment = 2
+
+[node name="BestTurnLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
 layout_mode = 2
 text = "Best Turn Score: 0"
-theme_override_font_sizes/font_size = 20
 
-[node name="TotalBustsLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="BustIcon" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
+layout_mode = 2
+text = "✕"
+horizontal_alignment = 2
+
+[node name="TotalBustsLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
 layout_mode = 2
 text = "Total Busts: 0"
-theme_override_font_sizes/font_size = 20
 
-[node name="FavoriteDieLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="DieIcon" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
+layout_mode = 2
+text = "⬡"
+horizontal_alignment = 2
+
+[node name="FavoriteDieLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
 layout_mode = 2
 text = "Favorite Die Type: None"
-theme_override_font_sizes/font_size = 20
 
-[node name="LifetimeRunsLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="RunIcon" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
+layout_mode = 2
+text = "◇"
+horizontal_alignment = 2
+
+[node name="LifetimeRunsLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
 layout_mode = 2
 text = "Lifetime Runs: 0"
-theme_override_font_sizes/font_size = 20
 
-[node name="StagesClearedLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="StageIcon" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
+layout_mode = 2
+text = "✓"
+horizontal_alignment = 2
+
+[node name="StagesClearedLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content/StatsGrid"]
 layout_mode = 2
 text = "Total Stages Cleared: 0"
-theme_override_font_sizes/font_size = 20
 
-[node name="AchievementsLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="AchievementSeparator" type="HSeparator" parent="CenterContainer/Card/MarginContainer/Content"]
 layout_mode = 2
-text = "Achievements: 0 / 0"
-theme_override_font_sizes/font_size = 20
 
-[node name="CloseButton" type="Button" parent="MarginContainer/VBoxContainer"]
+[node name="AchievementsHeader" type="Label" parent="CenterContainer/Card/MarginContainer/Content"]
 layout_mode = 2
-custom_minimum_size = Vector2(180, 48)
+text = "ACHIEVEMENTS"
+horizontal_alignment = 1
+
+[node name="AchievementsLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content"]
+layout_mode = 2
+text = "0 / 0"
+horizontal_alignment = 1
+
+[node name="AchievementGrid" type="HFlowContainer" parent="CenterContainer/Card/MarginContainer/Content"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="FooterSpacer" type="Control" parent="CenterContainer/Card/MarginContainer/Content"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="CloseButton" type="Button" parent="CenterContainer/Card/MarginContainer/Content"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 56)
 size_flags_horizontal = 4
 text = "Close"
-theme_override_font_sizes/font_size = 20
