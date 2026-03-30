@@ -23,8 +23,10 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
 @onready var career_button: Button = $MarginContainer/VBoxContainer/ButtonRow/CareerButton
+@onready var codex_button: Button = $MarginContainer/VBoxContainer/ButtonRow/CodexButton
 @onready var shop_panel: ShopPanel = $ShopPanel
 @onready var career_panel: CareerPanel = $CareerPanel
+@onready var codex_panel: DiceCodexPanel = $DiceCodexPanel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -59,14 +61,17 @@ func _ready() -> void:
 	bank_button.pressed.connect(_on_bank_pressed)
 	new_run_button.pressed.connect(_on_new_run_pressed)
 	career_button.pressed.connect(_on_career_pressed)
+	codex_button.pressed.connect(_on_codex_pressed)
 	dice_tray.die_toggled.connect(_on_die_toggled)
 	shop_panel.shop_closed.connect(_on_shop_closed)
 	career_panel.closed.connect(_on_career_closed)
+	codex_panel.closed.connect(_on_codex_closed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
 	new_run_button.visible = false
 	career_button.visible = false
+	codex_button.visible = false
 	_streak_display = StreakDisplayScript.new()
 	add_child(_streak_display)
 	if GameManager.skip_archetype_picker:
@@ -491,7 +496,6 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
 
-
 func _check_roll_combos() -> void:
 	if turn_state != TurnState.ACTIVE:
 		return
@@ -501,6 +505,7 @@ func _check_roll_combos() -> void:
 			continue
 		_triggered_combo_ids[combo.combo_id] = true
 		hud.flash_combo(combo.display_name, combo.flash_color)
+
 
 func _get_bust_threshold() -> int:
 	var base: int = BASE_BUST_THRESHOLD
@@ -585,6 +590,7 @@ func _on_run_ended() -> void:
 	bank_button.disabled = true
 	new_run_button.visible = true
 	career_button.visible = true
+	codex_button.visible = true
 	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
 
 func _on_stage_cleared() -> void:
@@ -632,6 +638,7 @@ func _on_new_run_pressed() -> void:
 	_record_run_snapshot_if_needed()
 	new_run_button.visible = false
 	career_button.visible = false
+	codex_button.visible = false
 	shop_panel.visible = false
 	_roll_content.visible = true
 	_show_archetype_picker()
@@ -642,6 +649,14 @@ func _on_career_pressed() -> void:
 
 
 func _on_career_closed() -> void:
+	pass
+
+
+func _on_codex_pressed() -> void:
+	codex_panel.open_panel()
+
+
+func _on_codex_closed() -> void:
 	pass
 
 

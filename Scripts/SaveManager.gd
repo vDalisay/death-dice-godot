@@ -15,6 +15,7 @@ var total_stages_cleared: int = 0
 var career_best_turn_score: int = 0
 var career_best_loop: int = 0
 var dice_type_counts: Dictionary = {}
+var discovered_dice: Dictionary = {}
 var unlocked_achievements: Dictionary = {}
 
 func _ready() -> void:
@@ -33,6 +34,7 @@ func record_run(run: RunSaveData) -> void:
 	career_best_loop = maxi(career_best_loop, run.loops_completed)
 	for die_name: String in run.final_dice_names:
 		dice_type_counts[die_name] = int(dice_type_counts.get(die_name, 0)) + 1
+		discover_die(die_name)
 	if run.score > highscore:
 		highscore = run.score
 		highscore_changed.emit(highscore)
@@ -84,6 +86,21 @@ func get_favorite_die_type() -> String:
 			best_name = die_name
 	return best_name
 
+
+func discover_die(die_name: String) -> void:
+	if not discovered_dice.has(die_name):
+		discovered_dice[die_name] = true
+		_save()
+
+
+func is_die_discovered(die_name: String) -> bool:
+	return bool(discovered_dice.get(die_name, false))
+
+
+func get_discovered_count() -> int:
+	return discovered_dice.size()
+
+
 # ---------------------------------------------------------------------------
 # Persistence
 # ---------------------------------------------------------------------------
@@ -101,6 +118,7 @@ func _save() -> void:
 		"career_best_turn_score": career_best_turn_score,
 		"career_best_loop": career_best_loop,
 		"dice_type_counts": dice_type_counts,
+		"discovered_dice": discovered_dice,
 		"unlocked_achievements": unlocked_achievements,
 		"runs": runs_array,
 	}
@@ -129,6 +147,7 @@ func _load() -> void:
 	career_best_turn_score = data.get("career_best_turn_score", 0) as int
 	career_best_loop = data.get("career_best_loop", 0) as int
 	dice_type_counts = data.get("dice_type_counts", {}) as Dictionary
+	discovered_dice = data.get("discovered_dice", {}) as Dictionary
 	unlocked_achievements = data.get("unlocked_achievements", {}) as Dictionary
 	var runs: Array = data.get("runs", []) as Array
 	run_history.clear()

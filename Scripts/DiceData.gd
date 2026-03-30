@@ -335,6 +335,23 @@ static func make_blank_canvas_d6() -> DiceData:
 	return die
 
 
+## Returns one instance of every known die type (for codex enumeration).
+static func get_all_known_dice() -> Array[DiceData]:
+	var all: Array[DiceData] = [
+		make_standard_d6(),
+		make_blank_canvas_d6(),
+		make_simple_d6(),
+		make_lucky_d6(),
+		make_heavy_d6(),
+		make_gambler_d6(),
+		make_golden_d6(),
+		make_insurance_d6(),
+		make_explosive_d6(),
+		make_pink_d6(),
+	]
+	return all
+
+
 ## Simple die — no stops, half numbers, half blanks. Safe filler.
 static func make_simple_d6() -> DiceData:
 	var die := DiceData.new()
