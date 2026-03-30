@@ -174,6 +174,7 @@ func _on_bank_pressed() -> void:
 		GameManager.best_turn_score = banked
 		hud.show_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
 		SFXManager.play_personal_best()
+	_play_multiply_face_vfx()
 	# Per-die score count-up followed by cascade checkpoints.
 	_play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
 	_sync_buttons()
@@ -849,6 +850,22 @@ func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: in
 	checkpoint_tween.tween_callback(func() -> void:
 		hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
 	).set_delay(BANK_CASCADE_STEP_DELAY)
+
+
+func _play_multiply_face_vfx() -> void:
+	for i: int in GameManager.dice_pool.size():
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face == null:
+			continue
+		var die: PhysicsDie = dice_arena.get_die(i)
+		if die == null:
+			continue
+		if face.type == DiceFaceData.FaceType.MULTIPLY:
+			die.play_multiply_vfx(face.value)
+		elif face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
+			die.play_multiply_left_vfx(face.value)
 
 
 ## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).

@@ -30,6 +30,8 @@ const THROW_ANGULAR_MIN: float = -8.0
 const THROW_ANGULAR_MAX: float = 8.0
 const THROW_STAGGER_DELAY: float = 0.03
 const SPAWN_MARGIN: float = 80.0
+const BOTTOM_SPAWN_LIFT: float = 92.0
+const CONTAINMENT_BOUNCE_DAMP: float = 0.45
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -58,6 +60,7 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	_enforce_arena_containment()
 	if not _settle_check_active:
 		return
 	# Check if all dice have settled
@@ -250,7 +253,7 @@ func _spawn_position_for_origin(origin: SpawnOrigin) -> Vector2:
 	var jitter_y: float = randf_range(-20.0, 20.0)
 	match origin:
 		SpawnOrigin.CENTER_BOTTOM:
-			return Vector2(cx + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+			return Vector2(cx + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
 		SpawnOrigin.CENTER_TOP:
 			return Vector2(cx + jitter_x, margin + jitter_y)
 		SpawnOrigin.TOP_LEFT:
@@ -258,16 +261,16 @@ func _spawn_position_for_origin(origin: SpawnOrigin) -> Vector2:
 		SpawnOrigin.TOP_RIGHT:
 			return Vector2(ARENA_WIDTH - margin + jitter_x, margin + jitter_y)
 		SpawnOrigin.BOTTOM_LEFT:
-			return Vector2(margin + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+			return Vector2(margin + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
 		SpawnOrigin.BOTTOM_RIGHT:
-			return Vector2(ARENA_WIDTH - margin + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+			return Vector2(ARENA_WIDTH - margin + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
 		SpawnOrigin.LEFT:
 			return Vector2(margin + jitter_x, cy + jitter_y)
 		SpawnOrigin.RIGHT:
 			return Vector2(ARENA_WIDTH - margin + jitter_x, cy + jitter_y)
 		SpawnOrigin.TOP:
 			return Vector2(cx + jitter_x, margin + jitter_y)
-	return Vector2(cx + jitter_x, ARENA_HEIGHT - margin + jitter_y)
+	return Vector2(cx + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
 
 
 ## Returns a target point for the throw impulse based on spawn origin.
@@ -365,3 +368,36 @@ func _clear_dice() -> void:
 		if is_instance_valid(die):
 			die.queue_free()
 	_dice.clear()
+
+
+func _enforce_arena_containment() -> void:
+	if instant_mode or _dice.is_empty():
+		return
+	var rect: Rect2 = get_arena_rect()
+	var min_x: float = rect.position.x + PhysicsDie.COLLISION_RADIUS
+	var max_x: float = rect.end.x - PhysicsDie.COLLISION_RADIUS
+	var min_y: float = rect.position.y + PhysicsDie.COLLISION_RADIUS
+	var max_y: float = rect.end.y - PhysicsDie.COLLISION_RADIUS
+	for die: PhysicsDie in _dice:
+		if die == null or die.freeze:
+			continue
+		var p: Vector2 = die.global_position
+		var corrected: bool = false
+		if p.x < min_x:
+			p.x = min_x
+			die.linear_velocity.x = absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP
+			corrected = true
+		elif p.x > max_x:
+			p.x = max_x
+			die.linear_velocity.x = -absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP
+			corrected = true
+		if p.y < min_y:
+			p.y = min_y
+			die.linear_velocity.y = absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP
+			corrected = true
+		elif p.y > max_y:
+			p.y = max_y
+			die.linear_velocity.y = -absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP
+			corrected = true
+		if corrected:
+			die.global_position = p

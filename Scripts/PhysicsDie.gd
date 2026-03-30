@@ -30,6 +30,9 @@ const BUMP_BOOST_MULTIPLIER: float = 0.1
 const SETTLE_POP_SCALE: float = 1.08
 const SETTLE_POP_DURATION: float = 0.12
 const IMPACT_FLASH_DURATION: float = 0.08
+const SCORE_POPUP_RISE: float = 35.0
+const SCORE_POPUP_DURATION: float = 0.6
+const MULTIPLY_VFX_DURATION: float = 0.35
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -105,6 +108,7 @@ var _collision_shape: CollisionShape2D = null
 func _ready() -> void:
 	# Physics setup: top-down (no gravity), damped sliding
 	input_pickable = true
+	continuous_cd = RigidBody2D.CCD_MODE_CAST_SHAPE
 	gravity_scale = 0.0
 	linear_damp = 3.5
 	angular_damp = 4.0
@@ -260,13 +264,16 @@ func show_score_popup(value: int) -> void:
 	lbl.add_theme_font_size_override("font_size", 20)
 	lbl.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = Vector2(-20, -DIE_SIZE / 2.0 - 25)
+	lbl.top_level = true
+	lbl.size = Vector2(64, 24)
+	lbl.pivot_offset = lbl.size * 0.5
+	lbl.global_position = global_position + Vector2(-32.0, -DIE_SIZE / 2.0 - 28.0)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(lbl)
-	var start_y: float = lbl.position.y
+	var start_y: float = lbl.global_position.y
 	var tween: Tween = lbl.create_tween()
-	tween.tween_property(lbl, "position:y", start_y - 35.0, 0.6).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN).set_delay(0.2)
+	tween.tween_property(lbl, "global_position:y", start_y - SCORE_POPUP_RISE, SCORE_POPUP_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, SCORE_POPUP_DURATION).set_ease(Tween.EASE_IN).set_delay(0.2)
 	tween.tween_callback(lbl.queue_free)
 
 
@@ -277,14 +284,25 @@ func show_chain_label(depth: int) -> void:
 	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", _UITheme.EXPLOSION_ORANGE)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = Vector2(-30, -DIE_SIZE / 2.0 - 30)
+	lbl.top_level = true
+	lbl.size = Vector2(96, 20)
+	lbl.pivot_offset = lbl.size * 0.5
+	lbl.global_position = global_position + Vector2(-48.0, -DIE_SIZE / 2.0 - 34.0)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(lbl)
-	var start_y: float = lbl.position.y
+	var start_y: float = lbl.global_position.y
 	var tween: Tween = lbl.create_tween()
-	tween.tween_property(lbl, "position:y", start_y - 40.0, 0.8).set_ease(Tween.EASE_OUT)
+	tween.tween_property(lbl, "global_position:y", start_y - 40.0, 0.8).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.8).set_ease(Tween.EASE_IN).set_delay(0.3)
 	tween.tween_callback(lbl.queue_free)
+
+
+func play_multiply_vfx(multiplier: int) -> void:
+	_play_radial_effect(_UITheme.SCORE_GOLD, "x%d" % multiplier)
+
+
+func play_multiply_left_vfx(multiplier: int) -> void:
+	_play_directional_left_effect(_UITheme.ROSE_ACCENT, "<x%d" % multiplier)
 
 
 func start_glow_pulse(color: Color) -> void:
@@ -554,3 +572,83 @@ func _play_impact_accent() -> void:
 	var tween: Tween = create_tween()
 	tween.tween_property(_bg_panel, "modulate", Color(1.22, 1.22, 1.22, 1.0), IMPACT_FLASH_DURATION)
 	tween.tween_property(_bg_panel, "modulate", Color.WHITE, IMPACT_FLASH_DURATION)
+
+
+func _play_radial_effect(color: Color, label_text: String) -> void:
+	var fx_root := Node2D.new()
+	fx_root.top_level = true
+	fx_root.global_position = global_position
+	add_child(fx_root)
+
+	var ring := Line2D.new()
+	ring.width = 3.0
+	ring.default_color = color
+	ring.closed = true
+	ring.antialiased = true
+	var points: PackedVector2Array = PackedVector2Array()
+	var segments: int = 20
+	for i: int in segments:
+		var t: float = TAU * float(i) / float(segments)
+		points.append(Vector2(cos(t), sin(t)) * 42.0)
+	ring.points = points
+	fx_root.add_child(ring)
+
+	var tag := Label.new()
+	tag.text = label_text
+	tag.top_level = false
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.position = Vector2(-16, -12)
+	tag.add_theme_font_override("font", _UITheme.font_stats())
+	tag.add_theme_font_size_override("font_size", 18)
+	tag.add_theme_color_override("font_color", color)
+	fx_root.add_child(tag)
+
+	fx_root.scale = Vector2(0.35, 0.35)
+	fx_root.modulate.a = 0.95
+	var tween: Tween = fx_root.create_tween()
+	tween.tween_property(fx_root, "scale", Vector2(1.2, 1.2), MULTIPLY_VFX_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(fx_root, "modulate:a", 0.0, MULTIPLY_VFX_DURATION).set_ease(Tween.EASE_IN)
+	tween.tween_callback(fx_root.queue_free)
+
+
+func _play_directional_left_effect(color: Color, label_text: String) -> void:
+	var fx_root := Node2D.new()
+	fx_root.top_level = true
+	fx_root.global_position = global_position
+	add_child(fx_root)
+
+	var spray := CPUParticles2D.new()
+	spray.one_shot = true
+	spray.amount = 36
+	spray.lifetime = 0.35
+	spray.explosiveness = 0.85
+	spray.direction = Vector2.LEFT
+	spray.spread = 24.0
+	spray.initial_velocity_min = 140.0
+	spray.initial_velocity_max = 260.0
+	spray.gravity = Vector2.ZERO
+	spray.color = color
+	spray.emitting = true
+	fx_root.add_child(spray)
+
+	var streak := Line2D.new()
+	streak.width = 4.0
+	streak.default_color = color
+	streak.points = PackedVector2Array([Vector2.ZERO, Vector2(-120, 0)])
+	streak.antialiased = true
+	fx_root.add_child(streak)
+
+	var tag := Label.new()
+	tag.text = label_text
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.position = Vector2(-70, -18)
+	tag.add_theme_font_override("font", _UITheme.font_stats())
+	tag.add_theme_font_size_override("font_size", 17)
+	tag.add_theme_color_override("font_color", color)
+	fx_root.add_child(tag)
+
+	fx_root.modulate.a = 0.95
+	var tween: Tween = fx_root.create_tween()
+	tween.tween_property(fx_root, "position:x", fx_root.position.x - 20.0, MULTIPLY_VFX_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(fx_root, "modulate:a", 0.0, MULTIPLY_VFX_DURATION).set_ease(Tween.EASE_IN)
+	tween.tween_callback(fx_root.queue_free)
