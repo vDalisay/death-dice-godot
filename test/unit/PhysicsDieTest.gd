@@ -80,3 +80,12 @@ func test_hover_popup_visibility_changes() -> void:
 	assert_bool(_die._name_popup.visible).is_true()
 	_die._on_mouse_exited()
 	assert_bool(_die._name_popup.visible).is_false()
+
+
+func test_motion_polish_methods_do_not_error() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	_die.play_keep_lock_snap()
+	_die.play_shield_absorb()
+	_die.play_stop_impact(false)
+	_die.play_stop_impact(true)
+	assert_bool(true).is_true()

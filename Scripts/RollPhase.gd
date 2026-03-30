@@ -228,6 +228,9 @@ func _reroll_selected_dice() -> void:
 		if dice_keep[i] and not dice_keep_locked[i]:
 			dice_keep_locked[i] = true
 			dice_arena.lock_die(i)
+			var locked_die: PhysicsDie = dice_arena.get_die(i)
+			if locked_die:
+				locked_die.play_keep_lock_snap()
 
 	var rerolled: Array[int] = []
 	for i: int in GameManager.dice_pool.size():
@@ -374,6 +377,13 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > maxi(0, roll_stop_count - shield_count):
 		var shielded: int = roll_stop_count - maxi(0, roll_stop_count - shield_count)
 		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
+		for i: int in GameManager.dice_pool.size():
+			var shield_face: DiceFaceData = current_results[i]
+			if shield_face != null and shield_face.type == DiceFaceData.FaceType.SHIELD:
+				var shield_die: PhysicsDie = dice_arena.get_die(i)
+				if shield_die:
+					shield_die.play_shield_absorb()
+		SFXManager.play_shield_absorb()
 
 	# Handle EXPLODE chain re-rolls (free extra rolls, not counted toward bust)
 	if turn_state == TurnState.ACTIVE and not chain_reroll.is_empty():
@@ -512,6 +522,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				if die:
+					_shake_screen(2.0 + float(chain_depth) * 0.5, 0.1)
 					die.play_explode_charge()
 					die.tumble(face)
 					die.pop()

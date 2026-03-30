@@ -36,6 +36,8 @@ const MULTIPLY_VFX_DURATION: float = 0.35
 const REROLL_LIFT_DURATION: float = 0.14
 const EXPLODE_CHARGE_DURATION: float = 0.2
 const STOP_IMPACT_DURATION: float = 0.18
+const KEEP_LOCK_SNAP_DURATION: float = 0.14
+const SHIELD_ABSORB_DURATION: float = 0.3
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -334,6 +336,36 @@ func play_insurance_trigger() -> void:
 	add_child(ring)
 	ring.emitting = true
 	get_tree().create_timer(0.6).timeout.connect(func() -> void:
+		if is_instance_valid(ring):
+			ring.queue_free()
+	)
+
+
+func play_keep_lock_snap() -> void:
+	if _scale_tween and _scale_tween.is_valid():
+		_scale_tween.kill()
+	_scale_tween = create_tween()
+	_scale_tween.tween_property(self, "scale", Vector2(1.1, 1.1), KEEP_LOCK_SNAP_DURATION * 0.45).set_ease(Tween.EASE_OUT)
+	_scale_tween.tween_property(self, "scale", Vector2.ONE, KEEP_LOCK_SNAP_DURATION * 0.55).set_ease(Tween.EASE_IN)
+	_play_radial_effect(_UITheme.SUCCESS_GREEN, "LOCK")
+
+
+func play_shield_absorb() -> void:
+	_play_radial_effect(_UITheme.ACTION_CYAN, "SHIELD")
+	var ring := CPUParticles2D.new()
+	ring.one_shot = true
+	ring.amount = 18
+	ring.lifetime = SHIELD_ABSORB_DURATION
+	ring.explosiveness = 0.85
+	ring.direction = Vector2.ZERO
+	ring.spread = 180.0
+	ring.initial_velocity_min = 70.0
+	ring.initial_velocity_max = 140.0
+	ring.gravity = Vector2.ZERO
+	ring.color = _UITheme.ACTION_CYAN
+	add_child(ring)
+	ring.emitting = true
+	get_tree().create_timer(SHIELD_ABSORB_DURATION + 0.2).timeout.connect(func() -> void:
 		if is_instance_valid(ring):
 			ring.queue_free()
 	)
