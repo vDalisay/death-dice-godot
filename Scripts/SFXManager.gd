@@ -87,6 +87,15 @@ func play_shop_refresh() -> void:
 	_play_tone_delayed(440.0, 0.06, 0.4, 0.05)
 
 
+func play_double_down_win() -> void:
+	_play_tone(523.0, 0.1, 0.8)
+	_play_tone_delayed(659.0, 0.1, 0.8, 0.06)
+	_play_tone_delayed(784.0, 0.1, 0.8, 0.12)
+	_play_tone_delayed(1047.0, 0.15, 0.9, 0.20)
+	_play_tone_delayed(1319.0, 0.2, 1.0, 0.30)
+	_play_tone_delayed(1568.0, 0.25, 1.0, 0.42)
+
+
 # ---------------------------------------------------------------------------
 # Internal
 # ---------------------------------------------------------------------------

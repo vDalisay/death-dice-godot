@@ -10,6 +10,9 @@ const REFRESH_COST: int = 5
 
 const DICE_SLOTS: int = 4
 const MODIFIER_SLOTS: int = 2
+const DOUBLE_DOWN_MIN_GOLD: int = 10
+
+var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
 
 @onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var _gold_label: Label = $MarginContainer/VBoxContainer/GoldLabel
@@ -24,6 +27,8 @@ var _dice_items: Array[ShopItemData] = []
 var _modifier_items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
 var _refresh_button: Button = null
+var _double_down_overlay: DoubleDownOverlay = null
+var _dd_used_this_shop: bool = false
 
 
 func _ready() -> void:
@@ -38,6 +43,7 @@ func _ready() -> void:
 
 func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	GameManager.on_shop_entered()
+	_dd_used_this_shop = false
 	if is_loop_complete:
 		_title_label.text = "Loop %d Complete!" % (GameManager.current_loop - 1)
 		_continue_button.text = "Start Loop %d" % GameManager.current_loop
@@ -82,6 +88,9 @@ func _generate_items() -> void:
 	# Cleanse Curse: available if any die has a CURSED_STOP face (dice section).
 	if _any_die_has_cursed_stop():
 		_dice_items.append(ShopItemData.make_cleanse_curse())
+	# Double Down: always available if player has enough gold and hasn't used it this shop.
+	if GameManager.gold >= DOUBLE_DOWN_MIN_GOLD and not _dd_used_this_shop:
+		_dice_items.append(ShopItemData.make_double_down())
 	# Modifier items: offer 1-2 random modifiers the player doesn't already own.
 	if GameManager.can_add_modifier():
 		var mod_factories: Array[Callable] = RunModifier.all_factories()
@@ -138,6 +147,8 @@ func _make_item_row(item: ShopItemData) -> HBoxContainer:
 	var desc_label := Label.new()
 	if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
 		desc_label.text = _get_upgrade_preview()
+	elif item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		desc_label.text = "Wager all %dg — even doubles, odd loses!" % GameManager.gold
 	else:
 		desc_label.text = item.description
 	desc_label.add_theme_font_size_override("font_size", 14)
@@ -146,7 +157,10 @@ func _make_item_row(item: ShopItemData) -> HBoxContainer:
 	row.add_child(info)
 
 	var buy_btn := Button.new()
-	buy_btn.text = "Buy (%dg)" % item.cost
+	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		buy_btn.text = "Play!"
+	else:
+		buy_btn.text = "Buy (%dg)" % item.cost
 	buy_btn.custom_minimum_size = Vector2(120, 36)
 	buy_btn.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
 	buy_btn.pressed.connect(_on_buy_pressed.bind(item))
@@ -161,8 +175,12 @@ func _make_item_row(item: ShopItemData) -> HBoxContainer:
 # ---------------------------------------------------------------------------
 
 func _on_buy_pressed(item: ShopItemData) -> void:
-	if not GameManager.spend_gold(item.cost):
-		return
+	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		# Double Down is free to play — the wager is handled by the overlay.
+		SFXManager.play_shop_purchase()
+	else:
+		if not GameManager.spend_gold(item.cost):
+			return
 	GameManager.track_shop_spend(item.cost)
 	SFXManager.play_shop_purchase()
 	match item.item_type:
@@ -193,6 +211,9 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 				GameManager.add_modifier(item.modifier)
 		ShopItemData.ItemType.CLEANSE_CURSE:
 			_cleanse_random_cursed_die()
+		ShopItemData.ItemType.DOUBLE_DOWN:
+			_open_double_down()
+			return  # Don't refresh yet — overlay handles it.
 	_refresh_display()
 
 
@@ -302,3 +323,21 @@ func _cleanse_random_cursed_die() -> void:
 		if face.type == DiceFaceData.FaceType.CURSED_STOP:
 			face.type = DiceFaceData.FaceType.STOP
 			break
+
+
+func _open_double_down() -> void:
+	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
+		_double_down_overlay.queue_free()
+	_double_down_overlay = _DoubleDownScene.instantiate() as DoubleDownOverlay
+	add_child(_double_down_overlay)
+	_double_down_overlay.resolved.connect(_on_double_down_resolved)
+	_double_down_overlay.open(GameManager.gold)
+
+
+func _on_double_down_resolved() -> void:
+	_dd_used_this_shop = true
+	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
+		_double_down_overlay.queue_free()
+		_double_down_overlay = null
+	_generate_items()
+	_refresh_display()

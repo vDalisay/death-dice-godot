@@ -4,7 +4,7 @@ extends GdUnitTestSuite
 
 func test_all_factories_create_unique_types() -> void:
 	var factories: Array[Callable] = RunModifier.all_factories()
-	assert_int(factories.size()).is_equal(7)
+	assert_int(factories.size()).is_equal(6)
 	var seen_types: Array[int] = []
 	for factory: Callable in factories:
 		var mod: RunModifier = factory.call() as RunModifier

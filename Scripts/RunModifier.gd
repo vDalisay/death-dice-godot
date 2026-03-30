@@ -96,5 +96,4 @@ static func all_factories() -> Array[Callable]:
 		RunModifier.make_glass_cannon,
 		RunModifier.make_shield_wall,
 		RunModifier.make_miser,
-		RunModifier.make_double_down,
 	]

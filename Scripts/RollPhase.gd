@@ -146,16 +146,6 @@ func _on_bank_pressed() -> void:
 	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
 		var rush_gold: int = accumulated_stop_count
 		GameManager.add_gold(rush_gold)
-	# Double Down: roll D6, even = 2x gold, odd = 0 gold for this turn.
-	if GameManager.has_modifier(RunModifier.ModifierType.DOUBLE_DOWN):
-		var dd_roll: int = (randi() % 6) + 1
-		if dd_roll % 2 == 0:
-			GameManager.add_gold(banked)
-			hud.show_status("DOUBLE DOWN! Rolled %d (even) — 2x gold!" % dd_roll, Color(0.2, 1.0, 0.4))
-		else:
-			var gold_loss: int = mini(banked, GameManager.gold)
-			GameManager.add_gold(-gold_loss)
-			hud.show_status("DOUBLE DOWN! Rolled %d (odd) — no gold!" % dd_roll, Color(1.0, 0.4, 0.2))
 	# Jackpot check: first roll only (no rerolls), 5+ dice, 0 stops.
 	var is_jackpot: bool = _reroll_count == 0 and GameManager.dice_pool.size() >= JACKPOT_MIN_DICE and accumulated_stop_count == 0
 	AchievementManager.on_bank(banked, _reroll_count, accumulated_stop_count, GameManager.dice_pool.size(), bank_streak)
@@ -845,6 +835,9 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 func _maybe_open_forge(is_loop: bool) -> void:
 	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE and randf() < ForgePanel.FORGE_CHANCE:
 		_loop_complete_pending = is_loop
+		_roll_content.visible = false
+		if _streak_display != null:
+			_streak_display.visible = false
 		forge_panel.open()
 	else:
 		_open_shop(is_loop)
