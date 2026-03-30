@@ -28,6 +28,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var career_panel: CareerPanel = $CareerPanel
 @onready var codex_panel: DiceCodexPanel = $DiceCodexPanel
 @onready var highlights_panel: HighlightsPanel = $HighlightsPanel
+@onready var forge_panel: ForgePanel = $ForgePanel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -68,6 +69,7 @@ func _ready() -> void:
 	career_panel.closed.connect(_on_career_closed)
 	codex_panel.closed.connect(_on_codex_closed)
 	highlights_panel.closed.connect(_on_highlights_closed)
+	forge_panel.forge_closed.connect(_on_forge_closed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
@@ -836,8 +838,22 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 	overlay.call("setup", bonus_gold, surplus, is_loop)
 	overlay.connect("proceed_requested", func() -> void:
 		overlay.queue_free()
-		_open_shop(is_loop)
+		_maybe_open_forge(is_loop)
 	)
+
+
+func _maybe_open_forge(is_loop: bool) -> void:
+	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE and randf() < ForgePanel.FORGE_CHANCE:
+		_loop_complete_pending = is_loop
+		forge_panel.open()
+	else:
+		_open_shop(is_loop)
+
+
+func _on_forge_closed() -> void:
+	var is_loop: bool = _loop_complete_pending
+	forge_panel.visible = false
+	_open_shop(is_loop)
 
 
 # ---------------------------------------------------------------------------
