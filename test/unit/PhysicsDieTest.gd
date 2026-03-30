@@ -62,6 +62,9 @@ func test_constants_are_reasonable() -> void:
 	assert_float(PhysicsDie.IMPACT_FLASH_DURATION).is_greater(0.0)
 	assert_float(PhysicsDie.REROLL_LIFT_OPACITY).is_less_equal(1.0)
 	assert_float(PhysicsDie.REROLL_LIFT_OPACITY).is_greater(0.0)
+	assert_float(PhysicsDie.LAUNCH_BURST_DURATION).is_greater(0.0)
+	assert_float(PhysicsDie.EXPLODE_WOBBLE_STEP).is_greater(0.0)
+	assert_float(PhysicsDie.EXPLODE_WOBBLE_OFFSET).is_greater(0.0)
 
 
 func test_face_type_glyphs_cover_all_types() -> void:

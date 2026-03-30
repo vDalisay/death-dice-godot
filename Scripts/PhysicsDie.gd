@@ -39,6 +39,9 @@ const STOP_IMPACT_DURATION: float = 0.18
 const KEEP_LOCK_SNAP_DURATION: float = 0.14
 const SHIELD_ABSORB_DURATION: float = 0.3
 const REROLL_LIFT_OPACITY: float = 0.55
+const LAUNCH_BURST_DURATION: float = 0.28
+const EXPLODE_WOBBLE_STEP: float = 0.04
+const EXPLODE_WOBBLE_OFFSET: float = 4.0
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -382,13 +385,35 @@ func play_reroll_lift() -> void:
 	var alpha_tween: Tween = create_tween()
 	alpha_tween.tween_property(self, "modulate:a", REROLL_LIFT_OPACITY, REROLL_LIFT_DURATION * 0.45).set_ease(Tween.EASE_OUT)
 	alpha_tween.tween_property(self, "modulate:a", 1.0, REROLL_LIFT_DURATION * 0.55).set_ease(Tween.EASE_IN)
+	_play_visual_offset_pulse(-6.0, REROLL_LIFT_DURATION)
 	if _bg_panel:
 		var mod_tween: Tween = create_tween()
 		mod_tween.tween_property(_bg_panel, "modulate", Color(1.15, 1.15, 1.15, 1.0), REROLL_LIFT_DURATION * 0.5)
 		mod_tween.tween_property(_bg_panel, "modulate", Color.WHITE, REROLL_LIFT_DURATION * 0.5)
 
 
+func play_launch_burst() -> void:
+	var burst := CPUParticles2D.new()
+	burst.one_shot = true
+	burst.amount = 18
+	burst.lifetime = LAUNCH_BURST_DURATION
+	burst.explosiveness = 0.8
+	burst.direction = Vector2.UP
+	burst.spread = 60.0
+	burst.initial_velocity_min = 70.0
+	burst.initial_velocity_max = 150.0
+	burst.gravity = Vector2(0.0, 60.0)
+	burst.color = Color(1.0, 1.0, 1.0, 0.6)
+	add_child(burst)
+	burst.emitting = true
+	get_tree().create_timer(LAUNCH_BURST_DURATION + 0.2).timeout.connect(func() -> void:
+		if is_instance_valid(burst):
+			burst.queue_free()
+	)
+
+
 func play_explode_charge() -> void:
+	_play_explode_wobble()
 	if _bg_panel:
 		var panel_tween: Tween = create_tween()
 		panel_tween.tween_property(_bg_panel, "modulate", Color(1.0, 0.55, 0.22, 1.0), EXPLODE_CHARGE_DURATION * 0.45)
@@ -788,3 +813,58 @@ func _spawn_stop_smoke(color: Color) -> void:
 		if is_instance_valid(puff):
 			puff.queue_free()
 	)
+
+
+func _play_explode_wobble() -> void:
+	if _bg_panel == null:
+		return
+	var base_bg: Vector2 = _bg_panel.position
+	var base_face: Vector2 = _face_label.position if _face_label else Vector2.ZERO
+	var base_glyph: Vector2 = _glyph_label.position if _glyph_label else Vector2.ZERO
+	var wobble: Tween = create_tween()
+	wobble.tween_callback(func() -> void:
+		_bg_panel.position = base_bg + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
+		if _face_label:
+			_face_label.position = base_face + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
+		if _glyph_label:
+			_glyph_label.position = base_glyph + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
+	)
+	wobble.tween_interval(EXPLODE_WOBBLE_STEP)
+	wobble.tween_callback(func() -> void:
+		_bg_panel.position = base_bg + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
+		if _face_label:
+			_face_label.position = base_face + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
+		if _glyph_label:
+			_glyph_label.position = base_glyph + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
+	)
+	wobble.tween_interval(EXPLODE_WOBBLE_STEP)
+	wobble.tween_callback(func() -> void:
+		_bg_panel.position = base_bg + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
+		if _face_label:
+			_face_label.position = base_face + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
+		if _glyph_label:
+			_glyph_label.position = base_glyph + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
+	)
+	wobble.tween_interval(EXPLODE_WOBBLE_STEP)
+	wobble.tween_callback(func() -> void:
+		_bg_panel.position = base_bg
+		if _face_label:
+			_face_label.position = base_face
+		if _glyph_label:
+			_glyph_label.position = base_glyph
+	)
+
+
+func _play_visual_offset_pulse(offset_y: float, duration: float) -> void:
+	if _bg_panel == null:
+		return
+	var base_bg: Vector2 = _bg_panel.position
+	var base_face: Vector2 = _face_label.position if _face_label else Vector2.ZERO
+	var base_glyph: Vector2 = _glyph_label.position if _glyph_label else Vector2.ZERO
+	var tween: Tween = create_tween()
+	tween.tween_property(_bg_panel, "position:y", base_bg.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(_face_label, "position:y", base_face.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(_glyph_label, "position:y", base_glyph.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_bg_panel, "position:y", base_bg.y, duration * 0.55).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(_face_label, "position:y", base_face.y, duration * 0.55).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(_glyph_label, "position:y", base_glyph.y, duration * 0.55).set_ease(Tween.EASE_IN)

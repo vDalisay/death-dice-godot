@@ -137,6 +137,7 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			get_tree().create_timer(REROLL_LIFT_DELAY).timeout.connect(func() -> void:
 				if not is_instance_valid(die) or die.freeze:
 					return
+				die.play_launch_burst()
 				var direction: Vector2 = (target - die.global_position).normalized()
 				var spread: float = randf_range(-0.4, 0.4)
 				direction = direction.rotated(spread)
@@ -247,6 +248,7 @@ func _stagger_throw() -> void:
 
 func _launch_die(die: PhysicsDie, origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM) -> void:
 	die.tumble(die.current_face)
+	die.play_launch_burst()
 	# Impulse away from spawn origin toward arena interior
 	var target: Vector2 = _throw_target_for_origin(origin)
 	var direction: Vector2 = (target - die.global_position).normalized()
