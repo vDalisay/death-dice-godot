@@ -14,6 +14,11 @@ const JACKPOT_MIN_DICE: int = 5
 const JACKPOT_GOLD_BONUS: float = 0.25
 const ROLL_ANIMATION_LOCK_DURATION: float = 0.9
 const BANK_CASCADE_STEP_DELAY: float = 0.22
+const SHAKE_ROLL: float = 2.0
+const SHAKE_STOP: float = 3.0
+const SHAKE_CURSED_STOP: float = 5.0
+const SHAKE_BUST: float = 8.0
+const SHAKE_BIG_BANK: float = 4.0
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
@@ -53,11 +58,13 @@ var _run_snapshot_recorded: bool = false
 var _is_roll_animating: bool = false
 var _roll_anim_nonce: int = 0
 var _triggered_combo_ids: Dictionary = {}
+var _screen_shake: Node = null
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
 const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
+const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 func _ready() -> void:
@@ -83,6 +90,9 @@ func _ready() -> void:
 	codex_button.visible = false
 	_streak_display = StreakDisplayScript.new()
 	add_child(_streak_display)
+	_screen_shake = ScreenShakeScript.new()
+	add_child(_screen_shake)
+	_screen_shake.setup(_roll_content)
 	if GameManager.skip_archetype_picker:
 		_start_new_turn()
 	elif SaveManager.run_history.is_empty():
@@ -174,6 +184,8 @@ func _on_bank_pressed() -> void:
 		GameManager.best_turn_score = banked
 		hud.show_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
 		SFXManager.play_personal_best()
+	if banked >= 50:
+		_shake_screen(SHAKE_BIG_BANK, 0.2)
 	_play_multiply_face_vfx()
 	# Per-die score count-up followed by cascade checkpoints.
 	_play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
@@ -204,6 +216,7 @@ func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 
 func _roll_all_dice() -> void:
 	_begin_roll_animation_lock()
+	_shake_screen(SHAKE_ROLL, 0.15)
 	# Throw all dice into the arena — faces are rolled inside throw_dice
 	dice_arena.throw_dice(GameManager.dice_pool)
 	# Results will be processed when all_dice_settled signal fires
@@ -344,6 +357,14 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		SFXManager.play_clean_roll()
 
 	var roll_stop_count: int = _count_stops_in(rolled_indices)
+	if roll_stop_count > 0:
+		var has_cursed: bool = false
+		for i: int in rolled_indices:
+			var f: DiceFaceData = current_results[i]
+			if f != null and f.type == DiceFaceData.FaceType.CURSED_STOP:
+				has_cursed = true
+				break
+		_shake_screen(SHAKE_CURSED_STOP if has_cursed else SHAKE_STOP, 0.12 if has_cursed else 0.1)
 	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > maxi(0, roll_stop_count - shield_count):
 		var shielded: int = roll_stop_count - maxi(0, roll_stop_count - shield_count)
 		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
@@ -481,6 +502,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				if die:
+					die.play_explode_charge()
 					die.tumble(face)
 					die.pop()
 					die.show_chain_label(chain_depth)
@@ -909,10 +931,17 @@ func _get_per_die_scores() -> Array[int]:
 # ---------------------------------------------------------------------------
 
 func _show_bust_overlay(effective_stops: int) -> void:
+	_shake_screen(SHAKE_BUST, 0.4)
 	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
 	add_child(overlay)
 	overlay.call("play", 1)
 	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+
+
+func _shake_screen(intensity: float, duration: float) -> void:
+	if _screen_shake == null:
+		return
+	_screen_shake.shake(intensity, duration)
 
 
 func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> void:

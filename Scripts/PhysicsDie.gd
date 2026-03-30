@@ -33,6 +33,8 @@ const IMPACT_FLASH_DURATION: float = 0.08
 const SCORE_POPUP_RISE: float = 35.0
 const SCORE_POPUP_DURATION: float = 0.6
 const MULTIPLY_VFX_DURATION: float = 0.35
+const REROLL_LIFT_DURATION: float = 0.14
+const EXPLODE_CHARGE_DURATION: float = 0.2
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -303,6 +305,30 @@ func play_multiply_vfx(multiplier: int) -> void:
 
 func play_multiply_left_vfx(multiplier: int) -> void:
 	_play_directional_left_effect(_UITheme.ROSE_ACCENT, "<x%d" % multiplier)
+
+
+func play_reroll_lift() -> void:
+	if _scale_tween and _scale_tween.is_valid():
+		_scale_tween.kill()
+	_scale_tween = create_tween()
+	_scale_tween.tween_property(self, "scale", Vector2(0.9, 0.9), REROLL_LIFT_DURATION * 0.45).set_ease(Tween.EASE_OUT)
+	_scale_tween.tween_property(self, "scale", Vector2(1.03, 1.03), REROLL_LIFT_DURATION * 0.55).set_ease(Tween.EASE_IN)
+	if _bg_panel:
+		var mod_tween: Tween = create_tween()
+		mod_tween.tween_property(_bg_panel, "modulate", Color(1.15, 1.15, 1.15, 1.0), REROLL_LIFT_DURATION * 0.5)
+		mod_tween.tween_property(_bg_panel, "modulate", Color.WHITE, REROLL_LIFT_DURATION * 0.5)
+
+
+func play_explode_charge() -> void:
+	if _bg_panel:
+		var panel_tween: Tween = create_tween()
+		panel_tween.tween_property(_bg_panel, "modulate", Color(1.0, 0.55, 0.22, 1.0), EXPLODE_CHARGE_DURATION * 0.45)
+		panel_tween.tween_property(_bg_panel, "modulate", Color.WHITE, EXPLODE_CHARGE_DURATION * 0.55)
+	if _glyph_label:
+		var glyph_tween: Tween = create_tween()
+		glyph_tween.tween_property(_glyph_label, "scale", Vector2(1.2, 1.2), EXPLODE_CHARGE_DURATION * 0.45)
+		glyph_tween.tween_property(_glyph_label, "scale", Vector2.ONE, EXPLODE_CHARGE_DURATION * 0.55)
+	_spawn_explode_burst()
 
 
 func start_glow_pulse(color: Color) -> void:
@@ -652,3 +678,23 @@ func _play_directional_left_effect(color: Color, label_text: String) -> void:
 	tween.tween_property(fx_root, "position:x", fx_root.position.x - 20.0, MULTIPLY_VFX_DURATION).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(fx_root, "modulate:a", 0.0, MULTIPLY_VFX_DURATION).set_ease(Tween.EASE_IN)
 	tween.tween_callback(fx_root.queue_free)
+
+
+func _spawn_explode_burst() -> void:
+	var burst := CPUParticles2D.new()
+	burst.one_shot = true
+	burst.amount = 26
+	burst.lifetime = 0.26
+	burst.explosiveness = 0.9
+	burst.direction = Vector2.ZERO
+	burst.spread = 180.0
+	burst.initial_velocity_min = 120.0
+	burst.initial_velocity_max = 220.0
+	burst.gravity = Vector2.ZERO
+	burst.color = _UITheme.EXPLOSION_ORANGE
+	add_child(burst)
+	burst.emitting = true
+	get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		if is_instance_valid(burst):
+			burst.queue_free()
+	)

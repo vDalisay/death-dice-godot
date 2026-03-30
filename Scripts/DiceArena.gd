@@ -32,6 +32,7 @@ const THROW_STAGGER_DELAY: float = 0.03
 const SPAWN_MARGIN: float = 80.0
 const BOTTOM_SPAWN_LIFT: float = 92.0
 const CONTAINMENT_BOUNCE_DAMP: float = 0.45
+const REROLL_LIFT_DELAY: float = 0.06
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -122,14 +123,19 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			die.physics_state = PhysicsDie.DiePhysicsState.FLYING
 			die.freeze = false
 			die._settle_timer = 0.0
+			die.play_reroll_lift()
 			die.tumble(face)
 			var target: Vector2 = _throw_target_for_origin(origin)
-			var direction: Vector2 = (target - die.global_position).normalized()
-			var spread: float = randf_range(-0.4, 0.4)
-			direction = direction.rotated(spread)
 			var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.7, THROW_IMPULSE_MAX * 0.9)
-			die.apply_central_impulse(direction * magnitude)
-			die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
+			get_tree().create_timer(REROLL_LIFT_DELAY).timeout.connect(func() -> void:
+				if not is_instance_valid(die) or die.freeze:
+					return
+				var direction: Vector2 = (target - die.global_position).normalized()
+				var spread: float = randf_range(-0.4, 0.4)
+				direction = direction.rotated(spread)
+				die.apply_central_impulse(direction * magnitude)
+				die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
+			)
 
 	if instant_mode:
 		all_dice_settled.emit()
