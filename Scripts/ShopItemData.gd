@@ -85,7 +85,7 @@ static func make_buy_heavy_die() -> ShopItemData:
 static func make_buy_explosive_die() -> ShopItemData:
 	var item := ShopItemData.new()
 	item.item_name = "Explosive Die"
-	item.description = "Chain reaction! 💥 re-rolls itself. (💥2, 💥2, 2, STOP×3)"
+	item.description = "Chain reaction! ✦ re-rolls itself. (✦2, ✦2, 2, STOP×3)"
 	item.cost = 60
 	item.item_type = ItemType.BUY_EXPLOSIVE_DIE
 	return item

@@ -1,9 +1,11 @@
 class_name ShopPanel
 extends PanelContainer
 ## Between-stage shop. The player spends gold to buy dice or upgrade faces.
-## Emits shop_closed when the player clicks Continue.
+## Redesigned as a modal card shop while preserving existing economy logic.
 
 signal shop_closed()
+
+const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const ITEM_FONT_SIZE: int = 18
 const REFRESH_COST: int = 5
@@ -13,27 +15,35 @@ const MODIFIER_SLOTS: int = 2
 const DOUBLE_DOWN_MIN_GOLD: int = 10
 
 var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
+var _ShopItemCardScene: PackedScene = preload("res://Scenes/ShopItemCard.tscn")
 
-@onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
-@onready var _gold_label: Label = $MarginContainer/VBoxContainer/GoldLabel
-@onready var _dice_container: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceContainer
-@onready var _modifier_container: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierContainer
-@onready var _dice_header: Label = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceHeader
-@onready var _modifier_header: Label = $MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierHeader
-@onready var _pool_label: Label = $MarginContainer/VBoxContainer/PoolLabel
-@onready var _continue_button: Button = $MarginContainer/VBoxContainer/ContinueButton
+@onready var _backdrop: ColorRect = $Backdrop
+@onready var _modal: PanelContainer = $CenterContainer/Modal
+@onready var _gold_badge: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge
+@onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
+@onready var _gold_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge/GoldLabel
+@onready var _dice_container: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceContainer
+@onready var _modifier_container: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierContainer
+@onready var _dice_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceHeader
+@onready var _modifier_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierHeader
+@onready var _pool_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/PoolLabel
+@onready var _refresh_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/RefreshButton
+@onready var _continue_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/ContinueButton
 
 var _dice_items: Array[ShopItemData] = []
 var _modifier_items: Array[ShopItemData] = []
+var _all_items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
-var _refresh_button: Button = null
+var _price_labels: Array[Label] = []
+var _double_down_desc_label: Label = null
 var _double_down_overlay: DoubleDownOverlay = null
 var _dd_used_this_shop: bool = false
-var _dd_desc_label: Label = null
 
 
 func _ready() -> void:
+	_apply_theme_styling()
 	_continue_button.pressed.connect(_on_continue_pressed)
+	_refresh_button.pressed.connect(_on_refresh_pressed)
 	GameManager.gold_changed.connect(_on_gold_changed)
 	visible = false
 
@@ -46,14 +56,58 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	GameManager.on_shop_entered()
 	_dd_used_this_shop = false
 	if is_loop_complete:
-		_title_label.text = "Loop %d Complete!" % (GameManager.current_loop - 1)
+		_title_label.text = "LOOP %d COMPLETE" % (GameManager.current_loop - 1)
 		_continue_button.text = "Start Loop %d" % GameManager.current_loop
 	else:
-		_title_label.text = "Stage %d Complete!" % stage_just_cleared
+		_title_label.text = "STAGE %d COMPLETE" % stage_just_cleared
 		_continue_button.text = "Continue to Stage %d" % (stage_just_cleared + 1)
 	_generate_items()
 	_refresh_display()
 	visible = true
+
+
+# ---------------------------------------------------------------------------
+# Visual styling
+# ---------------------------------------------------------------------------
+
+func _apply_theme_styling() -> void:
+	# Root should be transparent while backdrop + modal do the visual work.
+	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
+	_backdrop.color = Color(0, 0, 0, 0.72)
+
+	_modal.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+	)
+	_gold_badge.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 2)
+	)
+
+	_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_title_label.add_theme_font_size_override("font_size", 18)
+	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_gold_label.add_theme_font_override("font", _UITheme.font_stats())
+	_gold_label.add_theme_font_size_override("font_size", 24)
+	_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_dice_header.add_theme_font_override("font", _UITheme.font_display())
+	_dice_header.add_theme_font_size_override("font_size", 14)
+	_dice_header.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_modifier_header.add_theme_font_override("font", _UITheme.font_display())
+	_modifier_header.add_theme_font_size_override("font_size", 14)
+	_modifier_header.add_theme_color_override("font_color", _UITheme.NEON_PURPLE)
+
+	_pool_label.add_theme_font_override("font", _UITheme.font_body())
+	_pool_label.add_theme_font_size_override("font_size", 18)
+	_pool_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+
+	_refresh_button.text = "Refresh Shop (%s%d)" % [_UITheme.GLYPH_GOLD, REFRESH_COST]
+	_refresh_button.add_theme_font_override("font", _UITheme.font_display())
+	_refresh_button.add_theme_font_size_override("font_size", 12)
+	_continue_button.add_theme_font_override("font", _UITheme.font_display())
+	_continue_button.add_theme_font_size_override("font_size", 12)
 
 
 # ---------------------------------------------------------------------------
@@ -63,8 +117,8 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 func _generate_items() -> void:
 	_dice_items.clear()
 	_modifier_items.clear()
-	_dd_desc_label = null
-	# Build the pool of all available dice shop items.
+	_double_down_desc_label = null
+
 	var dice_pool: Array[ShopItemData] = [
 		ShopItemData.make_buy_simple_die(),
 		ShopItemData.make_buy_standard_die(),
@@ -72,28 +126,25 @@ func _generate_items() -> void:
 		ShopItemData.make_buy_lucky_die(),
 		ShopItemData.make_buy_pink_die(),
 	]
-	# Unlock additional dice in loop 2+.
 	if GameManager.current_loop >= 2:
 		dice_pool.append(ShopItemData.make_buy_runner_die())
 		dice_pool.append(ShopItemData.make_buy_golden_die())
 		dice_pool.append(ShopItemData.make_buy_insurance_die())
 		dice_pool.append(ShopItemData.make_buy_heavy_die())
 		dice_pool.append(ShopItemData.make_buy_explosive_die())
-	# Shuffle and pick a random subset.
+
 	dice_pool.shuffle()
 	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
 	for i: int in pick_count:
 		_dice_items.append(dice_pool[i])
-	# Empower Die is always available if the player has dice.
+
 	if not GameManager.dice_pool.is_empty():
 		_dice_items.append(ShopItemData.make_upgrade_die())
-	# Cleanse Curse: available if any die has a CURSED_STOP face (dice section).
 	if _any_die_has_cursed_stop():
 		_dice_items.append(ShopItemData.make_cleanse_curse())
-	# Double Down: always available if player has enough gold and hasn't used it this shop.
 	if GameManager.gold >= DOUBLE_DOWN_MIN_GOLD and not _dd_used_this_shop:
 		_dice_items.append(ShopItemData.make_double_down())
-	# Modifier items: offer 1-2 random modifiers the player doesn't already own.
+
 	if GameManager.can_add_modifier():
 		var mod_factories: Array[Callable] = RunModifier.all_factories()
 		var available_mods: Array[Callable] = []
@@ -106,71 +157,102 @@ func _generate_items() -> void:
 		for i: int in mod_count:
 			var mod: RunModifier = available_mods[i].call() as RunModifier
 			_modifier_items.append(ShopItemData.make_buy_modifier(mod))
-	_build_item_rows()
+
+	_build_item_cards()
 
 
-func _build_item_rows() -> void:
-	for child: Node in _dice_container.get_children():
-		child.queue_free()
-	for child: Node in _modifier_container.get_children():
-		child.queue_free()
+func _build_item_cards() -> void:
+	_clear_container(_dice_container)
+	_clear_container(_modifier_container)
+	_all_items.clear()
 	_buy_buttons.clear()
+	_price_labels.clear()
 
-	# Dice section
 	_dice_header.visible = not _dice_items.is_empty()
 	for item: ShopItemData in _dice_items:
-		_dice_container.add_child(_make_item_row(item))
+		var card: PanelContainer = _make_item_card(item)
+		_dice_container.add_child(card)
+		_all_items.append(item)
 
-	# Modifier section
 	_modifier_header.visible = not _modifier_items.is_empty()
 	for item: ShopItemData in _modifier_items:
-		_modifier_container.add_child(_make_item_row(item))
-
-	# Refresh shop button after both sections.
-	_refresh_button = Button.new()
-	_refresh_button.text = "Refresh Shop (%dg)" % REFRESH_COST
-	_refresh_button.custom_minimum_size = Vector2(180, 36)
-	_refresh_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_refresh_button.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
-	_refresh_button.pressed.connect(_on_refresh_pressed)
-	_modifier_container.add_child(_refresh_button)
+		var card: PanelContainer = _make_item_card(item)
+		_modifier_container.add_child(card)
+		_all_items.append(item)
 
 
-func _make_item_row(item: ShopItemData) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+func _clear_container(container: Node) -> void:
+	for child: Node in container.get_children():
+		child.queue_free()
 
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var name_label := Label.new()
+
+func _make_item_card(item: ShopItemData) -> PanelContainer:
+	var card: PanelContainer = _ShopItemCardScene.instantiate() as PanelContainer
+	var accent_bar: ColorRect = card.get_node("VBoxContainer/AccentBar") as ColorRect
+	var name_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/NameLabel") as Label
+	var desc_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/DescLabel") as Label
+	var price_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/PriceLabel") as Label
+	var buy_button: Button = card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/BuyButton") as Button
+
+	var accent_color: Color = _item_accent_color(item)
+	accent_bar.color = accent_color
+	card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, accent_color, 2)
+	)
+
 	name_label.text = item.item_name
-	name_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
-	info.add_child(name_label)
-	var desc_label := Label.new()
-	if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
-		desc_label.text = _get_upgrade_preview()
-	elif item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
-		desc_label.text = _dd_desc_text()
-		_dd_desc_label = desc_label
-	else:
-		desc_label.text = item.description
-	desc_label.add_theme_font_size_override("font_size", 14)
-	desc_label.modulate = Color(0.7, 0.7, 0.7)
-	info.add_child(desc_label)
-	row.add_child(info)
+	name_label.add_theme_font_override("font", _UITheme.font_display())
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 
-	var buy_btn := Button.new()
+	desc_label.text = _item_description(item)
+	desc_label.add_theme_font_override("font", _UITheme.font_body())
+	desc_label.add_theme_font_size_override("font_size", 13)
+	desc_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+
 	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
-		buy_btn.text = "Play!"
+		buy_button.text = "Play"
+		_double_down_desc_label = desc_label
 	else:
-		buy_btn.text = "Buy (%dg)" % item.cost
-	buy_btn.custom_minimum_size = Vector2(120, 36)
-	buy_btn.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
-	buy_btn.pressed.connect(_on_buy_pressed.bind(item))
-	row.add_child(buy_btn)
-	_buy_buttons.append(buy_btn)
+		buy_button.text = "Buy"
+	buy_button.custom_minimum_size = Vector2(120, 44)
+	buy_button.add_theme_font_override("font", _UITheme.font_display())
+	buy_button.add_theme_font_size_override("font_size", 11)
+	buy_button.pressed.connect(_on_buy_pressed.bind(item))
 
-	return row
+	if item.cost > 0:
+		price_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, item.cost]
+	else:
+		price_label.text = "FREE"
+	price_label.add_theme_font_override("font", _UITheme.font_stats())
+	price_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
+	price_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_buy_buttons.append(buy_button)
+	_price_labels.append(price_label)
+	return card
+
+
+func _item_description(item: ShopItemData) -> String:
+	if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
+		return _get_upgrade_preview()
+	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		return _dd_desc_text()
+	return item.description
+
+
+func _item_accent_color(item: ShopItemData) -> Color:
+	match item.item_type:
+		ShopItemData.ItemType.BUY_MODIFIER:
+			return _UITheme.NEON_PURPLE
+		ShopItemData.ItemType.DOUBLE_DOWN:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.UPGRADE_DIE:
+			return _UITheme.ACTION_CYAN
+		ShopItemData.ItemType.CLEANSE_CURSE:
+			return _UITheme.DANGER_RED
+	return _UITheme.SCORE_GOLD
 
 
 # ---------------------------------------------------------------------------
@@ -178,14 +260,12 @@ func _make_item_row(item: ShopItemData) -> HBoxContainer:
 # ---------------------------------------------------------------------------
 
 func _on_buy_pressed(item: ShopItemData) -> void:
-	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
-		# Double Down is free to play — the wager is handled by the overlay.
-		SFXManager.play_shop_purchase()
-	else:
+	if item.item_type != ShopItemData.ItemType.DOUBLE_DOWN:
 		if not GameManager.spend_gold(item.cost):
 			return
 	GameManager.track_shop_spend(item.cost)
 	SFXManager.play_shop_purchase()
+
 	match item.item_type:
 		ShopItemData.ItemType.BUY_STANDARD_DIE:
 			GameManager.add_dice(DiceData.make_standard_d6())
@@ -216,7 +296,8 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			_cleanse_random_cursed_die()
 		ShopItemData.ItemType.DOUBLE_DOWN:
 			_open_double_down()
-			return  # Don't refresh yet — overlay handles it.
+			return
+
 	_refresh_display()
 
 
@@ -243,32 +324,30 @@ func _on_gold_changed(_new_gold: int) -> void:
 
 
 func _refresh_display() -> void:
-	_gold_label.text = "Gold: %d" % GameManager.gold
+	_gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, GameManager.gold]
 	var mod_text: String = ""
 	if not GameManager.active_modifiers.is_empty():
 		var names: Array[String] = []
 		for m: RunModifier in GameManager.active_modifiers:
 			names.append(m.modifier_name)
-		mod_text = "  |  Modifiers: %s" % ", ".join(names)
-	_pool_label.text = "Your Dice: %d%s" % [GameManager.dice_pool.size(), mod_text]
+		mod_text = "  |  Mods: %s" % ", ".join(names)
+	_pool_label.text = "Dice Pool: %d%s" % [GameManager.dice_pool.size(), mod_text]
 	_refresh_buy_buttons()
 
 
 func _refresh_buy_buttons() -> void:
-	var all_items: Array[ShopItemData] = []
-	all_items.append_array(_dice_items)
-	all_items.append_array(_modifier_items)
 	for i: int in _buy_buttons.size():
-		if i < all_items.size():
-			var item: ShopItemData = all_items[i]
-			var too_expensive: bool = GameManager.gold < item.cost
-			var mod_full: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and not GameManager.can_add_modifier()
-			var already_owned: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type)
-			_buy_buttons[i].disabled = too_expensive or mod_full or already_owned
-	if _dd_desc_label != null and is_instance_valid(_dd_desc_label):
-		_dd_desc_label.text = _dd_desc_text()
-	if _refresh_button != null:
-		_refresh_button.disabled = GameManager.gold < REFRESH_COST
+		var item: ShopItemData = _all_items[i]
+		var too_expensive: bool = GameManager.gold < item.cost
+		var mod_full: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and not GameManager.can_add_modifier()
+		var already_owned: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type)
+		var blocked: bool = too_expensive or mod_full or already_owned
+		_buy_buttons[i].disabled = blocked
+		_price_labels[i].add_theme_color_override("font_color", _UITheme.DANGER_RED if too_expensive else _UITheme.SCORE_GOLD)
+
+	if _double_down_desc_label != null and is_instance_valid(_double_down_desc_label):
+		_double_down_desc_label.text = _dd_desc_text()
+	_refresh_button.disabled = GameManager.gold < REFRESH_COST
 
 
 func _on_refresh_pressed() -> void:
@@ -279,12 +358,13 @@ func _on_refresh_pressed() -> void:
 	_refresh_display()
 
 
-## Preview which face and die would be upgraded by Empower Die.
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 func _get_upgrade_preview() -> String:
 	if GameManager.dice_pool.is_empty():
 		return "No dice to upgrade."
-	# Find die with the weakest face (mimics _upgrade_random_die's random pick,
-	# but for preview we show ALL eligible dice's weakest face).
 	var previews: Array[String] = []
 	for die: DiceData in GameManager.dice_pool:
 		var worst_index: int = -1
@@ -303,7 +383,7 @@ func _get_upgrade_preview() -> String:
 				previews.append(preview)
 	if previews.is_empty():
 		return "No upgradeable faces."
-	return "Will upgrade a random die. Candidates: %s" % ", ".join(previews)
+	return "Upgrades one random weakest face. Candidates: %s" % ", ".join(previews)
 
 
 func _any_die_has_cursed_stop() -> bool:
@@ -331,7 +411,12 @@ func _cleanse_random_cursed_die() -> void:
 
 
 static func _dd_desc_text() -> String:
-	return "Wager all %dg — win = %dg!" % [GameManager.gold, GameManager.gold * 2]
+	return "Wager all %s%d. Win returns %s%d!" % [
+		_UITheme.GLYPH_GOLD,
+		GameManager.gold,
+		_UITheme.GLYPH_GOLD,
+		GameManager.gold * 2,
+	]
 
 
 func _open_double_down() -> void:

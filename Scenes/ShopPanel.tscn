@@ -3,77 +3,115 @@
 [ext_resource type="Script" path="res://Scripts/ShopPanel.gd" id="1"]
 
 [node name="ShopPanel" type="PanelContainer"]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1")
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.72)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Modal" type="PanelContainer" parent="CenterContainer"]
 layout_mode = 2
-theme_override_constants/margin_left = 40
+custom_minimum_size = Vector2(1280, 760)
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Modal"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 40
+theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 20
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 16
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="HeaderRow" type="HBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
-text = "Stage Complete!"
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
+layout_mode = 2
+text = "Stage Complete"
+
+[node name="HeaderSpacer" type="Control" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GoldBadge" type="PanelContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 48)
+
+[node name="GoldLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge"]
+layout_mode = 2
+text = "G 0"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 28
+vertical_alignment = 1
 
-[node name="GoldLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-text = "Gold: 0"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 22
-
-[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/VBoxContainer"]
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="ScrollContent" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer"]
+[node name="ScrollContent" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 24
+
+[node name="DiceHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+layout_mode = 2
+text = "DICE"
+
+[node name="DiceContainer" type="HFlowContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+
+[node name="ModifierHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+layout_mode = 2
+text = "MODIFIERS"
+
+[node name="ModifierContainer" type="HFlowContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+
+[node name="FooterRow" type="HBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
+layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="DiceHeader" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="PoolLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow"]
 layout_mode = 2
-text = "— Dice —"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 20
+size_flags_horizontal = 3
+text = "Dice Pool: 5"
+vertical_alignment = 1
 
-[node name="DiceContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="RefreshButton" type="Button" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow"]
 layout_mode = 2
-theme_override_constants/separation = 6
+custom_minimum_size = Vector2(220, 56)
+text = "Refresh Shop (G5)"
 
-[node name="ModifierHeader" type="Label" parent="MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="ContinueButton" type="Button" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow"]
 layout_mode = 2
-text = "— Modifiers —"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 20
-
-[node name="ModifierContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="HSeparator2" type="HSeparator" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="PoolLabel" type="Label" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-text = "Your Dice: 5"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 18
-
-[node name="ContinueButton" type="Button" parent="MarginContainer/VBoxContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(200, 44)
-size_flags_horizontal = 4
+custom_minimum_size = Vector2(260, 56)
 text = "Continue"
-theme_override_font_sizes/font_size = 20
