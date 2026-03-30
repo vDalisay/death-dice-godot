@@ -11,6 +11,7 @@ enum ModifierType {
 	GLASS_CANNON,     ## Bust threshold -1, NUMBER faces +2
 	SHIELD_WALL,      ## Each shield absorbs 2 stops instead of 1
 	MISER,            ## Spend <15g in shop → +20g next shop
+	DOUBLE_DOWN,      ## On bank: roll D6. Even = 2x gold. Odd = 0 gold.
 }
 
 @export var modifier_type: ModifierType = ModifierType.GAMBLERS_RUSH
@@ -77,7 +78,16 @@ static func make_miser() -> RunModifier:
 	return m
 
 
-## Returns all 6 modifier factory methods for building the shop pool.
+static func make_double_down() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.DOUBLE_DOWN
+	m.modifier_name = "Double Down"
+	m.description = "On bank: roll D6. Even = 2x gold. Odd = 0 gold."
+	m.cost = 30
+	return m
+
+
+## Returns all modifier factory methods for building the shop pool.
 static func all_factories() -> Array[Callable]:
 	return [
 		RunModifier.make_gamblers_rush,
@@ -86,4 +96,5 @@ static func all_factories() -> Array[Callable]:
 		RunModifier.make_glass_cannon,
 		RunModifier.make_shield_wall,
 		RunModifier.make_miser,
+		RunModifier.make_double_down,
 	]

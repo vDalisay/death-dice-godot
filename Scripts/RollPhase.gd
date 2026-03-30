@@ -144,6 +144,16 @@ func _on_bank_pressed() -> void:
 	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
 		var rush_gold: int = accumulated_stop_count
 		GameManager.add_gold(rush_gold)
+	# Double Down: roll D6, even = 2x gold, odd = 0 gold for this turn.
+	if GameManager.has_modifier(RunModifier.ModifierType.DOUBLE_DOWN):
+		var dd_roll: int = (randi() % 6) + 1
+		if dd_roll % 2 == 0:
+			GameManager.add_gold(banked)
+			hud.show_status("DOUBLE DOWN! Rolled %d (even) — 2x gold!" % dd_roll, Color(0.2, 1.0, 0.4))
+		else:
+			var gold_loss: int = mini(banked, GameManager.gold)
+			GameManager.add_gold(-gold_loss)
+			hud.show_status("DOUBLE DOWN! Rolled %d (odd) — no gold!" % dd_roll, Color(1.0, 0.4, 0.2))
 	# Jackpot check: first roll only (no rerolls), 5+ dice, 0 stops.
 	var is_jackpot: bool = _reroll_count == 0 and GameManager.dice_pool.size() >= JACKPOT_MIN_DICE and accumulated_stop_count == 0
 	AchievementManager.on_bank(banked, _reroll_count, accumulated_stop_count, GameManager.dice_pool.size(), bank_streak)
@@ -586,13 +596,14 @@ func _sync_ui() -> void:
 			pass  # Already set in _on_bank_pressed
 
 func _on_run_ended() -> void:
-	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
+	# Capture prior career bests BEFORE recording (so highlights compare against pre-run values).
 	var prior_bests: Dictionary = {
 		"highscore": SaveManager.highscore,
 		"best_stages": SaveManager.total_stages_cleared,
 		"best_loop": SaveManager.career_best_loop,
 		"best_turn": SaveManager.career_best_turn_score,
 	}
+	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
 	_record_run_snapshot_if_needed()
 	_run_active = false
 	roll_button.disabled = true
