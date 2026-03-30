@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://Scripts/RollPhase.gd" id="1"]
 [ext_resource type="PackedScene" path="res://Scenes/HUD.tscn" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://Scenes/ShopPanel.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://Scenes/CareerPanel.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://Scenes/DiceCodexPanel.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://Scenes/HighlightsPanel.tscn" id="7"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -85,4 +86,7 @@ grow_vertical = 2
 layout_mode = 1
 
 [node name="DiceCodexPanel" parent="." instance=ExtResource("6")]
+layout_mode = 1
+
+[node name="HighlightsPanel" parent="." instance=ExtResource("7")]
 layout_mode = 1

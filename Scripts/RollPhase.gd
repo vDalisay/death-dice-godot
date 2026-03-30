@@ -27,6 +27,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var shop_panel: ShopPanel = $ShopPanel
 @onready var career_panel: CareerPanel = $CareerPanel
 @onready var codex_panel: DiceCodexPanel = $DiceCodexPanel
+@onready var highlights_panel: HighlightsPanel = $HighlightsPanel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -66,6 +67,7 @@ func _ready() -> void:
 	shop_panel.shop_closed.connect(_on_shop_closed)
 	career_panel.closed.connect(_on_career_closed)
 	codex_panel.closed.connect(_on_codex_closed)
+	highlights_panel.closed.connect(_on_highlights_closed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
@@ -584,14 +586,24 @@ func _sync_ui() -> void:
 			pass  # Already set in _on_bank_pressed
 
 func _on_run_ended() -> void:
+	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
+	var prior_bests: Dictionary = {
+		"highscore": SaveManager.highscore,
+		"best_stages": SaveManager.total_stages_cleared,
+		"best_loop": SaveManager.career_best_loop,
+		"best_turn": SaveManager.career_best_turn_score,
+	}
 	_record_run_snapshot_if_needed()
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
+	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
+	highlights_panel.show_highlights(snapshot, prior_bests)
+
+func _on_highlights_closed() -> void:
 	new_run_button.visible = true
 	career_button.visible = true
 	codex_button.visible = true
-	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
 
 func _on_stage_cleared() -> void:
 	AchievementManager.on_stage_cleared()
