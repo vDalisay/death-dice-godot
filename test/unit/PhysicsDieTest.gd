@@ -65,6 +65,14 @@ func test_constants_are_reasonable() -> void:
 	assert_float(PhysicsDie.LAUNCH_BURST_DURATION).is_greater(0.0)
 	assert_float(PhysicsDie.EXPLODE_WOBBLE_STEP).is_greater(0.0)
 	assert_float(PhysicsDie.EXPLODE_WOBBLE_OFFSET).is_greater(0.0)
+	assert_float(PhysicsDie.LANDING_SLAM_MAX_SCALE).is_greater(PhysicsDie.SETTLE_POP_SCALE)
+	assert_float(PhysicsDie.LANDING_SLAM_MAX_OFFSET_Y).is_greater(0.0)
+	assert_float(PhysicsDie.LANDING_SLAM_MIN_TRIGGER_SPEED).is_greater(PhysicsDie.SETTLE_VELOCITY_THRESHOLD)
+	assert_float(PhysicsDie.LANDING_SLAM_SPEED_RANGE).is_greater(0.0)
+	assert_float(PhysicsDie.LANDING_SLAM_CURVE_EXPONENT).is_greater(1.0)
+	assert_float(PhysicsDie.LANDING_SLAM_LATERAL_MAX_OFFSET_X).is_greater(0.0)
+	assert_float(PhysicsDie.LANDING_SLAM_DURATION_MIN_FACTOR).is_greater(0.0)
+	assert_float(PhysicsDie.LANDING_SLAM_DURATION_MAX_FACTOR).is_greater(PhysicsDie.LANDING_SLAM_DURATION_MIN_FACTOR)
 
 
 func test_face_type_glyphs_cover_all_types() -> void:

@@ -33,6 +33,12 @@ const SPAWN_MARGIN: float = 80.0
 const BOTTOM_SPAWN_LIFT: float = 92.0
 const CONTAINMENT_BOUNCE_DAMP: float = 0.45
 const REROLL_LIFT_DELAY: float = 0.06
+const REROLL_LIFT_RANDOM_MAX: float = 0.03
+const THROW_STAGGER_RANDOM_MAX: float = 0.02
+const THROW_STAGGER_SWEEP: float = 0.85
+const THROW_STAGGER_SPAWN_SWEEP_X: float = 52.0
+const THROW_STAGGER_TARGET_SWEEP_X: float = 116.0
+const THROW_STAGGER_MAGNITUDE_VARIANCE: float = 0.12
 const BOUNDARY_GLOW_HIT_GAIN: float = 0.22
 const BOUNDARY_GLOW_DECAY_PER_SEC: float = 2.1
 
@@ -134,7 +140,8 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			die.tumble(face)
 			var target: Vector2 = _throw_target_for_origin(origin)
 			var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.7, THROW_IMPULSE_MAX * 0.9)
-			get_tree().create_timer(REROLL_LIFT_DELAY).timeout.connect(func() -> void:
+			var lift_delay: float = REROLL_LIFT_DELAY + randf_range(0.0, REROLL_LIFT_RANDOM_MAX)
+			get_tree().create_timer(lift_delay).timeout.connect(func() -> void:
 				if not is_instance_valid(die) or die.freeze:
 					return
 				die.play_launch_burst()
@@ -240,25 +247,47 @@ func _stagger_throw() -> void:
 		var die: PhysicsDie = _dice[i]
 		# Stagger: use a timer callback
 		if i == 0:
-			_launch_die(die, default_spawn_origin)
+			_launch_die(die, default_spawn_origin, i, _dice.size())
 		else:
-			var timer: SceneTreeTimer = get_tree().create_timer(THROW_STAGGER_DELAY * i)
-			timer.timeout.connect(_launch_die.bind(die, default_spawn_origin))
+			var delay: float = THROW_STAGGER_DELAY * i + randf_range(0.0, THROW_STAGGER_RANDOM_MAX)
+			var timer: SceneTreeTimer = get_tree().create_timer(delay)
+			timer.timeout.connect(_launch_die.bind(die, default_spawn_origin, i, _dice.size()))
 
 
-func _launch_die(die: PhysicsDie, origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM) -> void:
+func _launch_die(
+	die: PhysicsDie,
+	origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM,
+	launch_index: int = 0,
+	launch_total: int = 1
+) -> void:
+	var stagger_unit: float = _stagger_unit(launch_index, launch_total)
+	die.global_position += Vector2(stagger_unit * THROW_STAGGER_SPAWN_SWEEP_X, 0.0)
 	die.tumble(die.current_face)
 	die.play_launch_burst()
 	# Impulse away from spawn origin toward arena interior
 	var target: Vector2 = _throw_target_for_origin(origin)
+	target.x += stagger_unit * THROW_STAGGER_TARGET_SWEEP_X
 	var direction: Vector2 = (target - die.global_position).normalized()
 	# Add some random spread
 	var spread: float = randf_range(-0.4, 0.4)
 	direction = direction.rotated(spread)
-	var magnitude: float = randf_range(THROW_IMPULSE_MIN, THROW_IMPULSE_MAX)
+	var magnitude_bias: float = clampf(
+		1.0 + stagger_unit * THROW_STAGGER_MAGNITUDE_VARIANCE + randf_range(-0.05, 0.05),
+		0.82,
+		1.25
+	)
+	var magnitude: float = randf_range(THROW_IMPULSE_MIN, THROW_IMPULSE_MAX) * magnitude_bias
 	die.apply_central_impulse(direction * magnitude)
 	die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
 	SFXManager.play_roll()
+
+
+func _stagger_unit(launch_index: int, launch_total: int) -> float:
+	if launch_total <= 1:
+		return 0.0
+	var normalized: float = (float(launch_index) / float(maxi(launch_total - 1, 1))) * 2.0 - 1.0
+	var wave: float = sin(float(launch_index) * 1.2) * 0.35
+	return clampf(normalized * THROW_STAGGER_SWEEP + wave, -1.0, 1.0)
 
 
 ## Returns a spawn position for the given origin with slight random jitter.

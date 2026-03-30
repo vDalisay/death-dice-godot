@@ -42,6 +42,14 @@ const REROLL_LIFT_OPACITY: float = 0.55
 const LAUNCH_BURST_DURATION: float = 0.28
 const EXPLODE_WOBBLE_STEP: float = 0.04
 const EXPLODE_WOBBLE_OFFSET: float = 4.0
+const LANDING_SLAM_MAX_SCALE: float = 1.16
+const LANDING_SLAM_MAX_OFFSET_Y: float = 5.0
+const LANDING_SLAM_MIN_TRIGGER_SPEED: float = 120.0
+const LANDING_SLAM_SPEED_RANGE: float = 720.0
+const LANDING_SLAM_CURVE_EXPONENT: float = 1.3
+const LANDING_SLAM_LATERAL_MAX_OFFSET_X: float = 3.0
+const LANDING_SLAM_DURATION_MIN_FACTOR: float = 0.8
+const LANDING_SLAM_DURATION_MAX_FACTOR: float = 1.25
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -101,6 +109,8 @@ var _tumble_tween: Tween = null
 var _scale_tween: Tween = null
 var _glow_tween: Tween = null
 var _is_hovered: bool = false
+var _peak_speed_since_launch: float = 0.0
+var _last_motion_velocity: Vector2 = Vector2.ZERO
 
 # ---------------------------------------------------------------------------
 # Visual nodes (created in _ready)
@@ -212,6 +222,7 @@ func setup(index: int, data: DiceData) -> void:
 	is_keep_locked = false
 	is_stopped = false
 	physics_state = DiePhysicsState.FLYING
+	_peak_speed_since_launch = 0.0
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
 	if _name_popup_label:
 		_name_popup_label.text = data.dice_name if data else ""
@@ -242,6 +253,8 @@ func set_physics_state(new_state: DiePhysicsState) -> void:
 		freeze = true
 	elif new_state == DiePhysicsState.FLYING:
 		freeze = false
+		_peak_speed_since_launch = 0.0
+		_last_motion_velocity = Vector2.ZERO
 	_apply_visual()
 
 
@@ -464,12 +477,16 @@ func _physics_process(delta: float) -> void:
 
 	# Settling detection
 	if physics_state == DiePhysicsState.FLYING:
-		if linear_velocity.length() < SETTLE_VELOCITY_THRESHOLD:
+		var speed: float = linear_velocity.length()
+		_peak_speed_since_launch = maxf(_peak_speed_since_launch, speed)
+		if speed >= SETTLE_VELOCITY_THRESHOLD:
+			_last_motion_velocity = linear_velocity
+		if speed < SETTLE_VELOCITY_THRESHOLD:
 			_settle_timer += delta
 			if _settle_timer >= SETTLE_TIME_REQUIRED:
 				physics_state = DiePhysicsState.SETTLED
 				freeze = true
-				_play_settle_accent()
+				_play_settle_accent(_peak_speed_since_launch)
 				settled.emit()
 		else:
 			_settle_timer = 0.0
@@ -676,14 +693,27 @@ func _set_random_glyph() -> void:
 		_face_label.text = TUMBLE_GLYPHS[randi() % TUMBLE_GLYPHS.size()]
 
 
-func _play_settle_accent() -> void:
+func _play_settle_accent(peak_speed: float) -> void:
 	if _scale_tween and _scale_tween.is_valid():
 		_scale_tween.kill()
+	var speed_t: float = clampf((peak_speed - LANDING_SLAM_MIN_TRIGGER_SPEED) / LANDING_SLAM_SPEED_RANGE, 0.0, 1.0)
+	speed_t = pow(speed_t, LANDING_SLAM_CURVE_EXPONENT)
+	var slam_scale: float = lerpf(SETTLE_POP_SCALE, LANDING_SLAM_MAX_SCALE, speed_t)
+	var slam_offset: float = lerpf(1.0, LANDING_SLAM_MAX_OFFSET_Y, speed_t)
+	var slam_duration: float = SETTLE_POP_DURATION * lerpf(LANDING_SLAM_DURATION_MIN_FACTOR, LANDING_SLAM_DURATION_MAX_FACTOR, speed_t)
+	var lateral_offset_x: float = 0.0
+	if _last_motion_velocity.length() > 0.01:
+		lateral_offset_x = clampf(
+			_last_motion_velocity.normalized().x * LANDING_SLAM_LATERAL_MAX_OFFSET_X * speed_t,
+			-LANDING_SLAM_LATERAL_MAX_OFFSET_X,
+			LANDING_SLAM_LATERAL_MAX_OFFSET_X
+		)
 	_scale_tween = create_tween()
-	_scale_tween.tween_property(self, "scale", Vector2(SETTLE_POP_SCALE, SETTLE_POP_SCALE), SETTLE_POP_DURATION * 0.45) \
+	_scale_tween.tween_property(self, "scale", Vector2(slam_scale, slam_scale), slam_duration * 0.45) \
 		.set_ease(Tween.EASE_OUT)
-	_scale_tween.tween_property(self, "scale", Vector2.ONE, SETTLE_POP_DURATION * 0.55) \
+	_scale_tween.tween_property(self, "scale", Vector2.ONE, slam_duration * 0.55) \
 		.set_ease(Tween.EASE_IN)
+	_play_visual_offset_pulse_xy(lateral_offset_x, slam_offset, slam_duration)
 	SFXManager.play_dice_settle()
 
 
@@ -856,15 +886,25 @@ func _play_explode_wobble() -> void:
 
 
 func _play_visual_offset_pulse(offset_y: float, duration: float) -> void:
+	_play_visual_offset_pulse_xy(0.0, offset_y, duration)
+
+
+func _play_visual_offset_pulse_xy(offset_x: float, offset_y: float, duration: float) -> void:
 	if _bg_panel == null:
 		return
 	var base_bg: Vector2 = _bg_panel.position
 	var base_face: Vector2 = _face_label.position if _face_label else Vector2.ZERO
 	var base_glyph: Vector2 = _glyph_label.position if _glyph_label else Vector2.ZERO
 	var tween: Tween = create_tween()
-	tween.tween_property(_bg_panel, "position:y", base_bg.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_bg_panel, "position:x", base_bg.x + offset_x, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(_face_label, "position:x", base_face.x + offset_x, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(_glyph_label, "position:x", base_glyph.x + offset_x, duration * 0.45).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(_bg_panel, "position:y", base_bg.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(_face_label, "position:y", base_face.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(_glyph_label, "position:y", base_glyph.y + offset_y, duration * 0.45).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_bg_panel, "position:y", base_bg.y, duration * 0.55).set_ease(Tween.EASE_IN)
+	tween.tween_property(_bg_panel, "position:x", base_bg.x, duration * 0.55).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(_face_label, "position:x", base_face.x, duration * 0.55).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(_glyph_label, "position:x", base_glyph.x, duration * 0.55).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(_bg_panel, "position:y", base_bg.y, duration * 0.55).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_face_label, "position:y", base_face.y, duration * 0.55).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_glyph_label, "position:y", base_glyph.y, duration * 0.55).set_ease(Tween.EASE_IN)
