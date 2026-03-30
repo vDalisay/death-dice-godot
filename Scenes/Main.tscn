@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://Scripts/RollPhase.gd" id="1"]
 [ext_resource type="PackedScene" path="res://Scenes/HUD.tscn" id="2"]
-[ext_resource type="PackedScene" path="res://Scenes/DiceTray.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://Scenes/DiceArena.tscn" id="3_arena"]
 [ext_resource type="PackedScene" path="res://Scenes/ShopPanel.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://Scenes/CareerPanel.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://Scenes/DiceCodexPanel.tscn" id="6"]
@@ -37,8 +37,17 @@ theme_override_constants/separation = 16
 [node name="HUD" parent="MarginContainer/VBoxContainer" instance=ExtResource("2")]
 layout_mode = 2
 
-[node name="DiceTray" parent="MarginContainer/VBoxContainer" instance=ExtResource("3")]
+[node name="ArenaViewportContainer" type="SubViewportContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
+size_flags_vertical = 3
+stretch = true
+
+[node name="ArenaViewport" type="SubViewport" parent="MarginContainer/VBoxContainer/ArenaViewportContainer"]
+handle_input_locally = true
+size = Vector2i(1840, 520)
+render_target_update_mode = 4
+
+[node name="DiceArena" parent="MarginContainer/VBoxContainer/ArenaViewportContainer/ArenaViewport" instance=ExtResource("3_arena")]
 
 [node name="ButtonRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

@@ -11,6 +11,12 @@ func before_test() -> void:
 	GameManager.active_modifiers.clear()
 	GameManager.reset_run()
 
+
+func _get_root(runner: GdUnitSceneRunner) -> RollPhase:
+	var root: RollPhase = runner.scene() as RollPhase
+	root.dice_arena.instant_mode = true
+	return root
+
 ## are NOT kept/locked ARE rerolled alongside other free dice.
 ##
 ## Also covers the "pick up a stopped die" toggle interaction.
@@ -24,7 +30,7 @@ func test_stopped_dice_are_rerolled_on_reroll_button() -> void:
 	## Core regression test: pressing Reroll should reroll stopped dice.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 	var pool_size: int = GameManager.dice_pool.size()
 
 	# Roll all dice.
@@ -73,7 +79,7 @@ func test_stopped_dice_not_rerolled_if_kept() -> void:
 	## Dice that are kept/locked should NOT be rerolled, even if stopped.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -113,7 +119,7 @@ func test_reroll_clears_stopped_flag_before_rolling() -> void:
 	## When a stopped die is rerolled, its stopped flag must clear before the roll.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -143,7 +149,7 @@ func test_manual_pickup_then_reroll() -> void:
 	## Player clicks a stopped die to "pick it up", then rerolls.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -161,7 +167,7 @@ func test_manual_pickup_then_reroll() -> void:
 	root._sync_all_dice()
 
 	# Simulate clicking the stopped die to pick it up (toggle signal).
-	root.dice_tray.die_toggled.emit(0, false)
+	root.dice_arena.die_clicked.emit(0, false)
 	await runner.simulate_frames(2)
 
 	# Die should no longer be stopped after pickup.
@@ -173,7 +179,7 @@ func test_kept_dice_stay_locked_after_reroll() -> void:
 	## Dice toggled to KEPT before reroll should become locked after reroll.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -205,7 +211,7 @@ func test_auto_kept_dice_survive_reroll_of_stops() -> void:
 	## AUTO_KEEP / SHIELD / MULTIPLY dice should never be rerolled.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -246,7 +252,7 @@ func test_multiple_rerolls_keep_clearing_stops() -> void:
 	## Stops from reroll N should be clearable in reroll N+1.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -297,7 +303,7 @@ func test_auto_bank_when_all_dice_kept_and_reroll_pressed() -> void:
 	## showing a dead-end message.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -334,7 +340,7 @@ func test_auto_bank_score_correct_when_all_kept() -> void:
 	## Auto-bank from all-kept should bank the correct score (2 × 5 = 10).
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 
 	root.roll_button.pressed.emit()
 	await runner.simulate_frames(2)
@@ -371,7 +377,7 @@ func test_stops_accumulate_across_rerolls() -> void:
 	## Running counter: roll 2 stops → counter=2, reroll → 1 new stop → counter=3.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 	var pool_size: int = GameManager.dice_pool.size()
 
 	# Initial roll to get into ACTIVE state.
@@ -424,7 +430,7 @@ func test_pickup_does_not_reduce_accumulated_counter() -> void:
 	## Picking up a stopped die clears the visual flag but NOT the running counter.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 	var pool_size: int = GameManager.dice_pool.size()
 
 	root.roll_button.pressed.emit()
@@ -457,7 +463,7 @@ func test_pickup_does_not_reduce_accumulated_counter() -> void:
 	assert_int(root.accumulated_stop_count).is_equal(1)
 
 	# Player picks up the stopped die — counter must NOT decrease.
-	root.dice_tray.die_toggled.emit(0, false)
+	root.dice_arena.die_clicked.emit(0, false)
 	await runner.simulate_frames(2)
 
 	assert_bool(root.dice_stopped[0]).is_false()
@@ -468,7 +474,7 @@ func test_accumulated_stops_cause_bust_on_turn_2() -> void:
 	## With enough accumulated stops, turn 2+ should bust.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
-	var root: RollPhase = runner.scene() as RollPhase
+	var root: RollPhase = _get_root(runner)
 	var pool_size: int = GameManager.dice_pool.size()
 
 	# Roll to get to ACTIVE state.

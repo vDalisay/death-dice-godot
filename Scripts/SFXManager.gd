@@ -95,6 +95,9 @@ func play_double_down_win() -> void:
 	_play_tone_delayed(1319.0, 0.2, 1.0, 0.30)
 	_play_tone_delayed(1568.0, 0.25, 1.0, 0.42)
 
+func play_dice_collide() -> void:
+	_play_tone(180.0, 0.04, 0.3)
+
 
 # ---------------------------------------------------------------------------
 # Internal

@@ -1,7 +1,7 @@
 class_name RollPhase
 extends Control
 ## Turn state machine for the Cubitos-style dice rolling phase.
-## Owns dice logic. Delegates visuals to DiceTray and HUD.
+## Owns dice logic. Delegates visuals to DiceArena and HUD.
 
 const BASE_BUST_THRESHOLD: int = 3
 const AUTO_ADVANCE_DELAY: float = 1.5
@@ -18,7 +18,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
 @onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
-@onready var dice_tray: DiceTray = $MarginContainer/VBoxContainer/DiceTray
+@onready var dice_arena: DiceArena = $MarginContainer/VBoxContainer/ArenaViewportContainer/ArenaViewport/DiceArena
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
@@ -66,7 +66,9 @@ func _ready() -> void:
 	new_run_button.pressed.connect(_on_new_run_pressed)
 	career_button.pressed.connect(_on_career_pressed)
 	codex_button.pressed.connect(_on_codex_pressed)
-	dice_tray.die_toggled.connect(_on_die_toggled)
+	dice_arena.die_clicked.connect(_on_die_toggled)
+	dice_arena.all_dice_settled.connect(_on_all_dice_settled)
+	dice_arena.die_collision_rerolled.connect(_on_die_collision_rerolled)
 	shop_panel.shop_closed.connect(_on_shop_closed)
 	career_panel.closed.connect(_on_career_closed)
 	codex_panel.closed.connect(_on_codex_closed)
@@ -112,7 +114,7 @@ func _start_new_turn() -> void:
 	dice_keep.fill(false)
 	dice_keep_locked.resize(count)
 	dice_keep_locked.fill(false)
-	dice_tray.build(count)
+	dice_arena.reset()
 	_sync_ui()
 
 # ---------------------------------------------------------------------------
@@ -199,12 +201,10 @@ func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 # ---------------------------------------------------------------------------
 
 func _roll_all_dice() -> void:
-	SFXManager.play_roll()
-	var indices: Array[int] = []
-	for i: int in GameManager.dice_pool.size():
-		current_results[i] = GameManager.dice_pool[i].roll()
-		indices.append(i)
-	_process_roll_results(indices)
+	_begin_roll_animation_lock()
+	# Throw all dice into the arena — faces are rolled inside throw_dice
+	dice_arena.throw_dice(GameManager.dice_pool)
+	# Results will be processed when all_dice_settled signal fires
 
 func _reroll_selected_dice() -> void:
 	_reroll_count += 1
@@ -212,7 +212,8 @@ func _reroll_selected_dice() -> void:
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] and not dice_keep_locked[i]:
 			dice_keep_locked[i] = true
-	SFXManager.play_roll()
+			dice_arena.lock_die(i)
+
 	var rerolled: Array[int] = []
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] or dice_keep_locked[i]:
@@ -220,13 +221,37 @@ func _reroll_selected_dice() -> void:
 		# Stopped dice are rerolled too (Cubitos-style: pick them up and retry)
 		if dice_stopped[i]:
 			dice_stopped[i] = false
-		current_results[i] = GameManager.dice_pool[i].roll()
 		rerolled.append(i)
 	if rerolled.is_empty():
 		# No dice to reroll — all are kept/locked, so auto-bank.
 		_on_bank_pressed()
 		return
-	_process_roll_results(rerolled)
+	_begin_roll_animation_lock()
+	dice_arena.reroll_dice(rerolled, GameManager.dice_pool)
+	# Results will be processed when all_dice_settled signal fires
+
+
+## Called when all dice in the arena have stopped moving.
+func _on_all_dice_settled() -> void:
+	# Read final faces from the arena (only for non-locked dice; locked keep their result)
+	var arena_results: Array[DiceFaceData] = dice_arena.get_results()
+	for i: int in arena_results.size():
+		if not dice_keep_locked[i]:
+			current_results[i] = arena_results[i]
+	# Determine which indices to process (all non-locked dice)
+	var rolled_indices: Array[int] = []
+	for i: int in GameManager.dice_pool.size():
+		if not dice_keep_locked[i]:
+			rolled_indices.append(i)
+	if rolled_indices.is_empty():
+		rolled_indices = range(GameManager.dice_pool.size()) as Array[int]
+	_process_roll_results(rolled_indices)
+
+
+## Called when a collision reroll happens during the rolling phase (cosmetic only).
+func _on_die_collision_rerolled(die_index: int, new_face: DiceFaceData) -> void:
+	# Update our tracking — cosmetic only, stops are NOT accumulated
+	current_results[die_index] = new_face
 
 func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if not rolled_indices.is_empty():
@@ -254,18 +279,17 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
 
-	# Tumble animation for rolled dice; pop auto-kept dice after tumble.
+	# Update arena die visuals for rolled dice
 	for i: int in rolled_indices:
-		dice_tray.tumble_die(i, current_results[i], _die_visual_state(i))
-	for i: int in rolled_indices:
-		var face: DiceFaceData = current_results[i]
-		if face == null:
-			continue
-		if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
-				or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
-				or face.type == DiceFaceData.FaceType.INSURANCE \
-				or face.type == DiceFaceData.FaceType.EXPLODE:
-			dice_tray.pop_die(i)
+		var die: PhysicsDie = dice_arena.get_die(i)
+		if die:
+			die.show_face(current_results[i])
+			_sync_arena_die_state(i)
+			var face: DiceFaceData = current_results[i]
+			if face and (face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
+					or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
+					or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.EXPLODE):
+				die.pop()
 
 	# Accumulated bust check: add new stops from this roll to running total
 	accumulated_stop_count += _count_stops_in(rolled_indices)
@@ -278,7 +302,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		var insurance_index: int = _find_insurance_face_index()
 		if insurance_index >= 0:
 			_consume_insurance_face(insurance_index)
-			dice_tray.update_die(insurance_index, current_results[insurance_index], _die_visual_state(insurance_index))
+			_sync_arena_die_state(insurance_index)
 			turn_state = TurnState.BANKED
 			bank_streak = 0
 			_update_streak_display()
@@ -299,10 +323,10 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	else:
 		turn_state = TurnState.ACTIVE
 
-	# Sync non-rolled dice (rolled ones already have tumble animation).
+	# Sync non-rolled dice visuals.
 	for i: int in GameManager.dice_pool.size():
 		if i not in rolled_indices:
-			dice_tray.update_die(i, current_results[i], _die_visual_state(i))
+			_sync_arena_die_state(i)
 	_sync_ui()
 
 	# Status messages based on roll outcome.
@@ -449,28 +473,35 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			dice_keep_locked[i] = false
 			current_results[i] = GameManager.dice_pool[i].roll()
 			var face: DiceFaceData = current_results[i]
+			var die: PhysicsDie = dice_arena.get_die(i)
 			if face.type == DiceFaceData.FaceType.EXPLODE:
 				# Chain continues! Score and reroll again.
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
-				dice_tray.tumble_die(i, face, _die_visual_state(i))
-				dice_tray.pop_die(i)
-				dice_tray.show_chain_label(i, chain_depth)
+				if die:
+					die.tumble(face)
+					die.pop()
+					die.show_chain_label(chain_depth)
 				next_chain.append(i)
 			elif face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
 				accumulated_stop_count += 2 if face.type == DiceFaceData.FaceType.CURSED_STOP else 1
-				dice_tray.tumble_die(i, face, _die_visual_state(i))
+				if die:
+					die.tumble(face)
+					_sync_arena_die_state(i)
 			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
-				dice_tray.tumble_die(i, face, _die_visual_state(i))
-				dice_tray.pop_die(i)
+				if die:
+					die.tumble(face)
+					die.pop()
 			else:
 				if not dice_keep_locked[i]:
 					dice_keep[i] = false
-				dice_tray.tumble_die(i, face, _die_visual_state(i))
+				if die:
+					die.tumble(face)
+					_sync_arena_die_state(i)
 		to_reroll = next_chain
 
 	# Explosophile: after chains end, reroll 1 extra un-resolved die for free.
@@ -489,7 +520,10 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE]:
 				dice_keep[extra_i] = true
 				dice_keep_locked[extra_i] = true
-			dice_tray.tumble_die(extra_i, extra_face, _die_visual_state(extra_i))
+			var extra_die: PhysicsDie = dice_arena.get_die(extra_i)
+			if extra_die:
+				extra_die.tumble(extra_face)
+				_sync_arena_die_state(extra_i)
 
 	_sync_all_dice()
 	_sync_ui()
@@ -555,19 +589,16 @@ func _get_bust_risk_text(effective_stops: int, threshold: int) -> String:
 	else:
 		return "Bust risk: MEDIUM"
 
-func _die_visual_state(index: int) -> DieButton.DieState:
-	var face: DiceFaceData = current_results[index]
-	if face == null:
-		return DieButton.DieState.UNROLLED
-	if dice_stopped[index]:
-		return DieButton.DieState.STOPPED
-	if face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.EXPLODE or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE:
-		return DieButton.DieState.AUTO_KEPT
-	if dice_keep_locked[index]:
-		return DieButton.DieState.KEEP_LOCKED
-	if dice_keep[index]:
-		return DieButton.DieState.KEPT
-	return DieButton.DieState.REROLLABLE
+## Sync the i-th PhysicsDie's visual flags to match RollPhase tracking state.
+func _sync_arena_die_state(index: int) -> void:
+	var die: PhysicsDie = dice_arena.get_die(index)
+	if die == null:
+		return
+	die.is_stopped = dice_stopped[index]
+	die.is_kept = dice_keep[index]
+	die.is_keep_locked = dice_keep_locked[index]
+	die.show_face(current_results[index])
+	die._apply_visual()
 
 # ---------------------------------------------------------------------------
 # UI sync
@@ -575,7 +606,7 @@ func _die_visual_state(index: int) -> DieButton.DieState:
 
 func _sync_all_dice() -> void:
 	for i: int in GameManager.dice_pool.size():
-		dice_tray.update_die(i, current_results[i], _die_visual_state(i))
+		_sync_arena_die_state(i)
 
 func _sync_ui() -> void:
 	var shield_count: int = _count_shields()
@@ -776,8 +807,10 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 		var _old: int = running
 		var _new: int = new_running
 		tween.tween_callback(func() -> void:
-			dice_tray.show_score_popup(die_i, die_score)
-			dice_tray.pop_die(die_i)
+			var score_die: PhysicsDie = dice_arena.get_die(die_i)
+			if score_die:
+				score_die.show_score_popup(die_score)
+				score_die.pop()
 			SFXManager.play_score_tick()
 			hud.animate_score_count(_old, _new)
 		).set_delay(interval)

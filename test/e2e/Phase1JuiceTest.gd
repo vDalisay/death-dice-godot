@@ -16,6 +16,7 @@ func before_test() -> void:
 
 func _setup_scene(runner: GdUnitSceneRunner) -> RollPhase:
 	var root: RollPhase = runner.scene() as RollPhase
+	root.dice_arena.instant_mode = true
 	return root
 
 
