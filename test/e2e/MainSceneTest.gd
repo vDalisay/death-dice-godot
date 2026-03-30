@@ -88,7 +88,7 @@ func test_hud_shows_correct_lives() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = runner.scene() as RollPhase
-	assert_str(root.hud.lives_label.text).contains("3")
+	assert_int(root.hud.lives_label.text.length()).is_equal(GameManager.lives)
 
 
 func test_hud_shows_correct_target() -> void:
@@ -162,5 +162,5 @@ func test_hud_shows_stage_label() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = runner.scene() as RollPhase
-	assert_str(root.hud.stage_label.text).contains("Stage")
+	assert_str(root.hud.stage_label.text).contains("STAGE")
 	assert_str(root.hud.stage_label.text).contains("1")

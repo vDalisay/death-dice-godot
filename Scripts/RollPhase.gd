@@ -570,7 +570,7 @@ func _sync_ui() -> void:
 	var shield_count: int = _count_shields()
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var turn_score: int = _calculate_turn_score()
-	hud.update_turn(turn_score, effective_stops, _get_bust_threshold())
+	hud.update_turn(turn_score, effective_stops, _get_bust_threshold(), shield_count)
 	_sync_buttons()
 
 	match turn_state:
