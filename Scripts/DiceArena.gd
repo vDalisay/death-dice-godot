@@ -33,6 +33,8 @@ const SPAWN_MARGIN: float = 80.0
 const BOTTOM_SPAWN_LIFT: float = 92.0
 const CONTAINMENT_BOUNCE_DAMP: float = 0.45
 const REROLL_LIFT_DELAY: float = 0.06
+const BOUNDARY_FLASH_COOLDOWN: float = 0.08
+const BOUNDARY_FLASH_DURATION: float = 0.09
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -48,6 +50,8 @@ var default_spawn_origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM
 var _dice: Array[PhysicsDie] = []
 var _settle_check_active: bool = false
 var _bg_panel: Panel = null
+var _bg_style: StyleBoxFlat = null
+var _boundary_flash_timer: float = 0.0
 ## When true, dice settle instantly (no physics). Set by tests.
 var instant_mode: bool = false
 
@@ -61,6 +65,8 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	if _boundary_flash_timer > 0.0:
+		_boundary_flash_timer = maxf(0.0, _boundary_flash_timer - _delta)
 	_enforce_arena_containment()
 	if not _settle_check_active:
 		return
@@ -316,12 +322,12 @@ func _build_background() -> void:
 	_bg_panel.size = Vector2(ARENA_WIDTH, ARENA_HEIGHT)
 	_bg_panel.position = Vector2.ZERO
 	_bg_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = ARENA_BG_COLOR
-	sb.border_color = ARENA_BORDER_COLOR
-	sb.set_border_width_all(ARENA_BORDER_WIDTH)
-	sb.set_corner_radius_all(ARENA_CORNER_RADIUS)
-	_bg_panel.add_theme_stylebox_override("panel", sb)
+	_bg_style = StyleBoxFlat.new()
+	_bg_style.bg_color = ARENA_BG_COLOR
+	_bg_style.border_color = ARENA_BORDER_COLOR
+	_bg_style.set_border_width_all(ARENA_BORDER_WIDTH)
+	_bg_style.set_corner_radius_all(ARENA_CORNER_RADIUS)
+	_bg_panel.add_theme_stylebox_override("panel", _bg_style)
 	add_child(_bg_panel)
 	move_child(_bg_panel, 0)
 
@@ -407,3 +413,15 @@ func _enforce_arena_containment() -> void:
 			corrected = true
 		if corrected:
 			die.global_position = p
+			_flash_boundary()
+
+
+func _flash_boundary() -> void:
+	if _bg_panel == null or _bg_style == null:
+		return
+	if _boundary_flash_timer > 0.0:
+		return
+	_boundary_flash_timer = BOUNDARY_FLASH_COOLDOWN
+	var tween: Tween = create_tween()
+	tween.tween_property(_bg_style, "border_color", _UITheme.DANGER_RED, BOUNDARY_FLASH_DURATION * 0.45)
+	tween.tween_property(_bg_style, "border_color", ARENA_BORDER_COLOR, BOUNDARY_FLASH_DURATION * 0.55)

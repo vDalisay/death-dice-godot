@@ -38,6 +38,7 @@ const EXPLODE_CHARGE_DURATION: float = 0.2
 const STOP_IMPACT_DURATION: float = 0.18
 const KEEP_LOCK_SNAP_DURATION: float = 0.14
 const SHIELD_ABSORB_DURATION: float = 0.3
+const REROLL_LIFT_OPACITY: float = 0.55
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -314,6 +315,7 @@ func play_stop_impact(is_cursed: bool) -> void:
 	var color: Color = _UITheme.NEON_PURPLE if is_cursed else _UITheme.DANGER_RED
 	var label_text: String = "CURSED!" if is_cursed else "STOP"
 	_play_radial_effect(color, label_text)
+	_spawn_stop_smoke(color)
 	if _bg_panel:
 		var tween: Tween = create_tween()
 		tween.tween_property(_bg_panel, "modulate", Color(color, 1.0), STOP_IMPACT_DURATION * 0.45)
@@ -377,6 +379,9 @@ func play_reroll_lift() -> void:
 	_scale_tween = create_tween()
 	_scale_tween.tween_property(self, "scale", Vector2(0.9, 0.9), REROLL_LIFT_DURATION * 0.45).set_ease(Tween.EASE_OUT)
 	_scale_tween.tween_property(self, "scale", Vector2(1.03, 1.03), REROLL_LIFT_DURATION * 0.55).set_ease(Tween.EASE_IN)
+	var alpha_tween: Tween = create_tween()
+	alpha_tween.tween_property(self, "modulate:a", REROLL_LIFT_OPACITY, REROLL_LIFT_DURATION * 0.45).set_ease(Tween.EASE_OUT)
+	alpha_tween.tween_property(self, "modulate:a", 1.0, REROLL_LIFT_DURATION * 0.55).set_ease(Tween.EASE_IN)
 	if _bg_panel:
 		var mod_tween: Tween = create_tween()
 		mod_tween.tween_property(_bg_panel, "modulate", Color(1.15, 1.15, 1.15, 1.0), REROLL_LIFT_DURATION * 0.5)
@@ -762,4 +767,24 @@ func _spawn_explode_burst() -> void:
 	get_tree().create_timer(0.5).timeout.connect(func() -> void:
 		if is_instance_valid(burst):
 			burst.queue_free()
+	)
+
+
+func _spawn_stop_smoke(color: Color) -> void:
+	var puff := CPUParticles2D.new()
+	puff.one_shot = true
+	puff.amount = 14
+	puff.lifetime = 0.28
+	puff.explosiveness = 0.75
+	puff.direction = Vector2.ZERO
+	puff.spread = 180.0
+	puff.initial_velocity_min = 28.0
+	puff.initial_velocity_max = 70.0
+	puff.gravity = Vector2(0, -24.0)
+	puff.color = Color(color.r, color.g, color.b, 0.75)
+	add_child(puff)
+	puff.emitting = true
+	get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		if is_instance_valid(puff):
+			puff.queue_free()
 	)
