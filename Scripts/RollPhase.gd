@@ -57,8 +57,10 @@ const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
 const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
+const _UITheme := preload("res://Scripts/UITheme.gd")
 
 func _ready() -> void:
+	theme = _UITheme.build_theme()
 	roll_button.pressed.connect(_on_roll_pressed)
 	bank_button.pressed.connect(_on_bank_pressed)
 	new_run_button.pressed.connect(_on_new_run_pressed)

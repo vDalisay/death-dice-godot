@@ -5,7 +5,7 @@ extends Control
 
 const BASE_SIZE: Vector2 = Vector2(80, 80)
 const MAX_SIZE: Vector2 = Vector2(160, 160)
-const FIRE_CHARS: Array[String] = ["🔥", "🔥", "🔥", "🔥", "🔥"]
+const FIRE_CHARS: Array[String] = ["▲", "▲", "▲", "▲", "▲"]
 const FLICKER_INTERVAL: float = 0.12
 const PULSE_DURATION: float = 0.8
 
@@ -27,7 +27,7 @@ func _ready() -> void:
 	_container.position = Vector2(12, 12)
 	add_child(_container)
 
-	# Create layered fire emoji labels for depth effect.
+	# Create layered fire glyph labels for depth effect.
 	for i: int in FIRE_CHARS.size():
 		var lbl: Label = Label.new()
 		lbl.text = FIRE_CHARS[i]
@@ -81,7 +81,7 @@ func _layout_fire() -> void:
 	var t: float = clampf(float(_streak - 1) / 9.0, 0.0, 1.0)
 	var display_size: Vector2 = BASE_SIZE.lerp(MAX_SIZE, t)
 
-	# How many fire emojis to show (1 at streak 1, up to all 5 at streak 5+).
+	# How many fire glyphs to show (1 at streak 1, up to all 5 at streak 5+).
 	var fire_count: int = clampi(_streak, 1, FIRE_CHARS.size())
 	var font_size: int = int(lerpf(36.0, 72.0, t))
 

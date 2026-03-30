@@ -15,7 +15,7 @@ const KEPT_OPACITY: float = 0.6
 const KEPT_OFFSET_Y: float = 5.0
 
 ## All possible display strings cycled during the tumble animation.
-const TUMBLE_GLYPHS: Array[String] = ["1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "💥3"]
+const TUMBLE_GLYPHS: Array[String] = ["1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "✦3"]
 
 const COLOR_UNROLLED: Color   = Color(0.6, 0.6, 0.6)
 const COLOR_REROLLABLE: Color = Color(1.0, 0.65, 0.2)   # Orange

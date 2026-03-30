@@ -32,7 +32,7 @@ theme_override_font_sizes/font_size = 36
 
 [node name="DieLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
-text = "🎲"
+text = "⬡"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 120
 

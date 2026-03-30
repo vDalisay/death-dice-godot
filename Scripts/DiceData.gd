@@ -14,10 +14,10 @@ const MAX_CHAIN_ROLLS: int = 10
 
 enum Rarity { GREY, GREEN, BLUE, PURPLE }
 
-const RARITY_GREY_COLOR: Color = Color(0.62, 0.62, 0.62)
-const RARITY_GREEN_COLOR: Color = Color(0.34, 0.78, 0.34)
-const RARITY_BLUE_COLOR: Color = Color(0.32, 0.58, 0.95)
-const RARITY_PURPLE_COLOR: Color = Color(0.67, 0.42, 0.92)
+const RARITY_GREY_COLOR: Color = Color("#888888")
+const RARITY_GREEN_COLOR: Color = Color("#00E676")
+const RARITY_BLUE_COLOR: Color = Color("#4488FF")
+const RARITY_PURPLE_COLOR: Color = Color("#7C3AED")
 
 @export var dice_name: String = "Standard D6"
 @export var faces: Array[DiceFaceData] = []

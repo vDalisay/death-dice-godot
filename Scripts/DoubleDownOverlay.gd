@@ -8,6 +8,7 @@ const ROLL_DURATION: float = 3.0
 const MIN_INTERVAL: float = 0.3
 const START_INTERVAL: float = 0.06
 const DIE_FACES: Array[int] = [1, 2, 3, 4, 5, 6]
+const _UITheme := preload("res://Scripts/UITheme.gd")
 
 @onready var _die_label: Label = $MarginContainer/VBoxContainer/DieLabel
 @onready var _prompt_label: Label = $MarginContainer/VBoxContainer/PromptLabel
@@ -35,7 +36,7 @@ func _ready() -> void:
 func open(gold_at_stake: int) -> void:
 	_gold_at_stake = gold_at_stake
 	_rolling = false
-	_die_label.text = "🎲"
+	_die_label.text = _UITheme.GLYPH_DIE
 	_prompt_label.text = "Wager: %dg — pick your side!" % gold_at_stake
 	_result_label.text = ""
 	_even_button.visible = true
