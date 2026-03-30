@@ -99,6 +99,20 @@ func play_dice_collide() -> void:
 	_play_tone(180.0, 0.04, 0.3)
 
 
+func play_stop_face() -> void:
+	_play_tone(210.0, 0.08, 0.45)
+
+
+func play_cursed_stop() -> void:
+	_play_tone(66.0, 0.14, 0.6)
+	_play_tone_delayed(666.0, 0.08, 0.45, 0.03)
+
+
+func play_insurance_trigger() -> void:
+	_play_tone(880.0, 0.08, 0.55)
+	_play_tone_delayed(740.0, 0.12, 0.5, 0.06)
+
+
 # ---------------------------------------------------------------------------
 # Internal
 # ---------------------------------------------------------------------------

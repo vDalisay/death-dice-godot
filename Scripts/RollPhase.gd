@@ -301,6 +301,12 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			die.show_face(current_results[i])
 			_sync_arena_die_state(i)
 			var face: DiceFaceData = current_results[i]
+			if face and (face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP):
+				die.play_stop_impact(face.type == DiceFaceData.FaceType.CURSED_STOP)
+				if face.type == DiceFaceData.FaceType.CURSED_STOP:
+					SFXManager.play_cursed_stop()
+				else:
+					SFXManager.play_stop_face()
 			if face and (face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
 					or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
 					or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.EXPLODE):
@@ -467,6 +473,10 @@ func _consume_insurance_face(die_index: int) -> void:
 	var face: DiceFaceData = current_results[die_index]
 	if face == null:
 		return
+	var die: PhysicsDie = dice_arena.get_die(die_index)
+	if die:
+		die.play_insurance_trigger()
+	SFXManager.play_insurance_trigger()
 	face.type = DiceFaceData.FaceType.BLANK
 	face.value = 0
 	dice_keep[die_index] = true
@@ -512,6 +522,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_keep[i] = false
 				accumulated_stop_count += 2 if face.type == DiceFaceData.FaceType.CURSED_STOP else 1
 				if die:
+					die.play_stop_impact(face.type == DiceFaceData.FaceType.CURSED_STOP)
 					die.tumble(face)
 					_sync_arena_die_state(i)
 			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE:
@@ -538,13 +549,15 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			var extra_i: int = candidates[randi() % candidates.size()]
 			current_results[extra_i] = GameManager.dice_pool[extra_i].roll()
 			var extra_face: DiceFaceData = current_results[extra_i]
+			var extra_die: PhysicsDie = dice_arena.get_die(extra_i)
 			if extra_face.type == DiceFaceData.FaceType.STOP or extra_face.type == DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[extra_i] = true
 				accumulated_stop_count += 2 if extra_face.type == DiceFaceData.FaceType.CURSED_STOP else 1
+				if extra_die:
+					extra_die.play_stop_impact(extra_face.type == DiceFaceData.FaceType.CURSED_STOP)
 			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE]:
 				dice_keep[extra_i] = true
 				dice_keep_locked[extra_i] = true
-			var extra_die: PhysicsDie = dice_arena.get_die(extra_i)
 			if extra_die:
 				extra_die.tumble(extra_face)
 				_sync_arena_die_state(extra_i)

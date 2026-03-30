@@ -35,6 +35,7 @@ const SCORE_POPUP_DURATION: float = 0.6
 const MULTIPLY_VFX_DURATION: float = 0.35
 const REROLL_LIFT_DURATION: float = 0.14
 const EXPLODE_CHARGE_DURATION: float = 0.2
+const STOP_IMPACT_DURATION: float = 0.18
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -305,6 +306,37 @@ func play_multiply_vfx(multiplier: int) -> void:
 
 func play_multiply_left_vfx(multiplier: int) -> void:
 	_play_directional_left_effect(_UITheme.ROSE_ACCENT, "<x%d" % multiplier)
+
+
+func play_stop_impact(is_cursed: bool) -> void:
+	var color: Color = _UITheme.NEON_PURPLE if is_cursed else _UITheme.DANGER_RED
+	var label_text: String = "CURSED!" if is_cursed else "STOP"
+	_play_radial_effect(color, label_text)
+	if _bg_panel:
+		var tween: Tween = create_tween()
+		tween.tween_property(_bg_panel, "modulate", Color(color, 1.0), STOP_IMPACT_DURATION * 0.45)
+		tween.tween_property(_bg_panel, "modulate", Color.WHITE, STOP_IMPACT_DURATION * 0.55)
+
+
+func play_insurance_trigger() -> void:
+	_play_radial_effect(_UITheme.ACTION_CYAN, "INSURANCE")
+	var ring := CPUParticles2D.new()
+	ring.one_shot = true
+	ring.amount = 30
+	ring.lifetime = 0.4
+	ring.explosiveness = 0.8
+	ring.direction = Vector2.ZERO
+	ring.spread = 180.0
+	ring.initial_velocity_min = 80.0
+	ring.initial_velocity_max = 170.0
+	ring.gravity = Vector2.ZERO
+	ring.color = _UITheme.ACTION_CYAN
+	add_child(ring)
+	ring.emitting = true
+	get_tree().create_timer(0.6).timeout.connect(func() -> void:
+		if is_instance_valid(ring):
+			ring.queue_free()
+	)
 
 
 func play_reroll_lift() -> void:
