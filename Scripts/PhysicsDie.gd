@@ -341,23 +341,22 @@ func play_stop_impact(is_cursed: bool) -> void:
 
 func play_insurance_trigger() -> void:
 	_play_radial_effect(_UITheme.ACTION_CYAN, "INSURANCE")
-	var ring := CPUParticles2D.new()
-	ring.one_shot = true
-	ring.amount = 30
-	ring.lifetime = 0.4
-	ring.explosiveness = 0.8
-	ring.direction = Vector2.ZERO
-	ring.spread = 180.0
-	ring.initial_velocity_min = 80.0
-	ring.initial_velocity_max = 170.0
-	ring.gravity = Vector2.ZERO
-	ring.color = _UITheme.ACTION_CYAN
-	add_child(ring)
+	var ring: CPUParticles2D = ParticlePool.acquire(self)
+	if ring == null:
+		return
+	ParticlePool.configure_burst(ring, {
+		"amount": 30,
+		"lifetime": 0.4,
+		"explosiveness": 0.8,
+		"direction": Vector2.ZERO,
+		"spread": 180.0,
+		"initial_velocity_min": 80.0,
+		"initial_velocity_max": 170.0,
+		"gravity": Vector2.ZERO,
+		"color": _UITheme.ACTION_CYAN,
+	})
 	ring.emitting = true
-	get_tree().create_timer(0.6).timeout.connect(func() -> void:
-		if is_instance_valid(ring):
-			ring.queue_free()
-	)
+	ParticlePool.release_after(ring, 0.6)
 
 
 func play_keep_lock_snap() -> void:
@@ -371,23 +370,22 @@ func play_keep_lock_snap() -> void:
 
 func play_shield_absorb() -> void:
 	_play_radial_effect(_UITheme.ACTION_CYAN, "SHIELD")
-	var ring := CPUParticles2D.new()
-	ring.one_shot = true
-	ring.amount = 18
-	ring.lifetime = SHIELD_ABSORB_DURATION
-	ring.explosiveness = 0.85
-	ring.direction = Vector2.ZERO
-	ring.spread = 180.0
-	ring.initial_velocity_min = 70.0
-	ring.initial_velocity_max = 140.0
-	ring.gravity = Vector2.ZERO
-	ring.color = _UITheme.ACTION_CYAN
-	add_child(ring)
+	var ring: CPUParticles2D = ParticlePool.acquire(self)
+	if ring == null:
+		return
+	ParticlePool.configure_burst(ring, {
+		"amount": 18,
+		"lifetime": SHIELD_ABSORB_DURATION,
+		"explosiveness": 0.85,
+		"direction": Vector2.ZERO,
+		"spread": 180.0,
+		"initial_velocity_min": 70.0,
+		"initial_velocity_max": 140.0,
+		"gravity": Vector2.ZERO,
+		"color": _UITheme.ACTION_CYAN,
+	})
 	ring.emitting = true
-	get_tree().create_timer(SHIELD_ABSORB_DURATION + 0.2).timeout.connect(func() -> void:
-		if is_instance_valid(ring):
-			ring.queue_free()
-	)
+	ParticlePool.release_after(ring, SHIELD_ABSORB_DURATION + 0.2)
 
 
 func play_reroll_lift() -> void:
@@ -407,23 +405,22 @@ func play_reroll_lift() -> void:
 
 
 func play_launch_burst() -> void:
-	var burst := CPUParticles2D.new()
-	burst.one_shot = true
-	burst.amount = 18
-	burst.lifetime = LAUNCH_BURST_DURATION
-	burst.explosiveness = 0.8
-	burst.direction = Vector2.UP
-	burst.spread = 60.0
-	burst.initial_velocity_min = 70.0
-	burst.initial_velocity_max = 150.0
-	burst.gravity = Vector2(0.0, 60.0)
-	burst.color = Color(1.0, 1.0, 1.0, 0.6)
-	add_child(burst)
+	var burst: CPUParticles2D = ParticlePool.acquire(self)
+	if burst == null:
+		return
+	ParticlePool.configure_burst(burst, {
+		"amount": 18,
+		"lifetime": LAUNCH_BURST_DURATION,
+		"explosiveness": 0.8,
+		"direction": Vector2.UP,
+		"spread": 60.0,
+		"initial_velocity_min": 70.0,
+		"initial_velocity_max": 150.0,
+		"gravity": Vector2(0.0, 60.0),
+		"color": Color(1.0, 1.0, 1.0, 0.6),
+	})
 	burst.emitting = true
-	get_tree().create_timer(LAUNCH_BURST_DURATION + 0.2).timeout.connect(func() -> void:
-		if is_instance_valid(burst):
-			burst.queue_free()
-	)
+	ParticlePool.release_after(burst, LAUNCH_BURST_DURATION + 0.2)
 
 
 func play_explode_charge() -> void:
@@ -771,19 +768,23 @@ func _play_directional_left_effect(color: Color, label_text: String) -> void:
 	fx_root.global_position = global_position
 	add_child(fx_root)
 
-	var spray := CPUParticles2D.new()
-	spray.one_shot = true
-	spray.amount = 36
-	spray.lifetime = 0.35
-	spray.explosiveness = 0.85
-	spray.direction = Vector2.LEFT
-	spray.spread = 24.0
-	spray.initial_velocity_min = 140.0
-	spray.initial_velocity_max = 260.0
-	spray.gravity = Vector2.ZERO
-	spray.color = color
-	spray.emitting = true
-	fx_root.add_child(spray)
+	var spray: CPUParticles2D = ParticlePool.acquire(self)
+	if spray:
+		spray.top_level = true
+		spray.global_position = global_position
+		ParticlePool.configure_burst(spray, {
+			"amount": 36,
+			"lifetime": 0.35,
+			"explosiveness": 0.85,
+			"direction": Vector2.LEFT,
+			"spread": 24.0,
+			"initial_velocity_min": 140.0,
+			"initial_velocity_max": 260.0,
+			"gravity": Vector2.ZERO,
+			"color": color,
+		})
+		spray.emitting = true
+		ParticlePool.release_after(spray, 0.55)
 
 	var streak := Line2D.new()
 	streak.width = 4.0
@@ -809,43 +810,41 @@ func _play_directional_left_effect(color: Color, label_text: String) -> void:
 
 
 func _spawn_explode_burst() -> void:
-	var burst := CPUParticles2D.new()
-	burst.one_shot = true
-	burst.amount = 26
-	burst.lifetime = 0.26
-	burst.explosiveness = 0.9
-	burst.direction = Vector2.ZERO
-	burst.spread = 180.0
-	burst.initial_velocity_min = 120.0
-	burst.initial_velocity_max = 220.0
-	burst.gravity = Vector2.ZERO
-	burst.color = _UITheme.EXPLOSION_ORANGE
-	add_child(burst)
+	var burst: CPUParticles2D = ParticlePool.acquire(self)
+	if burst == null:
+		return
+	ParticlePool.configure_burst(burst, {
+		"amount": 26,
+		"lifetime": 0.26,
+		"explosiveness": 0.9,
+		"direction": Vector2.ZERO,
+		"spread": 180.0,
+		"initial_velocity_min": 120.0,
+		"initial_velocity_max": 220.0,
+		"gravity": Vector2.ZERO,
+		"color": _UITheme.EXPLOSION_ORANGE,
+	})
 	burst.emitting = true
-	get_tree().create_timer(0.5).timeout.connect(func() -> void:
-		if is_instance_valid(burst):
-			burst.queue_free()
-	)
+	ParticlePool.release_after(burst, 0.5)
 
 
 func _spawn_stop_smoke(color: Color) -> void:
-	var puff := CPUParticles2D.new()
-	puff.one_shot = true
-	puff.amount = 14
-	puff.lifetime = 0.28
-	puff.explosiveness = 0.75
-	puff.direction = Vector2.ZERO
-	puff.spread = 180.0
-	puff.initial_velocity_min = 28.0
-	puff.initial_velocity_max = 70.0
-	puff.gravity = Vector2(0, -24.0)
-	puff.color = Color(color.r, color.g, color.b, 0.75)
-	add_child(puff)
+	var puff: CPUParticles2D = ParticlePool.acquire(self)
+	if puff == null:
+		return
+	ParticlePool.configure_burst(puff, {
+		"amount": 14,
+		"lifetime": 0.28,
+		"explosiveness": 0.75,
+		"direction": Vector2.ZERO,
+		"spread": 180.0,
+		"initial_velocity_min": 28.0,
+		"initial_velocity_max": 70.0,
+		"gravity": Vector2(0, -24.0),
+		"color": Color(color.r, color.g, color.b, 0.75),
+	})
 	puff.emitting = true
-	get_tree().create_timer(0.5).timeout.connect(func() -> void:
-		if is_instance_valid(puff):
-			puff.queue_free()
-	)
+	ParticlePool.release_after(puff, 0.5)
 
 
 func _play_explode_wobble() -> void:
