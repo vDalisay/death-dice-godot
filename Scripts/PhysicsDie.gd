@@ -198,7 +198,7 @@ func _ready() -> void:
 
 	# Hover popup showing face squares (hidden by default)
 	_name_popup = Panel.new()
-	_name_popup.size = Vector2(220, 32)
+	_name_popup.size = Vector2(32, 32)
 	_name_popup.top_level = true
 	_name_popup.position = Vector2.ZERO
 	_name_popup.pivot_offset = _name_popup.size * 0.5
@@ -209,23 +209,18 @@ func _ready() -> void:
 	popup_style.border_color = _UITheme.ACTION_CYAN
 	popup_style.set_border_width_all(1)
 	popup_style.set_corner_radius_all(6)
+	popup_style.content_margin_left = 4.0
+	popup_style.content_margin_right = 4.0
+	popup_style.content_margin_top = 4.0
+	popup_style.content_margin_bottom = 4.0
 	_name_popup.add_theme_stylebox_override("panel", popup_style)
 	add_child(_name_popup)
 
-	var popup_margin := MarginContainer.new()
-	popup_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	popup_margin.add_theme_constant_override("margin_left", 4)
-	popup_margin.add_theme_constant_override("margin_right", 4)
-	popup_margin.add_theme_constant_override("margin_top", 3)
-	popup_margin.add_theme_constant_override("margin_bottom", 3)
-	popup_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_name_popup.add_child(popup_margin)
-
 	_name_popup_faces = HBoxContainer.new()
 	_name_popup_faces.alignment = BoxContainer.ALIGNMENT_CENTER
-	_name_popup_faces.add_theme_constant_override("separation", 4)
+	_name_popup_faces.add_theme_constant_override("separation", 3)
 	_name_popup_faces.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	popup_margin.add_child(_name_popup_faces)
+	_name_popup.add_child(_name_popup_faces)
 
 	# Signals
 	body_entered.connect(_on_body_entered)
@@ -712,6 +707,11 @@ static func face_type_color(ft: DiceFaceData.FaceType) -> Color:
 	return _UITheme.MUTED_TEXT
 
 
+const POPUP_SQUARE_SIZE: float = 32.0
+const POPUP_PADDING: float = 4.0
+const POPUP_SPACING: float = 3.0
+
+
 func _build_face_squares() -> void:
 	if _name_popup_faces == null or die_data == null:
 		return
@@ -721,11 +721,7 @@ func _build_face_squares() -> void:
 	var face_count: int = die_data.faces.size()
 	if face_count == 0:
 		return
-	# Compute square size to fit within popup width with margins + spacing.
-	var margin_h: float = 8.0  # 4px left + 4px right
-	var spacing: float = 4.0
-	var total_spacing: float = spacing * maxf(0.0, face_count - 1)
-	var sq_size: float = minf(26.0, (_name_popup.size.x - margin_h - total_spacing) / face_count)
+	var sq_size: float = POPUP_SQUARE_SIZE
 	for face: DiceFaceData in die_data.faces:
 		var sq: ColorRect = ColorRect.new()
 		sq.custom_minimum_size = Vector2(sq_size, sq_size)
@@ -740,13 +736,16 @@ func _build_face_squares() -> void:
 		face_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		face_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		face_lbl.add_theme_font_override("font", _UITheme.font_mono())
-		face_lbl.add_theme_font_size_override("font_size", maxi(7, int(sq_size * 0.55)))
+		face_lbl.add_theme_font_size_override("font_size", maxi(9, int(sq_size * 0.5)))
 		face_lbl.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 0.85))
 		face_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sq.add_child(face_lbl)
-	# Resize popup height to fit squares with margin padding.
-	var margin_v: float = 6.0  # 3px top + 3px bottom
-	_name_popup.size.y = sq_size + margin_v
+	# Size popup to exactly fit the squares with padding on each side.
+	var total_spacing: float = POPUP_SPACING * maxf(0.0, face_count - 1)
+	_name_popup.size = Vector2(
+		sq_size * face_count + total_spacing + POPUP_PADDING * 2.0,
+		sq_size + POPUP_PADDING * 2.0
+	)
 	_name_popup.pivot_offset = _name_popup.size * 0.5
 
 
