@@ -29,7 +29,6 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
 @onready var dice_arena: DiceArena = $MarginContainer/VBoxContainer/ArenaViewportContainer/ArenaViewport/DiceArena
-@onready var _arena_viewport_container: SubViewportContainer = $MarginContainer/VBoxContainer/ArenaViewportContainer
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
@@ -99,7 +98,7 @@ func _ready() -> void:
 	add_child(_streak_display)
 	_screen_shake = ScreenShakeScript.new()
 	add_child(_screen_shake)
-	_screen_shake.setup(_arena_viewport_container)
+	_screen_shake.setup(_roll_content)
 	_screen_overlay = ScreenOverlayScript.new()
 	add_child(_screen_overlay)
 	_add_button_micro_tween(roll_button)
