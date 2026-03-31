@@ -83,6 +83,11 @@ func _ready() -> void:
 	highscore_label.text = "HI: %d" % SaveManager.highscore
 
 
+func set_top_bar_visible(show_top_bar: bool) -> void:
+	if _top_bar:
+		_top_bar.visible = show_top_bar
+
+
 # ---------------------------------------------------------------------------
 # Theme Styling
 # ---------------------------------------------------------------------------

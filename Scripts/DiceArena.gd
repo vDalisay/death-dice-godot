@@ -39,6 +39,9 @@ const THROW_STAGGER_SWEEP: float = 0.85
 const THROW_STAGGER_SPAWN_SWEEP_X: float = 52.0
 const THROW_STAGGER_TARGET_SWEEP_X: float = 116.0
 const THROW_STAGGER_MAGNITUDE_VARIANCE: float = 0.12
+const SPAWN_SPACING_MULT: float = 2.2
+const SPAWN_ROW_SPACING_MULT: float = 2.1
+const SPAWN_EDGE_PADDING: float = 8.0
 const BOUNDARY_GLOW_HIT_GAIN: float = 0.22
 const BOUNDARY_GLOW_DECAY_PER_SEC: float = 2.1
 const CONTAINMENT_MIN_BOUNCE_SPEED: float = 90.0
@@ -73,6 +76,10 @@ var instant_mode: bool = false
 func _ready() -> void:
 	_build_background()
 	_build_walls()
+	_update_centering()
+	var viewport: Viewport = get_viewport()
+	if viewport and not viewport.size_changed.is_connected(_update_centering):
+		viewport.size_changed.connect(_update_centering)
 
 
 func _physics_process(_delta: float) -> void:
@@ -98,6 +105,7 @@ func _physics_process(_delta: float) -> void:
 
 func throw_dice(pool: Array[DiceData]) -> void:
 	_clear_dice()
+	var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, pool.size())
 	for i: int in pool.size():
 		var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
 		add_child(die)
@@ -108,9 +116,8 @@ func throw_dice(pool: Array[DiceData]) -> void:
 		die.toggled_keep.connect(_on_die_toggled)
 		die.collision_rerolled.connect(_on_die_collision_rerolled)
 
-		# Spawn at the default origin (items can override per-die in the future)
-		var spawn_pos: Vector2 = _spawn_position_for_origin(default_spawn_origin)
-		die.global_position = spawn_pos
+		# Spawn with spread to avoid overlap bursts at high dice counts.
+		die.position = spawn_positions[i]
 
 		# Roll the die face
 		var face: DiceFaceData = pool[i].roll()
@@ -121,6 +128,8 @@ func throw_dice(pool: Array[DiceData]) -> void:
 
 
 func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
+	var reroll_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, indices.size())
+	var reroll_slot: int = 0
 	for i: int in indices:
 		if i < 0 or i >= _dice.size():
 			continue
@@ -138,7 +147,8 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 		else:
 			# Move to spawn origin and re-throw
 			var origin: SpawnOrigin = default_spawn_origin
-			die.global_position = _spawn_position_for_origin(origin)
+			die.position = reroll_positions[reroll_slot]
+			reroll_slot += 1
 			die.physics_state = PhysicsDie.DiePhysicsState.FLYING
 			die.freeze = false
 			die._settle_timer = 0.0
@@ -151,7 +161,7 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 				if not is_instance_valid(die) or die.freeze:
 					return
 				die.play_launch_burst()
-				var direction: Vector2 = (target - die.global_position).normalized()
+				var direction: Vector2 = (target - die.position).normalized()
 				var spread: float = randf_range(-0.4, 0.4)
 				direction = direction.rotated(spread)
 				die.apply_central_impulse(direction * magnitude)
@@ -267,13 +277,13 @@ func _launch_die(
 	launch_total: int = 1
 ) -> void:
 	var stagger_unit: float = _stagger_unit(launch_index, launch_total)
-	die.global_position += Vector2(stagger_unit * THROW_STAGGER_SPAWN_SWEEP_X, 0.0)
+	die.position += Vector2(stagger_unit * THROW_STAGGER_SPAWN_SWEEP_X, 0.0)
 	die.tumble(die.current_face)
 	die.play_launch_burst()
 	# Impulse away from spawn origin toward arena interior
 	var target: Vector2 = _throw_target_for_origin(origin)
 	target.x += stagger_unit * THROW_STAGGER_TARGET_SWEEP_X
-	var direction: Vector2 = (target - die.global_position).normalized()
+	var direction: Vector2 = (target - die.position).normalized()
 	# Add some random spread
 	var spread: float = randf_range(-0.4, 0.4)
 	direction = direction.rotated(spread)
@@ -323,6 +333,45 @@ func _spawn_position_for_origin(origin: SpawnOrigin) -> Vector2:
 		SpawnOrigin.TOP:
 			return Vector2(cx + jitter_x, margin + jitter_y)
 	return Vector2(cx + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
+
+
+func _build_spawn_positions(origin: SpawnOrigin, count: int) -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	if count <= 0:
+		return positions
+
+	var anchor: Vector2 = _spawn_position_for_origin(origin)
+	var radius: float = PhysicsDie.COLLISION_RADIUS
+	var min_x: float = WALL_THICKNESS + radius + SPAWN_EDGE_PADDING
+	var max_x: float = ARENA_WIDTH - WALL_THICKNESS - radius - SPAWN_EDGE_PADDING
+	var usable_width: float = maxf(0.0, max_x - min_x)
+	var spacing: float = maxf(radius * SPAWN_SPACING_MULT, 1.0)
+	var max_per_row: int = maxi(1, int(floor(usable_width / spacing)) + 1)
+	var row_count: int = maxi(1, int(ceil(float(count) / float(max_per_row))))
+	var row_spacing: float = radius * SPAWN_ROW_SPACING_MULT
+
+	var remaining: int = count
+	for row_index: int in row_count:
+		var rows_left: int = row_count - row_index
+		var in_row: int = int(ceil(float(remaining) / float(rows_left)))
+		remaining -= in_row
+		var total_span: float = float(maxi(0, in_row - 1)) * spacing
+		var start_x: float = anchor.x - total_span * 0.5
+		var row_y: float = anchor.y - row_index * row_spacing
+		for col: int in in_row:
+			var x: float = clampf(start_x + float(col) * spacing, min_x, max_x)
+			var y: float = clampf(row_y, WALL_THICKNESS + radius + SPAWN_EDGE_PADDING, ARENA_HEIGHT - WALL_THICKNESS - radius - SPAWN_EDGE_PADDING)
+			positions.append(Vector2(x, y))
+
+	return positions
+
+
+func _update_centering() -> void:
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return
+	var viewport_size: Vector2 = Vector2(viewport.size)
+	position = (viewport_size - Vector2(ARENA_WIDTH, ARENA_HEIGHT)) * 0.5
 
 
 ## Returns a target point for the throw impulse based on spawn origin.
@@ -434,7 +483,7 @@ func _enforce_arena_containment() -> void:
 	for die: PhysicsDie in _dice:
 		if die == null or die.freeze:
 			continue
-		var p: Vector2 = die.global_position
+		var p: Vector2 = die.position
 		var corrected: bool = false
 		if p.x < min_x:
 			p.x = min_x
@@ -453,7 +502,7 @@ func _enforce_arena_containment() -> void:
 			die.linear_velocity.y = -maxf(absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
 			corrected = true
 		if corrected:
-			die.global_position = p
+			die.position = p
 			var inward: Vector2 = (Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT * 0.5) - p).normalized()
 			if inward != Vector2.ZERO:
 				die.apply_central_impulse(inward * CONTAINMENT_INWARD_NUDGE)
@@ -479,7 +528,7 @@ func _apply_soft_separation() -> void:
 				continue
 			if b.linear_velocity.length() > SOFT_SEPARATION_MAX_SPEED:
 				continue
-			var delta_pos: Vector2 = a.global_position - b.global_position
+			var delta_pos: Vector2 = a.position - b.position
 			var dist_sq: float = delta_pos.length_squared()
 			if dist_sq <= 0.0001 or dist_sq >= min_distance_sq:
 				continue

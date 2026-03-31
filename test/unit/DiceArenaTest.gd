@@ -97,3 +97,24 @@ func test_constants_are_sensible() -> void:
 	assert_float(DiceArena.SOFT_SEPARATION_RADIUS_MULT).is_greater(1.0)
 	assert_float(DiceArena.SOFT_SEPARATION_MAX_SPEED).is_greater(0.0)
 	assert_float(DiceArena.SOFT_SEPARATION_PUSH).is_greater(0.0)
+
+
+func test_arena_centers_in_viewport() -> void:
+	_arena._update_centering()
+	var viewport_size: Vector2 = Vector2(_arena.get_viewport().size)
+	var expected: Vector2 = (viewport_size - Vector2(DiceArena.ARENA_WIDTH, DiceArena.ARENA_HEIGHT)) * 0.5
+	assert_float(_arena.position.x).is_equal(expected.x)
+	assert_float(_arena.position.y).is_equal(expected.y)
+
+
+func test_throw_dice_spread_avoids_overlap() -> void:
+	var pool: Array[DiceData] = []
+	for _i: int in 18:
+		pool.append(DiceData.make_standard_d6())
+	_arena.throw_dice(pool)
+	var min_allowed: float = PhysicsDie.COLLISION_RADIUS * 2.0
+	for i: int in _arena.get_die_count():
+		var a: PhysicsDie = _arena.get_die(i)
+		for j: int in range(i + 1, _arena.get_die_count()):
+			var b: PhysicsDie = _arena.get_die(j)
+			assert_float(a.position.distance_to(b.position)).is_greater_equal(min_allowed)
