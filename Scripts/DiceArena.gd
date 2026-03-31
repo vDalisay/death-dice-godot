@@ -52,12 +52,35 @@ const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
 
+# Cone Volley throw parameters
+const CONE_HALF_ANGLE_DEG: float = 13.0
+const CONE_CADENCE_START: float = 0.04
+const CONE_CADENCE_END_SMALL: float = 0.025
+const CONE_CADENCE_END_LARGE: float = 0.008
+const CONE_POOL_LARGE_THRESHOLD: int = 12
+const CONE_IMPULSE_MIN: float = 1500.0
+const CONE_IMPULSE_MAX: float = 2500.0
+const CONE_LATE_IMPULSE_BIAS: float = 0.1
+const CONE_SPAWN_JITTER_X: float = 18.0
+const CONE_SPAWN_JITTER_Y: float = 10.0
+const CONE_AIRBORNE_SOFT_CAP: int = 9
+const CONE_AIRBORNE_STRETCH: float = 1.6
+const CONE_MICRO_BURST_SIZE: int = 2
+const CONE_MICRO_BURST_DELAY: float = 0.012
+const CONE_MICRO_BURST_CHANCE_MEDIUM: float = 0.25
+const CONE_MICRO_BURST_CHANCE_LARGE: float = 0.35
+
 ## Spawn origin presets for dice throwing.
-## Items can override per-die spawn origins in the future.
 enum SpawnOrigin { CENTER_BOTTOM, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, CENTER_TOP }
+
+## Throw pattern for initial rolls.
+enum ThrowPattern { SPREAD, CONE_VOLLEY }
 
 ## Default spawn origin for all dice.
 var default_spawn_origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM
+
+## Throw pattern used for initial rolls. Rerolls always use SPREAD.
+var throw_pattern: ThrowPattern = ThrowPattern.CONE_VOLLEY
 
 # ---------------------------------------------------------------------------
 # State
@@ -68,6 +91,7 @@ var _settle_check_active: bool = false
 var _bg_panel: Panel = null
 var _bg_style: StyleBoxFlat = null
 var _boundary_glow_energy: float = 0.0
+var _airborne_count: int = 0
 ## When true, dice settle instantly (no physics). Set by tests.
 var instant_mode: bool = false
 
@@ -107,7 +131,9 @@ func _physics_process(_delta: float) -> void:
 
 func throw_dice(pool: Array[DiceData]) -> void:
 	_clear_dice()
-	var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, pool.size())
+	var use_cone: bool = throw_pattern == ThrowPattern.CONE_VOLLEY and not instant_mode
+	var spawn_positions: Array[Vector2] = [] as Array[Vector2] if use_cone else _build_spawn_positions(default_spawn_origin, pool.size())
+	var emitter: Vector2 = _cone_emitter_position() if use_cone else Vector2.ZERO
 	for i: int in pool.size():
 		var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
 		add_child(die)
@@ -119,8 +145,13 @@ func throw_dice(pool: Array[DiceData]) -> void:
 		die.shift_toggled_keep.connect(_on_die_shift_toggled)
 		die.collision_rerolled.connect(_on_die_collision_rerolled)
 
-		# Spawn with spread to avoid overlap bursts at high dice counts.
-		die.position = spawn_positions[i]
+		if use_cone:
+			# All dice start hidden at emitter; _launch_die_cone sets final spawn.
+			die.position = emitter
+			die.visible = false
+		else:
+			# Spawn with spread to avoid overlap bursts at high dice counts.
+			die.position = spawn_positions[i]
 
 		# Roll the die face
 		var face: DiceFaceData = pool[i].roll()
@@ -264,15 +295,109 @@ func _stagger_throw() -> void:
 		return
 
 	_settle_check_active = true
+	if throw_pattern == ThrowPattern.CONE_VOLLEY:
+		_stagger_throw_cone_volley()
+	else:
+		_stagger_throw_spread()
+
+
+func _stagger_throw_spread() -> void:
 	for i: int in _dice.size():
 		var die: PhysicsDie = _dice[i]
-		# Stagger: use a timer callback
 		if i == 0:
 			_launch_die(die, default_spawn_origin, i, _dice.size())
 		else:
 			var delay: float = THROW_STAGGER_DELAY * i + randf_range(0.0, THROW_STAGGER_RANDOM_MAX)
 			var timer: SceneTreeTimer = get_tree().create_timer(delay)
 			timer.timeout.connect(_launch_die.bind(die, default_spawn_origin, i, _dice.size()))
+
+
+func _stagger_throw_cone_volley() -> void:
+	_airborne_count = 0
+	var pool_size: int = _dice.size()
+	var emitter: Vector2 = _cone_emitter_position()
+	var elapsed: float = 0.0
+	var i: int = 0
+	while i < pool_size:
+		var is_burst: bool = _should_micro_burst(i, pool_size)
+		var burst_count: int = CONE_MICRO_BURST_SIZE if is_burst else 1
+		burst_count = mini(burst_count, pool_size - i)
+		for b: int in burst_count:
+			var die_index: int = i + b
+			var die: PhysicsDie = _dice[die_index]
+			var launch_delay: float = elapsed + float(b) * CONE_MICRO_BURST_DELAY
+			if die_index == 0 and b == 0:
+				_launch_die_cone(die, emitter, die_index, pool_size)
+			else:
+				var captured_emitter: Vector2 = emitter
+				var captured_index: int = die_index
+				var captured_total: int = pool_size
+				get_tree().create_timer(launch_delay).timeout.connect(
+					func() -> void:
+						if is_instance_valid(die):
+							_launch_die_cone(die, captured_emitter, captured_index, captured_total)
+				)
+		i += burst_count
+		var cadence: float = _cone_cadence(i - 1, pool_size)
+		# Soft airborne cap: stretch delay when too many dice are flying.
+		if _airborne_count >= CONE_AIRBORNE_SOFT_CAP:
+			cadence *= CONE_AIRBORNE_STRETCH
+		elapsed += cadence
+
+
+func _launch_die_cone(
+	die: PhysicsDie,
+	emitter: Vector2,
+	launch_index: int,
+	total: int,
+) -> void:
+	_airborne_count += 1
+	die.visible = true
+	# Jittered spawn position.
+	die.position = emitter + Vector2(
+		randf_range(-CONE_SPAWN_JITTER_X, CONE_SPAWN_JITTER_X),
+		randf_range(-CONE_SPAWN_JITTER_Y, CONE_SPAWN_JITTER_Y))
+	die.tumble(die.current_face)
+	die.play_launch_burst()
+	# Cone-aimed impulse.
+	var base_dir: Vector2 = Vector2.UP
+	var half_angle: float = deg_to_rad(CONE_HALF_ANGLE_DEG)
+	var angle_offset: float = randf_range(-half_angle, half_angle)
+	var direction: Vector2 = base_dir.rotated(angle_offset)
+	# Late-shot impulse bias so back-half dice penetrate the pile.
+	var progress: float = float(launch_index) / float(maxi(total - 1, 1))
+	var bias: float = 1.0 + progress * CONE_LATE_IMPULSE_BIAS
+	var magnitude: float = randf_range(CONE_IMPULSE_MIN, CONE_IMPULSE_MAX) * bias
+	die.apply_central_impulse(direction * magnitude)
+	die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
+	SFXManager.play_roll()
+	# Track when die settles to decrement airborne count.
+	die.settled.connect(func() -> void: _airborne_count = maxi(0, _airborne_count - 1), CONNECT_ONE_SHOT)
+
+
+## Cadence accelerates over the launch sequence.
+func _cone_cadence(launch_index: int, total: int) -> float:
+	var progress: float = float(launch_index) / float(maxi(total - 1, 1))
+	var cadence_end: float = CONE_CADENCE_END_SMALL
+	if total >= CONE_POOL_LARGE_THRESHOLD:
+		cadence_end = CONE_CADENCE_END_LARGE
+	return lerpf(CONE_CADENCE_START, cadence_end, progress)
+
+
+## Emitter: lower center of the arena.
+func _cone_emitter_position() -> Vector2:
+	return Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT - SPAWN_MARGIN - BOTTOM_SPAWN_LIFT)
+
+
+## Decide whether this launch index should fire a micro-burst.
+func _should_micro_burst(index: int, total: int) -> bool:
+	if index == 0:
+		return false  # First die always solo.
+	if total <= 8:
+		return false  # Small pools: all singles.
+	if total <= 16:
+		return randf() < CONE_MICRO_BURST_CHANCE_MEDIUM
+	return randf() < CONE_MICRO_BURST_CHANCE_LARGE
 
 
 func _launch_die(
