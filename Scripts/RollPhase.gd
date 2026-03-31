@@ -175,6 +175,7 @@ func _on_bank_pressed() -> void:
 		SFXManager.play_jackpot()
 		if _screen_overlay and _screen_overlay.has_method("flash_jackpot"):
 			_screen_overlay.flash_jackpot()
+		_spawn_jackpot_confetti()
 		hud.show_status("JACKPOT! +%dg bonus!" % jackpot_gold, Color(1.0, 0.85, 0.0))
 	var mult: int = _get_turn_multiplier()
 	var status_parts: Array[String] = []
@@ -960,6 +961,38 @@ func _get_per_die_scores() -> Array[int]:
 # ---------------------------------------------------------------------------
 # Juice overlays
 # ---------------------------------------------------------------------------
+
+const JACKPOT_CONFETTI_AMOUNT: int = 80
+const JACKPOT_CONFETTI_LIFETIME: float = 1.8
+
+
+func _spawn_jackpot_confetti() -> void:
+	var confetti := CPUParticles2D.new()
+	confetti.one_shot = true
+	confetti.amount = JACKPOT_CONFETTI_AMOUNT
+	confetti.lifetime = JACKPOT_CONFETTI_LIFETIME
+	confetti.explosiveness = 0.9
+	confetti.direction = Vector2(0, -1)
+	confetti.spread = 100.0
+	confetti.gravity = Vector2(0, 400)
+	confetti.initial_velocity_min = 200.0
+	confetti.initial_velocity_max = 500.0
+	confetti.scale_amount_min = 2.0
+	confetti.scale_amount_max = 5.0
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1.0, 0.85, 0.0))
+	gradient.add_point(0.33, Color(1.0, 0.65, 0.0))
+	gradient.add_point(0.66, Color(1.0, 1.0, 0.4))
+	gradient.set_color(1, Color(1.0, 0.85, 0.0, 0.0))
+	confetti.color_ramp = gradient
+	confetti.position = Vector2(size.x / 2.0, size.y * 0.3)
+	add_child(confetti)
+	confetti.emitting = true
+	get_tree().create_timer(JACKPOT_CONFETTI_LIFETIME + 0.5).timeout.connect(func() -> void:
+		if is_instance_valid(confetti):
+			confetti.queue_free()
+	)
+
 
 func _show_bust_overlay(effective_stops: int) -> void:
 	_shake_screen(SHAKE_BUST, 0.4)

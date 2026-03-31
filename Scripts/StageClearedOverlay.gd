@@ -7,6 +7,9 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const BACKDROP_ALPHA: float = 0.72
 const COUNT_DURATION: float = 0.45
+const SPARKLE_DELAY: float = 0.4
+const SPARKLE_AMOUNT: int = 50
+const SPARKLE_LIFETIME: float = 1.6
 
 @onready var _confetti: CPUParticles2D = $Confetti
 @onready var _card: PanelContainer = $CenterContainer/Card
@@ -72,6 +75,7 @@ func setup(bonus_gold: int, surplus: int, is_loop: bool) -> void:
 
 	_confetti.emitting = false
 	_confetti.emitting = true
+	_spawn_sparkle_wave()
 
 	var tween: Tween = create_tween()
 	tween.tween_property(self, "color:a", BACKDROP_ALPHA, 0.22)
@@ -114,3 +118,33 @@ func _on_proceed_pressed() -> void:
 	if _button_pulse_tween != null and _button_pulse_tween.is_valid():
 		_button_pulse_tween.kill()
 	proceed_requested.emit()
+
+
+func _spawn_sparkle_wave() -> void:
+	get_tree().create_timer(SPARKLE_DELAY).timeout.connect(func() -> void:
+		var sparkle := CPUParticles2D.new()
+		sparkle.one_shot = true
+		sparkle.amount = SPARKLE_AMOUNT
+		sparkle.lifetime = SPARKLE_LIFETIME
+		sparkle.explosiveness = 0.92
+		sparkle.direction = Vector2(0, -1)
+		sparkle.spread = 160.0
+		sparkle.gravity = Vector2(0, 120)
+		sparkle.initial_velocity_min = 100.0
+		sparkle.initial_velocity_max = 350.0
+		sparkle.scale_amount_min = 1.0
+		sparkle.scale_amount_max = 3.0
+		sparkle.color = Color(1.0, 1.0, 1.0, 0.7)
+		var gradient := Gradient.new()
+		gradient.set_color(0, _UITheme.SCORE_GOLD)
+		gradient.add_point(0.5, Color(1.0, 1.0, 1.0, 0.8))
+		gradient.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+		sparkle.color_ramp = gradient
+		sparkle.position = Vector2(size.x / 2.0, size.y * 0.3)
+		add_child(sparkle)
+		sparkle.emitting = true
+		get_tree().create_timer(SPARKLE_LIFETIME + 0.5).timeout.connect(func() -> void:
+			if is_instance_valid(sparkle):
+				sparkle.queue_free()
+		)
+	)
