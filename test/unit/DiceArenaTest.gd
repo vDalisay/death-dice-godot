@@ -118,10 +118,10 @@ func test_cone_cadence_accelerates() -> void:
 	assert_float(mid).is_greater(last)
 
 
-func test_cone_emitter_is_lower_center() -> void:
+func test_cone_emitter_is_below_arena() -> void:
 	var emitter: Vector2 = _arena._cone_emitter_position()
 	assert_float(emitter.x).is_equal_approx(DiceArena.ARENA_WIDTH * 0.5, 1.0)
-	assert_float(emitter.y).is_greater(DiceArena.ARENA_HEIGHT * 0.5)
+	assert_float(emitter.y).is_greater(DiceArena.ARENA_HEIGHT)
 
 
 func test_micro_burst_never_on_first_die() -> void:

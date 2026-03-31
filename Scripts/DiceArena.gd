@@ -53,7 +53,7 @@ const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
 
 # Cone Volley throw parameters
-const CONE_HALF_ANGLE_DEG: float = 13.0
+const CONE_HALF_ANGLE_DEG: float = 25.0
 const CONE_CADENCE_START: float = 0.04
 const CONE_CADENCE_END_SMALL: float = 0.025
 const CONE_CADENCE_END_LARGE: float = 0.008
@@ -61,8 +61,8 @@ const CONE_POOL_LARGE_THRESHOLD: int = 12
 const CONE_IMPULSE_MIN: float = 1500.0
 const CONE_IMPULSE_MAX: float = 2500.0
 const CONE_LATE_IMPULSE_BIAS: float = 0.1
-const CONE_SPAWN_JITTER_X: float = 18.0
-const CONE_SPAWN_JITTER_Y: float = 10.0
+const CONE_SPAWN_JITTER_X: float = 8.0
+const CONE_SPAWN_JITTER_Y: float = 4.0
 const CONE_AIRBORNE_SOFT_CAP: int = 9
 const CONE_AIRBORNE_STRETCH: float = 1.6
 const CONE_MICRO_BURST_SIZE: int = 2
@@ -162,8 +162,11 @@ func throw_dice(pool: Array[DiceData]) -> void:
 
 
 func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
-	var reroll_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, indices.size())
+	var use_cone: bool = throw_pattern == ThrowPattern.CONE_VOLLEY and not instant_mode
+	var reroll_positions: Array[Vector2] = [] as Array[Vector2] if use_cone else _build_spawn_positions(default_spawn_origin, indices.size())
+	var emitter: Vector2 = _cone_emitter_position() if use_cone else Vector2.ZERO
 	var reroll_slot: int = 0
+	var cone_dice: Array[PhysicsDie] = []
 	for i: int in indices:
 		if i < 0 or i >= _dice.size():
 			continue
@@ -180,6 +183,13 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			die.show_face(face)
 			die.freeze = true
 			die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+		elif use_cone:
+			die.position = emitter
+			die.visible = false
+			die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+			die.freeze = false
+			die._settle_timer = 0.0
+			cone_dice.append(die)
 		else:
 			# Move to spawn origin and re-throw
 			var origin: SpawnOrigin = default_spawn_origin
@@ -208,6 +218,8 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 		all_dice_settled.emit()
 	else:
 		_settle_check_active = true
+		if use_cone and cone_dice.size() > 0:
+			_stagger_reroll_cone(cone_dice)
 
 
 func lock_die(index: int) -> void:
@@ -345,6 +357,38 @@ func _stagger_throw_cone_volley() -> void:
 		elapsed += cadence
 
 
+## Reroll-specific cone volley: same cadence as initial throw.
+func _stagger_reroll_cone(dice_to_launch: Array[PhysicsDie]) -> void:
+	var pool_size: int = dice_to_launch.size()
+	var emitter: Vector2 = _cone_emitter_position()
+	var elapsed: float = 0.0
+	var i: int = 0
+	while i < pool_size:
+		var is_burst: bool = _should_micro_burst(i, pool_size)
+		var burst_count: int = CONE_MICRO_BURST_SIZE if is_burst else 1
+		burst_count = mini(burst_count, pool_size - i)
+		for b: int in burst_count:
+			var slot: int = i + b
+			var die: PhysicsDie = dice_to_launch[slot]
+			var launch_delay: float = elapsed + float(b) * CONE_MICRO_BURST_DELAY
+			if slot == 0 and b == 0:
+				_launch_die_cone(die, emitter, slot, pool_size)
+			else:
+				var cap_emitter: Vector2 = emitter
+				var cap_slot: int = slot
+				var cap_total: int = pool_size
+				get_tree().create_timer(launch_delay).timeout.connect(
+					func() -> void:
+						if is_instance_valid(die):
+							_launch_die_cone(die, cap_emitter, cap_slot, cap_total)
+				)
+		i += burst_count
+		var cadence: float = _cone_cadence(i - 1, pool_size)
+		if _airborne_count >= CONE_AIRBORNE_SOFT_CAP:
+			cadence *= CONE_AIRBORNE_STRETCH
+		elapsed += cadence
+
+
 func _launch_die_cone(
 	die: PhysicsDie,
 	emitter: Vector2,
@@ -353,6 +397,7 @@ func _launch_die_cone(
 ) -> void:
 	_airborne_count += 1
 	die.visible = true
+	die._launch_grace_timer = PhysicsDie.LAUNCH_GRACE_DURATION
 	# Jittered spawn position.
 	die.position = emitter + Vector2(
 		randf_range(-CONE_SPAWN_JITTER_X, CONE_SPAWN_JITTER_X),
@@ -384,9 +429,9 @@ func _cone_cadence(launch_index: int, total: int) -> float:
 	return lerpf(CONE_CADENCE_START, cadence_end, progress)
 
 
-## Emitter: lower center of the arena.
+## Emitter: below the bottom edge of the arena so dice shoot up onto the tray.
 func _cone_emitter_position() -> Vector2:
-	return Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT - SPAWN_MARGIN - BOTTOM_SPAWN_LIFT)
+	return Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT + 40.0)
 
 
 ## Decide whether this launch index should fire a micro-burst.
