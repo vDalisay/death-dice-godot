@@ -33,6 +33,7 @@ const THROW_STAGGER_DELAY: float = 0.03
 const SPAWN_MARGIN: float = 80.0
 const BOTTOM_SPAWN_LIFT: float = 92.0
 const CONTAINMENT_BOUNCE_DAMP: float = 0.45
+const WALL_BOUNCE_DAMPEN_FACTOR: float = 0.6
 const REROLL_LIFT_DELAY: float = 0.06
 const REROLL_LIFT_RANDOM_MAX: float = 0.03
 const THROW_STAGGER_RANDOM_MAX: float = 0.02
@@ -138,6 +139,7 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 		var die: PhysicsDie = _dice[i]
 		die.is_stopped = false
 		die._bump_count = 0
+		die._wall_bounce_count = 0
 
 		# Roll new face
 		var face: DiceFaceData = pool[i].roll()
@@ -492,23 +494,27 @@ func _enforce_arena_containment() -> void:
 			continue
 		var p: Vector2 = die.position
 		var corrected: bool = false
+		var wall_dampen: float = pow(WALL_BOUNCE_DAMPEN_FACTOR, mini(die._wall_bounce_count, 10))
+		var effective_min_speed: float = CONTAINMENT_MIN_BOUNCE_SPEED * wall_dampen
+		var effective_damp: float = CONTAINMENT_BOUNCE_DAMP * wall_dampen
 		if p.x < min_x:
 			p.x = min_x
-			die.linear_velocity.x = maxf(absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
+			die.linear_velocity.x = maxf(absf(die.linear_velocity.x) * effective_damp, effective_min_speed)
 			corrected = true
 		elif p.x > max_x:
 			p.x = max_x
-			die.linear_velocity.x = -maxf(absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
+			die.linear_velocity.x = -maxf(absf(die.linear_velocity.x) * effective_damp, effective_min_speed)
 			corrected = true
 		if p.y < min_y:
 			p.y = min_y
-			die.linear_velocity.y = maxf(absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
+			die.linear_velocity.y = maxf(absf(die.linear_velocity.y) * effective_damp, effective_min_speed)
 			corrected = true
 		elif p.y > max_y:
 			p.y = max_y
-			die.linear_velocity.y = -maxf(absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
+			die.linear_velocity.y = -maxf(absf(die.linear_velocity.y) * effective_damp, effective_min_speed)
 			corrected = true
 		if corrected:
+			die._wall_bounce_count += 1
 			die.position = p
 			var inward: Vector2 = (Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT * 0.5) - p).normalized()
 			if inward != Vector2.ZERO:

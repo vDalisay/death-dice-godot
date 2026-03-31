@@ -62,6 +62,10 @@ const LANDING_SLAM_DURATION_MAX_FACTOR: float = 1.25
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
+const TUMBLE_MIN_INTERVAL: float = 0.04
+const TUMBLE_MAX_INTERVAL: float = 0.3
+const TUMBLE_SPEED_FAST: float = 400.0
+const TUMBLE_SPEED_SLOW: float = 20.0
 const POP_SCALE: float = 1.15
 const POP_DURATION: float = 0.2
 const HOVER_SCALE: float = 1.08
@@ -116,6 +120,9 @@ var _settle_timer: float = 0.0
 var _jitter_timer: float = 0.0
 var _collision_cooldowns: Dictionary = {}  # body_rid -> float
 var _bump_count: int = 0
+var _wall_bounce_count: int = 0
+var _tumble_timer: float = 0.0
+var _pending_face: DiceFaceData = null
 var _tumble_tween: Tween = null
 var _scale_tween: Tween = null
 var _glow_tween: Tween = null
@@ -147,7 +154,7 @@ func _ready() -> void:
 	contact_monitor = true
 	max_contacts_reported = 4
 	physics_material_override = PhysicsMaterial.new()
-	physics_material_override.bounce = 0.475
+	physics_material_override.bounce = 0.65
 	physics_material_override.friction = 0.4
 
 	# Collision shape
@@ -243,7 +250,10 @@ func setup(index: int, data: DiceData) -> void:
 	physics_state = DiePhysicsState.FLYING
 	_peak_speed_since_launch = 0.0
 	_bump_count = 0
+	_wall_bounce_count = 0
 	_jitter_timer = 0.0
+	_tumble_timer = 0.0
+	_pending_face = null
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
 	_build_face_squares()
 	_update_name_popup_position()
@@ -282,12 +292,9 @@ func set_physics_state(new_state: DiePhysicsState) -> void:
 func tumble(final_face: DiceFaceData) -> void:
 	if _tumble_tween and _tumble_tween.is_valid():
 		_tumble_tween.kill()
-	_tumble_tween = create_tween()
-	var interval: float = TUMBLE_DURATION / TUMBLE_TICKS
-	for tick: int in TUMBLE_TICKS:
-		_tumble_tween.tween_callback(_set_random_glyph).set_delay(interval)
-	_tumble_tween.tween_callback(show_face.bind(final_face))
-	_tumble_tween.tween_callback(pop)
+	_pending_face = final_face
+	_tumble_timer = 0.0
+	_set_random_glyph()
 
 
 func pop() -> void:
@@ -499,9 +506,18 @@ func _physics_process(delta: float) -> void:
 		_peak_speed_since_launch = maxf(_peak_speed_since_launch, speed)
 		if speed >= SETTLE_VELOCITY_THRESHOLD:
 			_last_motion_velocity = linear_velocity
+		# Continuous face cycling while moving.
+		if _pending_face and speed >= SETTLE_VELOCITY_THRESHOLD:
+			var t: float = clampf((speed - TUMBLE_SPEED_SLOW) / (TUMBLE_SPEED_FAST - TUMBLE_SPEED_SLOW), 0.0, 1.0)
+			var interval: float = lerpf(TUMBLE_MAX_INTERVAL, TUMBLE_MIN_INTERVAL, t)
+			_tumble_timer += delta
+			if _tumble_timer >= interval:
+				_tumble_timer -= interval
+				_set_random_glyph()
 		if speed < SETTLE_VELOCITY_THRESHOLD:
 			_settle_timer += delta
 			if _settle_timer >= SETTLE_TIME_REQUIRED:
+				_resolve_pending_face()
 				physics_state = DiePhysicsState.SETTLED
 				freeze = true
 				_play_settle_accent(_peak_speed_since_launch)
@@ -514,6 +530,7 @@ func _physics_process(delta: float) -> void:
 			if _jitter_timer >= JITTER_FORCE_SETTLE_TIME:
 				linear_velocity = Vector2.ZERO
 				angular_velocity = 0.0
+				_resolve_pending_face()
 				physics_state = DiePhysicsState.SETTLED
 				freeze = true
 				_play_settle_accent(_peak_speed_since_launch)
@@ -823,6 +840,13 @@ func _apply_visual() -> void:
 func _set_random_glyph() -> void:
 	if _face_label:
 		_face_label.text = TUMBLE_GLYPHS[randi() % TUMBLE_GLYPHS.size()]
+
+
+func _resolve_pending_face() -> void:
+	if _pending_face:
+		show_face(_pending_face)
+		pop()
+		_pending_face = null
 
 
 func _play_settle_accent(peak_speed: float) -> void:

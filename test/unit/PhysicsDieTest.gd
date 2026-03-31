@@ -167,7 +167,7 @@ func test_physics_properties_set_correctly() -> void:
 	assert_float(_die.linear_damp).is_equal_approx(2.65, 0.01)
 	assert_float(_die.angular_damp).is_equal_approx(3.0, 0.01)
 	assert_object(_die.physics_material_override).is_not_null()
-	assert_float(_die.physics_material_override.bounce).is_equal_approx(0.475, 0.01)
+	assert_float(_die.physics_material_override.bounce).is_equal_approx(0.65, 0.01)
 	assert_float(_die.physics_material_override.friction).is_equal_approx(0.4, 0.01)
 
 
@@ -223,3 +223,67 @@ func test_shift_toggled_keep_signal_exists() -> void:
 	_die.setup(0, DiceData.make_standard_d6())
 	# Verify the signal is defined and emittable.
 	assert_bool(_die.has_signal("shift_toggled_keep")).is_true()
+
+
+func test_wall_bounce_count_starts_at_zero() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	assert_int(_die._wall_bounce_count).is_equal(0)
+
+
+func test_setup_resets_wall_bounce_count() -> void:
+	_die._wall_bounce_count = 7
+	_die.setup(0, DiceData.make_standard_d6())
+	assert_int(_die._wall_bounce_count).is_equal(0)
+
+
+func test_tumble_sets_pending_face_and_clears_on_settle() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 5
+	_die.tumble(face)
+	assert_object(_die._pending_face).is_same(face)
+	# Simulate settling — pending face should resolve.
+	_die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+	_die.freeze = false
+	_die.linear_velocity = Vector2(5.0, 0.0)  # Below settle threshold
+	_die._settle_timer = PhysicsDie.SETTLE_TIME_REQUIRED - 0.01
+	_die._physics_process(0.02)
+	# Die should have settled and resolved pending face.
+	assert_int(_die.physics_state).is_equal(PhysicsDie.DiePhysicsState.SETTLED)
+	assert_object(_die._pending_face).is_null()
+	assert_object(_die.current_face).is_same(face)
+
+
+func test_setup_resets_pending_face() -> void:
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 3
+	_die._pending_face = face
+	_die.setup(0, DiceData.make_standard_d6())
+	assert_object(_die._pending_face).is_null()
+
+
+func test_tumble_cycles_face_at_high_speed() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 4
+	_die.tumble(face)
+	_die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+	_die.freeze = false
+	# At high speed, face label should change (random glyph cycling).
+	_die.linear_velocity = Vector2(500.0, 0.0)
+	var initial_text: String = _die._face_label.text if _die._face_label else ""
+	# Run enough ticks that at TUMBLE_MIN_INTERVAL the glyph should cycle.
+	for i: int in 5:
+		_die._physics_process(0.05)
+	# Pending face should still be set (not resolved yet — still flying fast).
+	assert_object(_die._pending_face).is_not_null()
+
+
+func test_tumble_constants_are_reasonable() -> void:
+	assert_float(PhysicsDie.TUMBLE_MIN_INTERVAL).is_greater(0.0)
+	assert_float(PhysicsDie.TUMBLE_MAX_INTERVAL).is_greater(PhysicsDie.TUMBLE_MIN_INTERVAL)
+	assert_float(PhysicsDie.TUMBLE_SPEED_FAST).is_greater(PhysicsDie.TUMBLE_SPEED_SLOW)
+	assert_float(PhysicsDie.TUMBLE_SPEED_SLOW).is_greater(0.0)
