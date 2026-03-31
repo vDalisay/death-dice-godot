@@ -59,7 +59,6 @@ const LANDING_SLAM_CURVE_EXPONENT: float = 1.3
 const LANDING_SLAM_LATERAL_MAX_OFFSET_X: float = 3.0
 const LANDING_SLAM_DURATION_MIN_FACTOR: float = 0.8
 const LANDING_SLAM_DURATION_MAX_FACTOR: float = 1.25
-const LAUNCH_GRACE_DURATION: float = 0.25
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -132,7 +131,6 @@ var _popup_tween: Tween = null
 var _is_hovered: bool = false
 var _peak_speed_since_launch: float = 0.0
 var _last_motion_velocity: Vector2 = Vector2.ZERO
-var _launch_grace_timer: float = 0.0
 
 # ---------------------------------------------------------------------------
 # Visual nodes (created in _ready)
@@ -493,10 +491,6 @@ func _physics_process(delta: float) -> void:
 	if _name_popup:
 		_update_name_popup_position()
 
-	# Launch grace countdown (no die-die collisions right after launch).
-	if _launch_grace_timer > 0.0:
-		_launch_grace_timer = maxf(0.0, _launch_grace_timer - delta)
-
 	# Update collision cooldowns
 	var expired: Array[RID] = []
 	for rid: RID in _collision_cooldowns:
@@ -553,10 +547,6 @@ func _on_body_entered(other: Node) -> void:
 	if not other is PhysicsDie:
 		return
 	var other_die: PhysicsDie = other as PhysicsDie
-
-	# Skip die-die interaction during launch grace period.
-	if _launch_grace_timer > 0.0 or other_die._launch_grace_timer > 0.0:
-		return
 
 	# Add a small extra bump so collisions feel punchier.
 	var my_speed: float = linear_velocity.length()

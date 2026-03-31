@@ -99,57 +99,6 @@ func test_constants_are_sensible() -> void:
 	assert_float(DiceArena.SOFT_SEPARATION_PUSH).is_greater(0.0)
 
 
-func test_cone_volley_constants_are_sensible() -> void:
-	assert_float(DiceArena.CONE_HALF_ANGLE_DEG).is_greater(0.0)
-	assert_float(DiceArena.CONE_HALF_ANGLE_DEG).is_less(45.0)
-	assert_float(DiceArena.CONE_CADENCE_START).is_greater(DiceArena.CONE_CADENCE_END_SMALL)
-	assert_float(DiceArena.CONE_CADENCE_END_SMALL).is_greater(DiceArena.CONE_CADENCE_END_LARGE)
-	assert_float(DiceArena.CONE_IMPULSE_MAX).is_greater(DiceArena.CONE_IMPULSE_MIN)
-	assert_int(DiceArena.CONE_AIRBORNE_SOFT_CAP).is_greater(0)
-	assert_float(DiceArena.CONE_AIRBORNE_STRETCH).is_greater(1.0)
-	assert_int(DiceArena.CONE_MICRO_BURST_SIZE).is_greater_equal(2)
-
-
-func test_cone_cadence_accelerates() -> void:
-	var first: float = _arena._cone_cadence(0, 20)
-	var mid: float = _arena._cone_cadence(10, 20)
-	var last: float = _arena._cone_cadence(19, 20)
-	assert_float(first).is_greater(mid)
-	assert_float(mid).is_greater(last)
-
-
-func test_cone_emitter_is_below_arena() -> void:
-	var emitter: Vector2 = _arena._cone_emitter_position()
-	assert_float(emitter.x).is_equal_approx(DiceArena.ARENA_WIDTH * 0.5, 1.0)
-	assert_float(emitter.y).is_greater(DiceArena.ARENA_HEIGHT)
-
-
-func test_micro_burst_never_on_first_die() -> void:
-	## First die should always be solo regardless of pool size.
-	for _i: int in 50:
-		assert_bool(_arena._should_micro_burst(0, 30)).is_false()
-
-
-func test_micro_burst_never_for_small_pools() -> void:
-	## Pools <= 8 should never burst.
-	for _i: int in 50:
-		for idx: int in range(1, 8):
-			assert_bool(_arena._should_micro_burst(idx, 8)).is_false()
-
-
-func test_default_throw_pattern_is_cone_volley() -> void:
-	assert_int(_arena.throw_pattern).is_equal(DiceArena.ThrowPattern.CONE_VOLLEY)
-
-
-func test_cone_volley_creates_correct_die_count() -> void:
-	var pool: Array[DiceData] = []
-	for _i: int in 12:
-		pool.append(DiceData.make_standard_d6())
-	_arena.instant_mode = true
-	_arena.throw_dice(pool)
-	assert_int(_arena.get_die_count()).is_equal(12)
-
-
 func test_arena_centers_in_viewport() -> void:
 	_arena._update_centering()
 	var viewport_size: Vector2 = Vector2(_arena.get_viewport().size)
@@ -159,7 +108,6 @@ func test_arena_centers_in_viewport() -> void:
 
 
 func test_throw_dice_spread_avoids_overlap() -> void:
-	_arena.throw_pattern = DiceArena.ThrowPattern.SPREAD
 	var pool: Array[DiceData] = []
 	for _i: int in 18:
 		pool.append(DiceData.make_standard_d6())

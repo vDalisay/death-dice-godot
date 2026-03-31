@@ -78,7 +78,6 @@ func test_constants_are_reasonable() -> void:
 	assert_float(PhysicsDie.LANDING_SLAM_LATERAL_MAX_OFFSET_X).is_greater(0.0)
 	assert_float(PhysicsDie.LANDING_SLAM_DURATION_MIN_FACTOR).is_greater(0.0)
 	assert_float(PhysicsDie.LANDING_SLAM_DURATION_MAX_FACTOR).is_greater(PhysicsDie.LANDING_SLAM_DURATION_MIN_FACTOR)
-	assert_float(PhysicsDie.LAUNCH_GRACE_DURATION).is_greater(0.0)
 
 
 func test_face_type_glyphs_cover_all_types() -> void:
