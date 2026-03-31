@@ -8,6 +8,7 @@ const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tsc
 
 const SCORE_COUNT_DURATION: float = 0.5
 const GOLD_FLOAT_DURATION: float = 1.0
+const GOLD_COUNT_DURATION: float = 0.35
 const ALMOST_THERE_THRESHOLD: float = 0.9
 const RISK_PIP_COUNT: int = 5
 const COMBO_BADGE_HEIGHT: int = 26
@@ -52,6 +53,8 @@ const COMBO_BADGE_HEIGHT: int = 26
 var _score_tween: Tween = null
 var _progress_pulse_tween: Tween = null
 var _combo_flash_tween: Tween = null
+var _gold_tween: Tween = null
+var _displayed_gold: int = -1
 var _risk_pips: Array[Label] = []
 var _modifier_badges: Array[PanelContainer] = []
 var _last_modifier_types: Array[int] = []
@@ -320,7 +323,18 @@ func _on_lives_changed(new_lives: int) -> void:
 	lives_label.text = hearts if new_lives > 0 else _UITheme.GLYPH_STOP
 
 func _on_gold_changed(new_gold: int) -> void:
-	gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, new_gold]
+	if _gold_tween and _gold_tween.is_valid():
+		_gold_tween.kill()
+	var from_val: int = _displayed_gold
+	_displayed_gold = new_gold
+	# Skip animation on first call or when value hasn't changed.
+	if from_val < 0 or from_val == new_gold:
+		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, new_gold]
+		return
+	_gold_tween = create_tween()
+	_gold_tween.tween_method(func(v: float) -> void:
+		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(v)]
+	, float(from_val), float(new_gold), GOLD_COUNT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_stage_advanced(_new_stage: int) -> void:
 	_refresh_stage_display()
@@ -365,6 +379,11 @@ func _start_progress_pulse() -> void:
 	_progress_pulse_tween = create_tween().set_loops()
 	_progress_pulse_tween.tween_property(progress_bar, "modulate", Color(1.0, 0.88, 0.6), 0.25)
 	_progress_pulse_tween.tween_property(progress_bar, "modulate", Color.WHITE, 0.25)
+	# Add glow border on progress panel
+	var glow_style: StyleBoxFlat = _UITheme.make_panel_stylebox(
+		_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 2
+	)
+	_progress_panel.add_theme_stylebox_override("panel", glow_style)
 
 
 func _stop_progress_pulse() -> void:
@@ -372,6 +391,11 @@ func _stop_progress_pulse() -> void:
 		_progress_pulse_tween.kill()
 	_progress_pulse_tween = null
 	progress_bar.modulate = Color.WHITE
+	# Restore default panel style
+	var default_style: StyleBoxFlat = _UITheme.make_panel_stylebox(
+		_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.PANEL_SURFACE, 0
+	)
+	_progress_panel.add_theme_stylebox_override("panel", default_style)
 
 
 func _refresh_modifier_display() -> void:

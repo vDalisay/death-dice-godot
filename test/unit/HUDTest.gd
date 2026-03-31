@@ -78,6 +78,9 @@ func test_gold_display_format() -> void:
 	add_child(hud)
 	await await_idle_frame()
 	hud._on_gold_changed(42)
+	# Gold odometer animates via tween — wait for it to finish.
+	if hud._gold_tween and hud._gold_tween.is_valid():
+		await hud._gold_tween.finished
 	assert_str(hud.gold_label.text).contains("42")
 	assert_str(hud.gold_label.text).contains(_UITheme.GLYPH_GOLD)
 

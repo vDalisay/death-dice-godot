@@ -20,6 +20,10 @@ const SHAKE_CURSED_STOP: float = 5.0
 const SHAKE_BUST: float = 8.0
 const SHAKE_BIG_BANK: float = 4.0
 
+const BUTTON_HOVER_SCALE: float = 1.03
+const BUTTON_PRESS_SCALE: float = 0.96
+const BUTTON_TWEEN_DURATION: float = 0.08
+
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
 @onready var _roll_content: MarginContainer = $MarginContainer
@@ -97,6 +101,11 @@ func _ready() -> void:
 	_screen_shake.setup(_roll_content)
 	_screen_overlay = ScreenOverlayScript.new()
 	add_child(_screen_overlay)
+	_add_button_micro_tween(roll_button)
+	_add_button_micro_tween(bank_button)
+	_add_button_micro_tween(new_run_button)
+	_add_button_micro_tween(career_button)
+	_add_button_micro_tween(codex_button)
 	if GameManager.skip_archetype_picker:
 		_start_new_turn()
 	elif SaveManager.run_history.is_empty():
@@ -1008,6 +1017,28 @@ func _shake_screen(intensity: float, duration: float) -> void:
 	if _screen_shake == null:
 		return
 	_screen_shake.shake(intensity, duration)
+
+
+func _add_button_micro_tween(btn: Button) -> void:
+	btn.pivot_offset = btn.size / 2.0
+	btn.mouse_entered.connect(func() -> void:
+		if btn.disabled:
+			return
+		var t: Tween = btn.create_tween()
+		t.tween_property(btn, "scale", Vector2(BUTTON_HOVER_SCALE, BUTTON_HOVER_SCALE), BUTTON_TWEEN_DURATION).set_ease(Tween.EASE_OUT)
+	)
+	btn.mouse_exited.connect(func() -> void:
+		var t: Tween = btn.create_tween()
+		t.tween_property(btn, "scale", Vector2.ONE, BUTTON_TWEEN_DURATION).set_ease(Tween.EASE_IN)
+	)
+	btn.button_down.connect(func() -> void:
+		var t: Tween = btn.create_tween()
+		t.tween_property(btn, "scale", Vector2(BUTTON_PRESS_SCALE, BUTTON_PRESS_SCALE), BUTTON_TWEEN_DURATION * 0.6).set_ease(Tween.EASE_OUT)
+	)
+	btn.button_up.connect(func() -> void:
+		var t: Tween = btn.create_tween()
+		t.tween_property(btn, "scale", Vector2.ONE, BUTTON_TWEEN_DURATION).set_ease(Tween.EASE_IN)
+	)
 
 
 func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> void:
