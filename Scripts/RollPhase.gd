@@ -173,6 +173,8 @@ func _on_bank_pressed() -> void:
 		var jackpot_gold: int = maxi(1, int(banked * JACKPOT_GOLD_BONUS))
 		GameManager.add_gold(jackpot_gold)
 		SFXManager.play_jackpot()
+		if _screen_overlay and _screen_overlay.has_method("flash_jackpot"):
+			_screen_overlay.flash_jackpot()
 		hud.show_status("JACKPOT! +%dg bonus!" % jackpot_gold, Color(1.0, 0.85, 0.0))
 	var mult: int = _get_turn_multiplier()
 	var status_parts: Array[String] = []
@@ -961,6 +963,8 @@ func _get_per_die_scores() -> Array[int]:
 
 func _show_bust_overlay(effective_stops: int) -> void:
 	_shake_screen(SHAKE_BUST, 0.4)
+	if _screen_overlay and _screen_overlay.has_method("flash_bust"):
+		_screen_overlay.flash_bust()
 	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
 	add_child(overlay)
 	overlay.call("play", 1)
