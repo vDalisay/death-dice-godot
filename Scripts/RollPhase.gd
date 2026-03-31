@@ -866,7 +866,7 @@ func _sync_buttons() -> void:
 		TurnState.ACTIVE:
 			roll_button.text     = "Reroll %d" % _get_rerollable_count()
 			roll_button.disabled = _is_roll_animating
-			bank_button.disabled = false
+			bank_button.disabled = _is_roll_animating
 		TurnState.BUST, TurnState.BANKED:
 			roll_button.text     = "Roll All"
 			roll_button.disabled = true
