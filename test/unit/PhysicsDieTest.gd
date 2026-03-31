@@ -97,6 +97,9 @@ func test_hover_popup_visibility_changes() -> void:
 	_die._on_mouse_entered()
 	assert_bool(_die._name_popup.visible).is_true()
 	_die._on_mouse_exited()
+	# Popup fade-out is tweened — wait for it to complete.
+	if _die._popup_tween and _die._popup_tween.is_valid():
+		await _die._popup_tween.finished
 	assert_bool(_die._name_popup.visible).is_false()
 
 

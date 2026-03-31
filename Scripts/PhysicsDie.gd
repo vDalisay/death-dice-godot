@@ -38,6 +38,8 @@ const REROLL_LIFT_DURATION: float = 0.14
 const EXPLODE_CHARGE_DURATION: float = 0.2
 const STOP_IMPACT_DURATION: float = 0.18
 const KEEP_LOCK_SNAP_DURATION: float = 0.14
+const KEEP_OPACITY_TWEEN_DURATION: float = 0.12
+const NAME_POPUP_FADE_DURATION: float = 0.1
 const SHIELD_ABSORB_DURATION: float = 0.3
 const REROLL_LIFT_OPACITY: float = 0.55
 const LAUNCH_BURST_DURATION: float = 0.28
@@ -109,6 +111,8 @@ var _collision_cooldowns: Dictionary = {}  # body_rid -> float
 var _tumble_tween: Tween = null
 var _scale_tween: Tween = null
 var _glow_tween: Tween = null
+var _opacity_tween: Tween = null
+var _popup_tween: Tween = null
 var _is_hovered: bool = false
 var _peak_speed_since_launch: float = 0.0
 var _last_motion_velocity: Vector2 = Vector2.ZERO
@@ -588,15 +592,28 @@ func _on_mouse_entered() -> void:
 	if _name_popup and _name_popup_label and die_data:
 		_name_popup_label.text = die_data.dice_name
 		_name_popup.visible = true
+		_name_popup.modulate.a = 0.0
+		if _popup_tween and _popup_tween.is_valid():
+			_popup_tween.kill()
+		_popup_tween = _name_popup.create_tween()
+		_popup_tween.tween_property(_name_popup, "modulate:a", 1.0, NAME_POPUP_FADE_DURATION)
 	if physics_state in [DiePhysicsState.SETTLED, DiePhysicsState.KEPT] and not is_keep_locked:
 		_animate_hover(Vector2(HOVER_SCALE, HOVER_SCALE))
+		Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
 
 
 func _on_mouse_exited() -> void:
 	_is_hovered = false
 	if _name_popup:
-		_name_popup.visible = false
+		if _popup_tween and _popup_tween.is_valid():
+			_popup_tween.kill()
+		_popup_tween = _name_popup.create_tween()
+		_popup_tween.tween_property(_name_popup, "modulate:a", 0.0, NAME_POPUP_FADE_DURATION)
+		_popup_tween.tween_callback(func() -> void:
+			_name_popup.visible = false
+		)
 	_animate_hover(Vector2.ONE)
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 
 
 func _animate_hover(target_scale: Vector2) -> void:
@@ -664,11 +681,16 @@ func _apply_visual() -> void:
 		border_color = _UITheme.NEON_PURPLE
 		glyph_color = _UITheme.NEON_PURPLE
 
-	# Opacity for kept dice
-	if is_kept or is_keep_locked:
-		modulate.a = KEPT_OPACITY
-	elif not is_stopped:
-		modulate.a = 1.0
+	# Opacity for kept dice (tweened)
+	var target_opacity: float = KEPT_OPACITY if (is_kept or is_keep_locked) else 1.0
+	if not is_stopped:
+		if _opacity_tween and _opacity_tween.is_valid():
+			_opacity_tween.kill()
+		if absf(modulate.a - target_opacity) > 0.01:
+			_opacity_tween = create_tween()
+			_opacity_tween.tween_property(self, "modulate:a", target_opacity, KEEP_OPACITY_TWEEN_DURATION)
+		else:
+			modulate.a = target_opacity
 
 	# Apply panel stylebox
 	var sb := StyleBoxFlat.new()
