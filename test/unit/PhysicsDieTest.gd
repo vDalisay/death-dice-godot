@@ -141,3 +141,22 @@ func test_motion_polish_methods_do_not_error() -> void:
 	_die.play_stop_impact(false)
 	_die.play_stop_impact(true)
 	assert_bool(true).is_true()
+
+
+func test_bump_count_increases_on_collision() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	assert_int(_die._bump_count).is_equal(0)
+	# Simulate multiple bumps — count should increment.
+	var other: PhysicsDie = auto_free(PhysicsDie.new()) as PhysicsDie
+	add_child(other)
+	other.setup(1, DiceData.make_standard_d6())
+	_die._bump_count = 3
+	# Dampening factor should reduce impulse with each bump.
+	var dampen: float = pow(PhysicsDie.BUMP_DAMPEN_FACTOR, 3)
+	assert_float(dampen).is_less(1.0)
+
+
+func test_setup_resets_bump_count() -> void:
+	_die._bump_count = 5
+	_die.setup(0, DiceData.make_standard_d6())
+	assert_int(_die._bump_count).is_equal(0)

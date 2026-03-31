@@ -939,10 +939,14 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 		hud.show_floating_gold(new_total - old_total)
 		return
 
-	# Time per die: never exceed MAX_SCORE_ANIM_DURATION total.
-	var interval: float = minf(0.15, MAX_SCORE_ANIM_DURATION / float(scoring_indices.size()))
+	# Time per die: start at base interval, accelerate after ACCEL_START_TIME.
+	const ACCEL_START_TIME: float = 2.0
+	const ACCEL_PERIOD: float = 2.0
+	var base_interval: float = minf(0.15, MAX_SCORE_ANIM_DURATION / float(scoring_indices.size()))
 	var tween: Tween = create_tween()
 	var running: int = old_total
+	var elapsed: float = 0.0
+	var last_interval: float = base_interval
 	for idx: int in scoring_indices.size():
 		var die_i: int = scoring_indices[idx]
 		var die_score: int = per_die[die_i]
@@ -950,6 +954,15 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 		var new_running: int = running + die_score
 		var _old: int = running
 		var _new: int = new_running
+		# Accelerate: double speed every ACCEL_PERIOD seconds after ACCEL_START_TIME.
+		var interval: float = base_interval
+		if elapsed > ACCEL_START_TIME:
+			var accel_elapsed: float = elapsed - ACCEL_START_TIME
+			var doublings: float = accel_elapsed / ACCEL_PERIOD
+			interval = base_interval / pow(2.0, doublings)
+			interval = maxf(interval, 0.01)  # Floor to prevent zero-delay.
+		elapsed += interval
+		last_interval = interval
 		tween.tween_callback(func() -> void:
 			var score_die: PhysicsDie = dice_arena.get_die(die_i)
 			if score_die:
@@ -962,7 +975,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 	# After all per-die popups, show floating gold.
 	tween.tween_callback(func() -> void:
 		hud.show_floating_gold(new_total - old_total)
-	).set_delay(interval)
+	).set_delay(last_interval)
 
 
 ## Structured bank cascade checkpoints layered on top of per-die tally.

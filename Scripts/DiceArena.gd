@@ -135,6 +135,7 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			continue
 		var die: PhysicsDie = _dice[i]
 		die.is_stopped = false
+		die._bump_count = 0
 
 		# Roll new face
 		var face: DiceFaceData = pool[i].roll()

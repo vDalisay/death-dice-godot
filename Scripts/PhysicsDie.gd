@@ -28,6 +28,8 @@ const BUMP_BOOST_IMPULSE_MIN: float = 96.0
 const BUMP_BOOST_IMPULSE_MAX: float = 260.0
 const BUMP_BOOST_MULTIPLIER: float = 0.14
 const BUMP_TANGENT_JITTER: float = 0.22
+const BUMP_DAMPEN_FACTOR: float = 0.6
+const BUMP_DAMPEN_VELOCITY_FACTOR: float = 0.75
 const SETTLE_POP_SCALE: float = 1.08
 const SETTLE_POP_DURATION: float = 0.12
 const IMPACT_FLASH_DURATION: float = 0.08
@@ -109,6 +111,7 @@ var rarity_color: Color = Color.TRANSPARENT
 
 var _settle_timer: float = 0.0
 var _collision_cooldowns: Dictionary = {}  # body_rid -> float
+var _bump_count: int = 0
 var _tumble_tween: Tween = null
 var _scale_tween: Tween = null
 var _glow_tween: Tween = null
@@ -235,6 +238,7 @@ func setup(index: int, data: DiceData) -> void:
 	is_stopped = false
 	physics_state = DiePhysicsState.FLYING
 	_peak_speed_since_launch = 0.0
+	_bump_count = 0
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
 	_build_face_squares()
 	_update_name_popup_position()
@@ -524,10 +528,17 @@ func _on_body_entered(other: Node) -> void:
 			BUMP_BOOST_IMPULSE_MIN,
 			BUMP_BOOST_IMPULSE_MAX
 		)
+		# Dampen repeated bumps to prevent ping-pong between locked dice.
+		var dampen: float = pow(BUMP_DAMPEN_FACTOR, mini(_bump_count, 10))
+		bump_impulse *= dampen
 		if not freeze:
 			apply_central_impulse(collision_dir * bump_impulse)
+			linear_velocity *= BUMP_DAMPEN_VELOCITY_FACTOR
 		if not other_die.freeze:
 			other_die.apply_central_impulse(-collision_dir * bump_impulse)
+			other_die.linear_velocity *= BUMP_DAMPEN_VELOCITY_FACTOR
+		_bump_count += 1
+		other_die._bump_count += 1
 		_play_impact_accent()
 		other_die._play_impact_accent()
 
