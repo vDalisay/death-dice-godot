@@ -27,11 +27,6 @@ const BUTTON_TWEEN_DURATION: float = 0.08
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 
 @onready var _roll_content: MarginContainer = $MarginContainer
-@onready var _persistent_top_bar: PanelContainer = $PersistentTopBar
-@onready var _persistent_stage_label: Label = $PersistentTopBar/TopBarMargin/TopBarRow/StageLabel
-@onready var _persistent_lives_label: Label = $PersistentTopBar/TopBarMargin/TopBarRow/LivesLabel
-@onready var _persistent_gold_label: Label = $PersistentTopBar/TopBarMargin/TopBarRow/GoldLabel
-@onready var _persistent_highscore_label: Label = $PersistentTopBar/TopBarMargin/TopBarRow/HighscoreLabel
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
 @onready var dice_arena: DiceArena = $MarginContainer/VBoxContainer/ArenaViewportContainer/ArenaViewport/DiceArena
 @onready var _arena_viewport_container: SubViewportContainer = $MarginContainer/VBoxContainer/ArenaViewportContainer
@@ -97,11 +92,6 @@ func _ready() -> void:
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
-	GameManager.lives_changed.connect(_on_persistent_lives_changed)
-	GameManager.gold_changed.connect(_on_persistent_gold_changed)
-	GameManager.stage_advanced.connect(_on_persistent_stage_changed)
-	GameManager.loop_advanced.connect(_on_persistent_stage_changed)
-	SaveManager.highscore_changed.connect(_on_persistent_highscore_changed)
 	new_run_button.visible = false
 	career_button.visible = false
 	codex_button.visible = false
@@ -112,9 +102,6 @@ func _ready() -> void:
 	_screen_shake.setup(_arena_viewport_container)
 	_screen_overlay = ScreenOverlayScript.new()
 	add_child(_screen_overlay)
-	hud.set_top_bar_visible(false)
-	_setup_persistent_top_bar_style()
-	_refresh_persistent_top_bar()
 	_add_button_micro_tween(roll_button)
 	_add_button_micro_tween(bank_button)
 	_add_button_micro_tween(new_run_button)
@@ -132,48 +119,6 @@ func _ready() -> void:
 	else:
 		_show_archetype_picker()
 
-
-func _setup_persistent_top_bar_style() -> void:
-	_persistent_top_bar.add_theme_stylebox_override("panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD))
-	_persistent_stage_label.add_theme_font_override("font", _UITheme.font_display())
-	_persistent_stage_label.add_theme_font_size_override("font_size", 12)
-	_persistent_stage_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
-	_persistent_lives_label.add_theme_font_size_override("font_size", 20)
-	_persistent_lives_label.add_theme_color_override("font_color", _UITheme.DANGER_RED)
-	_persistent_gold_label.add_theme_font_override("font", _UITheme.font_stats())
-	_persistent_gold_label.add_theme_font_size_override("font_size", 20)
-	_persistent_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
-	_persistent_highscore_label.add_theme_font_override("font", _UITheme.font_display())
-	_persistent_highscore_label.add_theme_font_size_override("font_size", 12)
-	_persistent_highscore_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-
-
-func _refresh_persistent_top_bar() -> void:
-	_on_persistent_stage_changed(GameManager.current_stage)
-	_on_persistent_lives_changed(GameManager.lives)
-	_on_persistent_gold_changed(GameManager.gold)
-	_on_persistent_highscore_changed(SaveManager.highscore)
-
-
-func _on_persistent_stage_changed(_unused_value: int) -> void:
-	var loop_text: String = " L%d" % GameManager.current_loop if GameManager.current_loop > 1 else ""
-	_persistent_stage_label.text = "STAGE %d/%d%s" % [GameManager.current_stage, GameManager.get_stages_in_current_loop(), loop_text]
-
-
-func _on_persistent_lives_changed(new_lives: int) -> void:
-	var hearts: String = ""
-	for _i: int in new_lives:
-		hearts += _UITheme.GLYPH_HEART
-	_persistent_lives_label.text = hearts if new_lives > 0 else _UITheme.GLYPH_STOP
-
-
-func _on_persistent_gold_changed(new_gold: int) -> void:
-	_persistent_gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, new_gold]
-
-
-func _on_persistent_highscore_changed(new_highscore: int) -> void:
-	_persistent_highscore_label.text = "HI: %d" % new_highscore
 
 # ---------------------------------------------------------------------------
 # Setup

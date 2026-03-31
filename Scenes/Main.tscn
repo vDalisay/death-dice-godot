@@ -18,45 +18,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="PersistentTopBar" type="PanelContainer" parent="."]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_left = 40.0
-offset_top = 12.0
-offset_right = -40.0
-offset_bottom = 60.0
-
-[node name="TopBarMargin" type="MarginContainer" parent="PersistentTopBar"]
-layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_bottom = 4
-
-[node name="TopBarRow" type="HBoxContainer" parent="PersistentTopBar/TopBarMargin"]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="StageLabel" type="Label" parent="PersistentTopBar/TopBarMargin/TopBarRow"]
-layout_mode = 2
-text = "STAGE 1/5"
-
-[node name="LivesLabel" type="Label" parent="PersistentTopBar/TopBarMargin/TopBarRow"]
-layout_mode = 2
-
-[node name="TopSpacer" type="Control" parent="PersistentTopBar/TopBarMargin/TopBarRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="GoldLabel" type="Label" parent="PersistentTopBar/TopBarMargin/TopBarRow"]
-layout_mode = 2
-text = "G 0"
-
-[node name="HighscoreLabel" type="Label" parent="PersistentTopBar/TopBarMargin/TopBarRow"]
-layout_mode = 2
-text = "HI: 0"
-
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -65,7 +26,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/margin_left = 40
-theme_override_constants/margin_top = 72
+theme_override_constants/margin_top = 40
 theme_override_constants/margin_right = 40
 theme_override_constants/margin_bottom = 40
 
