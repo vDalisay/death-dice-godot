@@ -198,13 +198,20 @@ func _ready() -> void:
 	_name_popup.add_theme_stylebox_override("panel", popup_style)
 	add_child(_name_popup)
 
+	var popup_margin := MarginContainer.new()
+	popup_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	popup_margin.add_theme_constant_override("margin_left", 4)
+	popup_margin.add_theme_constant_override("margin_right", 4)
+	popup_margin.add_theme_constant_override("margin_top", 3)
+	popup_margin.add_theme_constant_override("margin_bottom", 3)
+	popup_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_name_popup.add_child(popup_margin)
+
 	_name_popup_faces = HBoxContainer.new()
 	_name_popup_faces.alignment = BoxContainer.ALIGNMENT_CENTER
 	_name_popup_faces.add_theme_constant_override("separation", 4)
-	_name_popup_faces.size = _name_popup.size
-	_name_popup_faces.position = Vector2.ZERO
 	_name_popup_faces.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_name_popup.add_child(_name_popup_faces)
+	popup_margin.add_child(_name_popup_faces)
 
 	# Signals
 	body_entered.connect(_on_body_entered)
@@ -668,11 +675,11 @@ func _build_face_squares() -> void:
 	var face_count: int = die_data.faces.size()
 	if face_count == 0:
 		return
-	# Compute square size to fit within popup width with spacing.
-	var popup_inner_w: float = _name_popup.size.x - 8.0  # 4px padding each side
+	# Compute square size to fit within popup width with margins + spacing.
+	var margin_h: float = 8.0  # 4px left + 4px right
 	var spacing: float = 4.0
 	var total_spacing: float = spacing * maxf(0.0, face_count - 1)
-	var sq_size: float = minf(18.0, (popup_inner_w - total_spacing) / face_count)
+	var sq_size: float = minf(18.0, (_name_popup.size.x - margin_h - total_spacing) / face_count)
 	for face: DiceFaceData in die_data.faces:
 		var sq: ColorRect = ColorRect.new()
 		sq.custom_minimum_size = Vector2(sq_size, sq_size)
@@ -680,9 +687,20 @@ func _build_face_squares() -> void:
 		sq.color = face_type_color(face.type)
 		sq.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_name_popup_faces.add_child(sq)
-	# Resize popup height to fit squares with padding.
-	_name_popup.size.y = sq_size + 6.0
-	_name_popup_faces.size = _name_popup.size
+		# Show face value as text on top of the square.
+		var face_lbl := Label.new()
+		face_lbl.text = face.get_display_text()
+		face_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		face_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		face_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		face_lbl.add_theme_font_override("font", _UITheme.font_mono())
+		face_lbl.add_theme_font_size_override("font_size", maxi(7, int(sq_size * 0.55)))
+		face_lbl.add_theme_color_override("font_color", Color(0.0, 0.0, 0.0, 0.85))
+		face_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sq.add_child(face_lbl)
+	# Resize popup height to fit squares with margin padding.
+	var margin_v: float = 6.0  # 3px top + 3px bottom
+	_name_popup.size.y = sq_size + margin_v
 	_name_popup.pivot_offset = _name_popup.size * 0.5
 
 
