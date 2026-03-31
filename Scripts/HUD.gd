@@ -37,10 +37,10 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var _streak_slot: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot
 
 # -- Info row --
-@onready var stop_label: Label            = $InfoRow/StopLabel
-@onready var _risk_meter: PanelContainer = $InfoRow/RiskMeter
-@onready var _risk_percent_label: Label = $InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskPercentLabel
-@onready var _risk_container: HBoxContainer = $InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskContainer
+@onready var stop_label: Label            = $InfoRow/RiskColumn/StopLabel
+@onready var _risk_meter: PanelContainer = $InfoRow/RiskColumn/RiskMeter
+@onready var _risk_percent_label: Label = $InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskPercentLabel
+@onready var _risk_container: HBoxContainer = $InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskContainer
 @onready var _risk_tooltip: PanelContainer = $RiskTooltip
 @onready var _risk_tooltip_label: Label = $RiskTooltip/MarginContainer/RiskTooltipLabel
 

@@ -136,36 +136,41 @@ layout_mode = 2
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="StopLabel" type="Label" parent="InfoRow"]
-layout_mode = 2
-text = "Stops: 0 / 3"
-
 [node name="InfoSpacer" type="Control" parent="InfoRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RiskMeter" type="PanelContainer" parent="InfoRow"]
+[node name="RiskColumn" type="VBoxContainer" parent="InfoRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="RiskMeter" type="PanelContainer" parent="InfoRow/RiskColumn"]
 layout_mode = 2
 mouse_filter = 0
 
-[node name="RiskMeterMargin" type="MarginContainer" parent="InfoRow/RiskMeter"]
+[node name="RiskMeterMargin" type="MarginContainer" parent="InfoRow/RiskColumn/RiskMeter"]
 layout_mode = 2
 theme_override_constants/margin_left = 8
 theme_override_constants/margin_right = 8
 theme_override_constants/margin_top = 4
 theme_override_constants/margin_bottom = 4
 
-[node name="RiskMeterRow" type="HBoxContainer" parent="InfoRow/RiskMeter/RiskMeterMargin"]
+[node name="RiskMeterRow" type="HBoxContainer" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="RiskPercentLabel" type="Label" parent="InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow"]
+[node name="RiskPercentLabel" type="Label" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow"]
 layout_mode = 2
 text = "RISK 0%"
 
-[node name="RiskContainer" type="HBoxContainer" parent="InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow"]
+[node name="RiskContainer" type="HBoxContainer" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow"]
 layout_mode = 2
 theme_override_constants/separation = 4
+
+[node name="StopLabel" type="Label" parent="InfoRow/RiskColumn"]
+layout_mode = 2
+text = "Stops: 0 / 3"
+horizontal_alignment = 2
 
 [node name="ComboRow" type="HBoxContainer" parent="."]
 layout_mode = 2
