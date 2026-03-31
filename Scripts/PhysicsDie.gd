@@ -126,7 +126,7 @@ var _bg_panel: Panel = null
 var _face_label: Label = null
 var _glyph_label: Label = null
 var _name_popup: Panel = null
-var _name_popup_label: Label = null
+var _name_popup_faces: HBoxContainer = null
 var _collision_shape: CollisionShape2D = null
 
 
@@ -182,7 +182,7 @@ func _ready() -> void:
 	_glyph_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_glyph_label)
 
-	# Hover popup for die name (hidden by default)
+	# Hover popup showing face squares (hidden by default)
 	_name_popup = Panel.new()
 	_name_popup.size = Vector2(140, 24)
 	_name_popup.top_level = true
@@ -198,15 +198,13 @@ func _ready() -> void:
 	_name_popup.add_theme_stylebox_override("panel", popup_style)
 	add_child(_name_popup)
 
-	_name_popup_label = Label.new()
-	_name_popup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name_popup_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_name_popup_label.size = _name_popup.size
-	_name_popup_label.add_theme_font_override("font", _UITheme.font_mono())
-	_name_popup_label.add_theme_font_size_override("font_size", 11)
-	_name_popup_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
-	_name_popup_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_name_popup.add_child(_name_popup_label)
+	_name_popup_faces = HBoxContainer.new()
+	_name_popup_faces.alignment = BoxContainer.ALIGNMENT_CENTER
+	_name_popup_faces.add_theme_constant_override("separation", 4)
+	_name_popup_faces.size = _name_popup.size
+	_name_popup_faces.position = Vector2.ZERO
+	_name_popup_faces.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_name_popup.add_child(_name_popup_faces)
 
 	# Signals
 	body_entered.connect(_on_body_entered)
@@ -231,8 +229,7 @@ func setup(index: int, data: DiceData) -> void:
 	physics_state = DiePhysicsState.FLYING
 	_peak_speed_since_launch = 0.0
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
-	if _name_popup_label:
-		_name_popup_label.text = data.dice_name if data else ""
+	_build_face_squares()
 	_update_name_popup_position()
 	if _face_label:
 		_face_label.text = "?"
@@ -592,8 +589,7 @@ func _press_bounce() -> void:
 
 func _on_mouse_entered() -> void:
 	_is_hovered = true
-	if _name_popup and _name_popup_label and die_data:
-		_name_popup_label.text = die_data.dice_name
+	if _name_popup and _name_popup_faces and die_data:
 		_update_name_popup_position()
 		_name_popup.visible = true
 		_name_popup.modulate.a = 0.0
@@ -635,6 +631,59 @@ func _update_name_popup_position() -> void:
 		-_name_popup.size.x * 0.5,
 		-half_height - NAME_POPUP_GAP - _name_popup.size.y
 	)
+
+
+## Maps a DiceFaceData.FaceType to a display color for the popup face square.
+static func face_type_color(ft: DiceFaceData.FaceType) -> Color:
+	match ft:
+		DiceFaceData.FaceType.NUMBER:
+			return _UITheme.BRIGHT_TEXT
+		DiceFaceData.FaceType.BLANK:
+			return _UITheme.MUTED_TEXT
+		DiceFaceData.FaceType.STOP:
+			return _UITheme.DANGER_RED
+		DiceFaceData.FaceType.AUTO_KEEP:
+			return _UITheme.SCORE_GOLD
+		DiceFaceData.FaceType.SHIELD:
+			return _UITheme.ACTION_CYAN
+		DiceFaceData.FaceType.MULTIPLY:
+			return _UITheme.SUCCESS_GREEN
+		DiceFaceData.FaceType.EXPLODE:
+			return _UITheme.EXPLOSION_ORANGE
+		DiceFaceData.FaceType.MULTIPLY_LEFT:
+			return _UITheme.SUCCESS_GREEN
+		DiceFaceData.FaceType.CURSED_STOP:
+			return _UITheme.NEON_PURPLE
+		DiceFaceData.FaceType.INSURANCE:
+			return _UITheme.ACTION_CYAN
+	return _UITheme.MUTED_TEXT
+
+
+func _build_face_squares() -> void:
+	if _name_popup_faces == null or die_data == null:
+		return
+	# Clear existing squares.
+	for child: Node in _name_popup_faces.get_children():
+		child.queue_free()
+	var face_count: int = die_data.faces.size()
+	if face_count == 0:
+		return
+	# Compute square size to fit within popup width with spacing.
+	var popup_inner_w: float = _name_popup.size.x - 8.0  # 4px padding each side
+	var spacing: float = 4.0
+	var total_spacing: float = spacing * maxf(0.0, face_count - 1)
+	var sq_size: float = minf(18.0, (popup_inner_w - total_spacing) / face_count)
+	for face: DiceFaceData in die_data.faces:
+		var sq: ColorRect = ColorRect.new()
+		sq.custom_minimum_size = Vector2(sq_size, sq_size)
+		sq.size = Vector2(sq_size, sq_size)
+		sq.color = face_type_color(face.type)
+		sq.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_name_popup_faces.add_child(sq)
+	# Resize popup height to fit squares with padding.
+	_name_popup.size.y = sq_size + 6.0
+	_name_popup_faces.size = _name_popup.size
+	_name_popup.pivot_offset = _name_popup.size * 0.5
 
 
 # ---------------------------------------------------------------------------

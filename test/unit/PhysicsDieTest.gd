@@ -115,6 +115,25 @@ func test_hover_popup_is_centered_above_die_even_when_rotated() -> void:
 	assert_float(_die._name_popup.global_position.y).is_less(_die.global_position.y)
 
 
+func test_hover_popup_shows_face_squares_matching_die_faces() -> void:
+	var data: DiceData = DiceData.make_standard_d6()
+	_die.setup(0, data)
+	await await_idle_frame()
+	var face_container: HBoxContainer = _die._name_popup_faces
+	assert_int(face_container.get_child_count()).is_equal(data.faces.size())
+	for i: int in data.faces.size():
+		var sq: ColorRect = face_container.get_child(i) as ColorRect
+		var expected_color: Color = PhysicsDie.face_type_color(data.faces[i].type)
+		assert_object(sq).is_not_null()
+		assert_bool(sq.color.is_equal_approx(expected_color)).is_true()
+
+
+func test_face_type_color_covers_all_face_types() -> void:
+	for ft: int in range(DiceFaceData.FaceType.size()):
+		var c: Color = PhysicsDie.face_type_color(ft as DiceFaceData.FaceType)
+		assert_object(c).is_not_null()
+
+
 func test_motion_polish_methods_do_not_error() -> void:
 	_die.setup(0, DiceData.make_standard_d6())
 	_die.play_keep_lock_snap()
