@@ -59,12 +59,14 @@ var _is_roll_animating: bool = false
 var _roll_anim_nonce: int = 0
 var _triggered_combo_ids: Dictionary = {}
 var _screen_shake: Node = null
+var _screen_overlay: Node = null
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
 const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
+const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 func _ready() -> void:
@@ -93,6 +95,8 @@ func _ready() -> void:
 	_screen_shake = ScreenShakeScript.new()
 	add_child(_screen_shake)
 	_screen_shake.setup(_roll_content)
+	_screen_overlay = ScreenOverlayScript.new()
+	add_child(_screen_overlay)
 	if GameManager.skip_archetype_picker:
 		_start_new_turn()
 	elif SaveManager.run_history.is_empty():
