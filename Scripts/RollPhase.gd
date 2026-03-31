@@ -4,7 +4,7 @@ extends Control
 ## Owns dice logic. Delegates visuals to DiceArena and HUD.
 
 const BASE_BUST_THRESHOLD: int = 3
-const AUTO_ADVANCE_DELAY: float = 1.5
+const AUTO_ADVANCE_DELAY: float = 0.75
 const MAX_SCORE_ANIM_DURATION: float = 2.0
 const HOT_STREAK_TIER_1: int = 3
 const HOT_STREAK_TIER_2: int = 5
@@ -81,6 +81,7 @@ func _ready() -> void:
 	career_button.pressed.connect(_on_career_pressed)
 	codex_button.pressed.connect(_on_codex_pressed)
 	dice_arena.die_clicked.connect(_on_die_toggled)
+	dice_arena.die_shift_clicked.connect(_on_die_shift_toggled)
 	dice_arena.all_dice_settled.connect(_on_all_dice_settled)
 	dice_arena.die_collision_rerolled.connect(_on_die_collision_rerolled)
 	shop_panel.shop_closed.connect(_on_shop_closed)
@@ -205,10 +206,10 @@ func _on_bank_pressed() -> void:
 		_shake_screen(SHAKE_BIG_BANK, 0.2)
 	_play_multiply_face_vfx()
 	# Per-die score count-up followed by cascade checkpoints.
-	_play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
+	var anim_duration: float = _play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
 	_sync_buttons()
-	# Auto-advance to next turn after a delay.
-	_schedule_auto_advance()
+	# Auto-advance to next turn after counting animation finishes.
+	_schedule_auto_advance(anim_duration)
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	if turn_state != TurnState.ACTIVE:
@@ -225,6 +226,41 @@ func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	if dice_stopped[die_index]:
 		return
 	dice_keep[die_index] = is_kept
+	_sync_ui()
+
+
+func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
+	if turn_state != TurnState.ACTIVE:
+		return
+	var clicked_face: DiceFaceData = current_results[die_index]
+	if clicked_face == null:
+		return
+	var target_type: DiceFaceData.FaceType = clicked_face.type
+	var target_value: int = clicked_face.value
+	for i: int in current_results.size():
+		if current_results[i] == null:
+			continue
+		if current_results[i].type != target_type or current_results[i].value != target_value:
+			continue
+		if dice_keep_locked[i]:
+			continue
+		if is_kept and dice_stopped[i]:
+			# Can't keep a stopped die — skip.
+			continue
+		if not is_kept and dice_stopped[i]:
+			# Pick up stopped dice of matching type.
+			dice_stopped[i] = false
+			dice_keep[i] = false
+			var die: PhysicsDie = dice_arena.get_die(i)
+			if die:
+				die.is_stopped = false
+				die.is_kept = false
+			continue
+		dice_keep[i] = is_kept
+		var die: PhysicsDie = dice_arena.get_die(i)
+		if die:
+			die.is_kept = is_kept
+	_sync_all_dice()
 	_sync_ui()
 
 # ---------------------------------------------------------------------------
@@ -906,10 +942,11 @@ func _get_rerollable_count() -> int:
 # Auto-advance & per-die score animation
 # ---------------------------------------------------------------------------
 
-func _schedule_auto_advance() -> void:
+func _schedule_auto_advance(after_delay: float = 0.0) -> void:
 	if not _run_active:
 		return
-	get_tree().create_timer(AUTO_ADVANCE_DELAY).timeout.connect(
+	var total_delay: float = after_delay + AUTO_ADVANCE_DELAY
+	get_tree().create_timer(total_delay).timeout.connect(
 		func() -> void:
 			if turn_state == TurnState.BANKED or turn_state == TurnState.BUST:
 				_start_new_turn()
@@ -917,7 +954,7 @@ func _schedule_auto_advance() -> void:
 
 
 ## Play left-to-right per-die score popups, then the total score tween.
-func _play_score_count_animation(old_total: int, new_total: int) -> void:
+func _play_score_count_animation(old_total: int, new_total: int) -> float:
 	var pool_size: int = GameManager.dice_pool.size()
 	var per_die: Array[int] = _get_per_die_scores()
 
@@ -937,7 +974,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 	if scoring_indices.is_empty():
 		hud.animate_score_count(old_total, new_total)
 		hud.show_floating_gold(new_total - old_total)
-		return
+		return 0.0
 
 	# Time per die: start at base interval, accelerate after ACCEL_START_TIME.
 	const ACCEL_START_TIME: float = 2.0
@@ -976,11 +1013,12 @@ func _play_score_count_animation(old_total: int, new_total: int) -> void:
 	tween.tween_callback(func() -> void:
 		hud.show_floating_gold(new_total - old_total)
 	).set_delay(last_interval)
+	return elapsed + last_interval
 
 
 ## Structured bank cascade checkpoints layered on top of per-die tally.
-func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: int, streak_multiplier: float) -> void:
-	_play_score_count_animation(old_total, new_total)
+func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: int, streak_multiplier: float) -> float:
+	var anim_duration: float = _play_score_count_animation(old_total, new_total)
 	var checkpoint_tween: Tween = create_tween()
 	if _triggered_combo_ids.size() > 0:
 		checkpoint_tween.tween_callback(func() -> void:
@@ -998,6 +1036,7 @@ func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: in
 	checkpoint_tween.tween_callback(func() -> void:
 		hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
 	).set_delay(BANK_CASCADE_STEP_DELAY)
+	return anim_duration
 
 
 func _play_multiply_face_vfx() -> void:

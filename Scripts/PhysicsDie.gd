@@ -8,6 +8,7 @@ extends RigidBody2D
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 signal toggled_keep(die_index: int, is_kept: bool)
+signal shift_toggled_keep(die_index: int, is_kept: bool)
 signal settled()
 signal collision_rerolled(die_index: int, new_face: DiceFaceData)
 
@@ -24,12 +25,14 @@ const SETTLE_TIME_REQUIRED: float = 0.3
 const REROLL_VELOCITY_THRESHOLD: float = 150.0
 const COLLISION_COOLDOWN: float = 0.2
 const BUMP_BOOST_MIN_SPEED: float = 34.0
-const BUMP_BOOST_IMPULSE_MIN: float = 96.0
-const BUMP_BOOST_IMPULSE_MAX: float = 260.0
+const BUMP_BOOST_IMPULSE_MIN: float = 150.0
+const BUMP_BOOST_IMPULSE_MAX: float = 400.0
 const BUMP_BOOST_MULTIPLIER: float = 0.14
 const BUMP_TANGENT_JITTER: float = 0.22
 const BUMP_DAMPEN_FACTOR: float = 0.6
 const BUMP_DAMPEN_VELOCITY_FACTOR: float = 0.75
+const JITTER_SPEED_CAP: float = 80.0
+const JITTER_FORCE_SETTLE_TIME: float = 2.0
 const SETTLE_POP_SCALE: float = 1.08
 const SETTLE_POP_DURATION: float = 0.12
 const IMPACT_FLASH_DURATION: float = 0.08
@@ -110,6 +113,7 @@ var is_stopped: bool = false
 var rarity_color: Color = Color.TRANSPARENT
 
 var _settle_timer: float = 0.0
+var _jitter_timer: float = 0.0
 var _collision_cooldowns: Dictionary = {}  # body_rid -> float
 var _bump_count: int = 0
 var _tumble_tween: Tween = null
@@ -138,13 +142,13 @@ func _ready() -> void:
 	input_pickable = true
 	continuous_cd = RigidBody2D.CCD_MODE_CAST_SHAPE
 	gravity_scale = 0.0
-	linear_damp = 3.5
-	angular_damp = 4.0
+	linear_damp = 2.65
+	angular_damp = 3.0
 	contact_monitor = true
 	max_contacts_reported = 4
 	physics_material_override = PhysicsMaterial.new()
-	physics_material_override.bounce = 0.4
-	physics_material_override.friction = 0.6
+	physics_material_override.bounce = 0.475
+	physics_material_override.friction = 0.4
 
 	# Collision shape
 	_collision_shape = CollisionShape2D.new()
@@ -239,6 +243,7 @@ func setup(index: int, data: DiceData) -> void:
 	physics_state = DiePhysicsState.FLYING
 	_peak_speed_since_launch = 0.0
 	_bump_count = 0
+	_jitter_timer = 0.0
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
 	_build_face_squares()
 	_update_name_popup_position()
@@ -503,6 +508,18 @@ func _physics_process(delta: float) -> void:
 				settled.emit()
 		else:
 			_settle_timer = 0.0
+		# Jitter detection: force-settle dice stuck at low speed for too long.
+		if speed < JITTER_SPEED_CAP:
+			_jitter_timer += delta
+			if _jitter_timer >= JITTER_FORCE_SETTLE_TIME:
+				linear_velocity = Vector2.ZERO
+				angular_velocity = 0.0
+				physics_state = DiePhysicsState.SETTLED
+				freeze = true
+				_play_settle_accent(_peak_speed_since_launch)
+				settled.emit()
+		else:
+			_jitter_timer = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -571,27 +588,28 @@ func _on_input_event(_viewport: Node, event: InputEvent, _shape_idx: int) -> voi
 	if event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			_handle_click()
+			_handle_click(mb.shift_pressed)
 
 
-func _handle_click() -> void:
+func _handle_click(shift_held: bool = false) -> void:
 	_press_bounce()
 	if physics_state != DiePhysicsState.SETTLED and physics_state != DiePhysicsState.KEPT:
 		return
 	if is_keep_locked:
 		return
 
+	var target_signal: Signal = shift_toggled_keep if shift_held else toggled_keep
 	if is_stopped:
 		# Pick up stopped die (Cubitos-style)
 		is_stopped = false
 		is_kept = false
-		toggled_keep.emit(die_index, false)
+		target_signal.emit(die_index, false)
 	elif is_kept:
 		is_kept = false
-		toggled_keep.emit(die_index, false)
+		target_signal.emit(die_index, false)
 	else:
 		is_kept = true
-		toggled_keep.emit(die_index, true)
+		target_signal.emit(die_index, true)
 	_apply_visual()
 
 

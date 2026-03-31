@@ -9,6 +9,7 @@ const PhysicsDieScene: PackedScene = preload("res://Scenes/PhysicsDie.tscn")
 
 signal all_dice_settled()
 signal die_clicked(die_index: int, is_kept: bool)
+signal die_shift_clicked(die_index: int, is_kept: bool)
 signal die_collision_rerolled(die_index: int, new_face: DiceFaceData)
 
 # ---------------------------------------------------------------------------
@@ -24,8 +25,8 @@ const ARENA_BORDER_COLOR: Color = Color("#333355")
 const ARENA_BORDER_WIDTH: int = 2
 
 # Throw parameters
-const THROW_IMPULSE_MIN: float = 1000.0
-const THROW_IMPULSE_MAX: float = 1800.0
+const THROW_IMPULSE_MIN: float = 1400.0
+const THROW_IMPULSE_MAX: float = 2400.0
 const THROW_ANGULAR_MIN: float = -8.0
 const THROW_ANGULAR_MAX: float = 8.0
 const THROW_STAGGER_DELAY: float = 0.03
@@ -114,6 +115,7 @@ func throw_dice(pool: Array[DiceData]) -> void:
 
 		# Connect signals
 		die.toggled_keep.connect(_on_die_toggled)
+		die.shift_toggled_keep.connect(_on_die_shift_toggled)
 		die.collision_rerolled.connect(_on_die_collision_rerolled)
 
 		# Spawn with spread to avoid overlap bursts at high dice counts.
@@ -455,6 +457,10 @@ func _add_wall(pos: Vector2, extents: Vector2) -> void:
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	die_clicked.emit(die_index, is_kept)
+
+
+func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
+	die_shift_clicked.emit(die_index, is_kept)
 
 
 func _on_die_collision_rerolled(die_index: int, new_face: DiceFaceData) -> void:

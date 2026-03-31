@@ -160,3 +160,66 @@ func test_setup_resets_bump_count() -> void:
 	_die._bump_count = 5
 	_die.setup(0, DiceData.make_standard_d6())
 	assert_int(_die._bump_count).is_equal(0)
+
+
+func test_physics_properties_set_correctly() -> void:
+	assert_float(_die.gravity_scale).is_equal(0.0)
+	assert_float(_die.linear_damp).is_equal_approx(2.65, 0.01)
+	assert_float(_die.angular_damp).is_equal_approx(3.0, 0.01)
+	assert_object(_die.physics_material_override).is_not_null()
+	assert_float(_die.physics_material_override.bounce).is_equal_approx(0.475, 0.01)
+	assert_float(_die.physics_material_override.friction).is_equal_approx(0.4, 0.01)
+
+
+func test_jitter_constants_are_reasonable() -> void:
+	assert_float(PhysicsDie.JITTER_SPEED_CAP).is_greater(PhysicsDie.SETTLE_VELOCITY_THRESHOLD)
+	assert_float(PhysicsDie.JITTER_FORCE_SETTLE_TIME).is_greater(0.0)
+
+
+func test_setup_resets_jitter_timer() -> void:
+	_die._jitter_timer = 1.5
+	_die.setup(0, DiceData.make_standard_d6())
+	assert_float(_die._jitter_timer).is_equal(0.0)
+
+
+func test_jitter_timer_accumulates_below_speed_cap() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	_die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+	_die.freeze = false
+	# Simulate low-speed jitter below JITTER_SPEED_CAP but above SETTLE_VELOCITY_THRESHOLD.
+	_die.linear_velocity = Vector2(50.0, 0.0)
+	_die._jitter_timer = 0.0
+	_die._physics_process(0.5)
+	assert_float(_die._jitter_timer).is_equal_approx(0.5, 0.01)
+	_die._physics_process(0.5)
+	assert_float(_die._jitter_timer).is_equal_approx(1.0, 0.01)
+
+
+func test_jitter_timer_resets_above_speed_cap() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	_die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+	_die.freeze = false
+	_die._jitter_timer = 1.5
+	# Speed above JITTER_SPEED_CAP should reset the timer.
+	_die.linear_velocity = Vector2(100.0, 0.0)
+	_die._physics_process(0.1)
+	assert_float(_die._jitter_timer).is_equal(0.0)
+
+
+func test_jitter_force_settles_after_timeout() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	_die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+	_die.freeze = false
+	_die.linear_velocity = Vector2(50.0, 0.0)
+	_die._jitter_timer = PhysicsDie.JITTER_FORCE_SETTLE_TIME - 0.01
+	_die._physics_process(0.02)
+	# Should have force-settled.
+	assert_int(_die.physics_state).is_equal(PhysicsDie.DiePhysicsState.SETTLED)
+	assert_bool(_die.freeze).is_true()
+	assert_float(_die.linear_velocity.length()).is_equal(0.0)
+
+
+func test_shift_toggled_keep_signal_exists() -> void:
+	_die.setup(0, DiceData.make_standard_d6())
+	# Verify the signal is defined and emittable.
+	assert_bool(_die.has_signal("shift_toggled_keep")).is_true()
