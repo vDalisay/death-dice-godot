@@ -92,3 +92,8 @@ func test_constants_are_sensible() -> void:
 	assert_float(DiceArena.THROW_STAGGER_SPAWN_SWEEP_X).is_greater(0.0)
 	assert_float(DiceArena.THROW_STAGGER_TARGET_SWEEP_X).is_greater(0.0)
 	assert_float(DiceArena.THROW_STAGGER_MAGNITUDE_VARIANCE).is_greater(0.0)
+	assert_float(DiceArena.CONTAINMENT_MIN_BOUNCE_SPEED).is_greater(0.0)
+	assert_float(DiceArena.CONTAINMENT_INWARD_NUDGE).is_greater(0.0)
+	assert_float(DiceArena.SOFT_SEPARATION_RADIUS_MULT).is_greater(1.0)
+	assert_float(DiceArena.SOFT_SEPARATION_MAX_SPEED).is_greater(0.0)
+	assert_float(DiceArena.SOFT_SEPARATION_PUSH).is_greater(0.0)

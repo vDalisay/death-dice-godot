@@ -23,10 +23,11 @@ const SETTLE_VELOCITY_THRESHOLD: float = 15.0
 const SETTLE_TIME_REQUIRED: float = 0.3
 const REROLL_VELOCITY_THRESHOLD: float = 150.0
 const COLLISION_COOLDOWN: float = 0.2
-const BUMP_BOOST_MIN_SPEED: float = 80.0
-const BUMP_BOOST_IMPULSE_MIN: float = 80.0
-const BUMP_BOOST_IMPULSE_MAX: float = 220.0
-const BUMP_BOOST_MULTIPLIER: float = 0.1
+const BUMP_BOOST_MIN_SPEED: float = 34.0
+const BUMP_BOOST_IMPULSE_MIN: float = 96.0
+const BUMP_BOOST_IMPULSE_MAX: float = 260.0
+const BUMP_BOOST_MULTIPLIER: float = 0.14
+const BUMP_TANGENT_JITTER: float = 0.22
 const SETTLE_POP_SCALE: float = 1.08
 const SETTLE_POP_DURATION: float = 0.12
 const IMPACT_FLASH_DURATION: float = 0.08
@@ -504,12 +505,14 @@ func _on_body_entered(other: Node) -> void:
 	# Add a small extra bump so collisions feel punchier.
 	var my_speed: float = linear_velocity.length()
 	var other_speed: float = other_die.linear_velocity.length()
-	if my_speed >= BUMP_BOOST_MIN_SPEED and other_speed >= BUMP_BOOST_MIN_SPEED:
+	var relative_speed: float = (linear_velocity - other_die.linear_velocity).length()
+	if my_speed >= BUMP_BOOST_MIN_SPEED or other_speed >= BUMP_BOOST_MIN_SPEED or relative_speed >= BUMP_BOOST_MIN_SPEED:
 		var collision_dir: Vector2 = (global_position - other_die.global_position).normalized()
 		if collision_dir == Vector2.ZERO:
 			collision_dir = Vector2.RIGHT.rotated(randf() * TAU)
+		collision_dir = collision_dir.rotated(randf_range(-BUMP_TANGENT_JITTER, BUMP_TANGENT_JITTER))
 		var bump_impulse: float = clamp(
-			(my_speed + other_speed) * BUMP_BOOST_MULTIPLIER,
+			(my_speed + other_speed + relative_speed * 0.5) * BUMP_BOOST_MULTIPLIER,
 			BUMP_BOOST_IMPULSE_MIN,
 			BUMP_BOOST_IMPULSE_MAX
 		)

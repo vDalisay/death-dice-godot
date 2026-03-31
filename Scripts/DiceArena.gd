@@ -41,6 +41,11 @@ const THROW_STAGGER_TARGET_SWEEP_X: float = 116.0
 const THROW_STAGGER_MAGNITUDE_VARIANCE: float = 0.12
 const BOUNDARY_GLOW_HIT_GAIN: float = 0.22
 const BOUNDARY_GLOW_DECAY_PER_SEC: float = 2.1
+const CONTAINMENT_MIN_BOUNCE_SPEED: float = 90.0
+const CONTAINMENT_INWARD_NUDGE: float = 54.0
+const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
+const SOFT_SEPARATION_MAX_SPEED: float = 150.0
+const SOFT_SEPARATION_PUSH: float = 38.0
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -75,6 +80,7 @@ func _physics_process(_delta: float) -> void:
 		_boundary_glow_energy = maxf(0.0, _boundary_glow_energy - BOUNDARY_GLOW_DECAY_PER_SEC * _delta)
 	_apply_boundary_glow()
 	_enforce_arena_containment()
+	_apply_soft_separation()
 	if not _settle_check_active:
 		return
 	# Check if all dice have settled
@@ -432,25 +438,57 @@ func _enforce_arena_containment() -> void:
 		var corrected: bool = false
 		if p.x < min_x:
 			p.x = min_x
-			die.linear_velocity.x = absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP
+			die.linear_velocity.x = maxf(absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
 			corrected = true
 		elif p.x > max_x:
 			p.x = max_x
-			die.linear_velocity.x = -absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP
+			die.linear_velocity.x = -maxf(absf(die.linear_velocity.x) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
 			corrected = true
 		if p.y < min_y:
 			p.y = min_y
-			die.linear_velocity.y = absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP
+			die.linear_velocity.y = maxf(absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
 			corrected = true
 		elif p.y > max_y:
 			p.y = max_y
-			die.linear_velocity.y = -absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP
+			die.linear_velocity.y = -maxf(absf(die.linear_velocity.y) * CONTAINMENT_BOUNCE_DAMP, CONTAINMENT_MIN_BOUNCE_SPEED)
 			corrected = true
 		if corrected:
 			die.global_position = p
+			var inward: Vector2 = (Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT * 0.5) - p).normalized()
+			if inward != Vector2.ZERO:
+				die.apply_central_impulse(inward * CONTAINMENT_INWARD_NUDGE)
 			hit_count += 1
 	if hit_count > 0:
 		_accumulate_boundary_glow(hit_count)
+
+
+func _apply_soft_separation() -> void:
+	if instant_mode or _dice.size() < 2:
+		return
+	var min_distance: float = PhysicsDie.COLLISION_RADIUS * SOFT_SEPARATION_RADIUS_MULT
+	var min_distance_sq: float = min_distance * min_distance
+	for i: int in _dice.size():
+		var a: PhysicsDie = _dice[i]
+		if a == null or a.freeze:
+			continue
+		if a.linear_velocity.length() > SOFT_SEPARATION_MAX_SPEED:
+			continue
+		for j: int in range(i + 1, _dice.size()):
+			var b: PhysicsDie = _dice[j]
+			if b == null or b.freeze:
+				continue
+			if b.linear_velocity.length() > SOFT_SEPARATION_MAX_SPEED:
+				continue
+			var delta_pos: Vector2 = a.global_position - b.global_position
+			var dist_sq: float = delta_pos.length_squared()
+			if dist_sq <= 0.0001 or dist_sq >= min_distance_sq:
+				continue
+			var dist: float = sqrt(dist_sq)
+			var normal: Vector2 = delta_pos / dist
+			var overlap_ratio: float = clampf((min_distance - dist) / min_distance, 0.0, 1.0)
+			var push: float = overlap_ratio * SOFT_SEPARATION_PUSH
+			a.apply_central_impulse(normal * push)
+			b.apply_central_impulse(-normal * push)
 
 
 func _accumulate_boundary_glow(hit_count: int) -> void:

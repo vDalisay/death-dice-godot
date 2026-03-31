@@ -35,6 +35,14 @@ func show_highlights(run: RunSaveData, prior_bests: Dictionary) -> void:
 	_animate_reveal()
 
 
+func _format_stat(name: String, value: int, prior_best: int) -> String:
+	if value > 0 and value >= prior_best:
+		return "%s: %d  (%s NEW BEST!)" % [name, value, _UITheme.GLYPH_STAR]
+	if prior_best > 0:
+		return "%s: %d (Best: %d)" % [name, value, prior_best]
+	return "%s: %d" % [name, value]
+
+
 func _on_close_pressed() -> void:
 	visible = false
 	closed.emit()
