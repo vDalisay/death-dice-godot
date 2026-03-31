@@ -198,7 +198,7 @@ func _ready() -> void:
 
 	# Hover popup showing face squares (hidden by default)
 	_name_popup = Panel.new()
-	_name_popup.size = Vector2(140, 24)
+	_name_popup.size = Vector2(220, 32)
 	_name_popup.top_level = true
 	_name_popup.position = Vector2.ZERO
 	_name_popup.pivot_offset = _name_popup.size * 0.5
@@ -725,7 +725,7 @@ func _build_face_squares() -> void:
 	var margin_h: float = 8.0  # 4px left + 4px right
 	var spacing: float = 4.0
 	var total_spacing: float = spacing * maxf(0.0, face_count - 1)
-	var sq_size: float = minf(18.0, (_name_popup.size.x - margin_h - total_spacing) / face_count)
+	var sq_size: float = minf(26.0, (_name_popup.size.x - margin_h - total_spacing) / face_count)
 	for face: DiceFaceData in die_data.faces:
 		var sq: ColorRect = ColorRect.new()
 		sq.custom_minimum_size = Vector2(sq_size, sq_size)
@@ -838,7 +838,12 @@ func _apply_visual() -> void:
 
 
 func _set_random_glyph() -> void:
-	if _face_label:
+	if not _face_label:
+		return
+	if die_data and die_data.faces.size() > 0:
+		var face: DiceFaceData = die_data.faces[randi() % die_data.faces.size()]
+		_face_label.text = face.get_display_text()
+	else:
 		_face_label.text = TUMBLE_GLYPHS[randi() % TUMBLE_GLYPHS.size()]
 
 
