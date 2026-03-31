@@ -271,36 +271,43 @@ func test_personal_best_not_overwritten_by_lower() -> void:
 # Bust Risk Indicator (#15)
 # ---------------------------------------------------------------------------
 
-func test_bust_risk_low_at_zero_stops() -> void:
+func test_bust_odds_increase_with_effective_stops() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
-	var text: String = root._get_bust_risk_text(0, 4)
-	assert_str(text).contains("LOW")
+	var low: float = root._estimate_bust_odds(0, 4)
+	var high: float = root._estimate_bust_odds(2, 4)
+	assert_float(high).is_greater(low)
 
 
-func test_bust_risk_high_at_threshold_minus_one() -> void:
+func test_bust_odds_increase_with_reroll_count() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
-	var text: String = root._get_bust_risk_text(3, 4)
-	assert_str(text).contains("HIGH")
+	root._reroll_count = 0
+	var initial: float = root._estimate_bust_odds(1, 4)
+	root._reroll_count = 3
+	var later: float = root._estimate_bust_odds(1, 4)
+	assert_float(later).is_greater(initial)
 
 
-func test_bust_risk_medium_in_between() -> void:
+func test_bust_odds_are_zero_when_no_rerollable_dice() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
-	var text: String = root._get_bust_risk_text(1, 4)
-	assert_str(text).contains("MEDIUM")
+	for i: int in GameManager.dice_pool.size():
+		root.dice_keep[i] = true
+		root.dice_keep_locked[i] = true
+	var odds: float = root._estimate_bust_odds(0, 4)
+	assert_float(odds).is_equal(0.0)
 
 
-func test_bust_risk_high_at_threshold() -> void:
+func test_bust_odds_are_one_when_threshold_reached() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
-	var text: String = root._get_bust_risk_text(4, 4)
-	assert_str(text).contains("HIGH")
+	var odds: float = root._estimate_bust_odds(4, 4)
+	assert_float(odds).is_equal(1.0)
 
 
 # ---------------------------------------------------------------------------

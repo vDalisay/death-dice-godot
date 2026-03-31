@@ -32,17 +32,17 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var turn_score_label: Label   = $ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox/TurnScoreLabel
 @onready var score_label: Label        = $ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox/ScoreLabel
 @onready var target_label: Label       = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/TargetLabel
-@onready var progress_bar: ProgressBar = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressBar
+@onready var progress_bar: ProgressBar = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressBar
 @onready var progress_hint_label: Label = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressHintLabel
+@onready var _combo_container: HFlowContainer = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ComboInlineContainer
 
 # -- Info row --
 @onready var stop_label: Label            = $InfoRow/StopLabel
-@onready var _risk_label: Label           = $InfoRow/RiskLabel
-@onready var _risk_container: HBoxContainer = $InfoRow/RiskContainer
-
-# -- Combo row --
-@onready var _combo_label: Label = $ComboRow/ComboLabel
-@onready var _combo_container: HFlowContainer = $ComboRow/ComboContainer
+@onready var _risk_meter: PanelContainer = $InfoRow/RiskMeter
+@onready var _risk_percent_label: Label = $InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskPercentLabel
+@onready var _risk_container: HBoxContainer = $InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskContainer
+@onready var _risk_tooltip: PanelContainer = $RiskTooltip
+@onready var _risk_tooltip_label: Label = $RiskTooltip/MarginContainer/RiskTooltipLabel
 
 # -- Status --
 @onready var status_label: Label = $StatusLabel
@@ -62,6 +62,7 @@ var _risk_pips: Array[Label] = []
 var _modifier_badges: Array[PanelContainer] = []
 var _last_modifier_types: Array[int] = []
 var _combo_badges_by_id: Dictionary = {}
+var _risk_tooltip_text: String = ""
 
 
 func _ready() -> void:
@@ -83,6 +84,8 @@ func _ready() -> void:
 	_refresh_modifier_display()
 	set_active_combos([])
 	_refresh_progress_display()
+	_risk_meter.mouse_entered.connect(_on_risk_meter_mouse_entered)
+	_risk_meter.mouse_exited.connect(_on_risk_meter_mouse_exited)
 	highscore_label.text = "HI: %d" % SaveManager.highscore
 
 
@@ -138,12 +141,16 @@ func _apply_theme_styling() -> void:
 
 	# Info row
 	stop_label.add_theme_font_size_override("font_size", 18)
-	_risk_label.add_theme_font_override("font", _UITheme.font_display())
-	_risk_label.add_theme_font_size_override("font_size", 10)
-	_risk_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-	_combo_label.add_theme_font_override("font", _UITheme.font_display())
-	_combo_label.add_theme_font_size_override("font_size", 10)
-	_combo_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_risk_meter.add_theme_stylebox_override("panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, _UITheme.PANEL_SURFACE, 0))
+	_risk_percent_label.add_theme_font_override("font", _UITheme.font_display())
+	_risk_percent_label.add_theme_font_size_override("font_size", 10)
+	_risk_percent_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_risk_tooltip.add_theme_stylebox_override("panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.ACTION_CYAN, 1))
+	_risk_tooltip_label.add_theme_font_override("font", _UITheme.font_body())
+	_risk_tooltip_label.add_theme_font_size_override("font_size", 13)
+	_risk_tooltip_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 
 	# Status
 	status_label.add_theme_font_size_override("font_size", 18)
@@ -174,14 +181,22 @@ func _cache_modifier_badges() -> void:
 # Public API — called by RollPhase to push turn-local info
 # ---------------------------------------------------------------------------
 
-func update_turn(turn_score: int, stop_count: int, bust_threshold: int, shield_count: int = 0) -> void:
+func update_turn(
+	turn_score: int,
+	stop_count: int,
+	bust_threshold: int,
+	shield_count: int = 0,
+	_reroll_count: int = 0,
+	bust_odds: float = 0.0,
+	risk_details: String = ""
+) -> void:
 	turn_score_label.text = "+%d" % turn_score
 	var stop_text: String = "STOP: %d/%d" % [stop_count, bust_threshold]
 	if shield_count > 0:
 		stop_text += " [%s×%d]" % [_UITheme.GLYPH_SHIELD, shield_count]
 	stop_label.text = stop_text
 	stop_label.modulate = _UITheme.DANGER_RED if stop_count > 0 else Color.WHITE
-	_update_risk_pips(stop_count, bust_threshold)
+	_update_risk_meter(bust_odds, risk_details)
 	_refresh_modifier_display()
 
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
@@ -218,7 +233,7 @@ func set_active_combos(combos: Array[RollCombo]) -> void:
 
 func _build_combo_badge(combo: RollCombo) -> PanelContainer:
 	var badge := PanelContainer.new()
-	badge.custom_minimum_size = Vector2(96, COMBO_BADGE_HEIGHT)
+	badge.custom_minimum_size = Vector2(80, COMBO_BADGE_HEIGHT)
 	badge.add_theme_stylebox_override(
 		"panel",
 		_UITheme.make_panel_stylebox(
@@ -228,7 +243,7 @@ func _build_combo_badge(combo: RollCombo) -> PanelContainer:
 			1
 		)
 	)
-	badge.pivot_offset = Vector2(48, COMBO_BADGE_HEIGHT * 0.5)
+	badge.pivot_offset = Vector2(40, COMBO_BADGE_HEIGHT * 0.5)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 8)
@@ -242,7 +257,7 @@ func _build_combo_badge(combo: RollCombo) -> PanelContainer:
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_override("font", _UITheme.font_mono())
-	name_label.add_theme_font_size_override("font_size", 18)
+	name_label.add_theme_font_size_override("font_size", 14)
 	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 	margin.add_child(name_label)
 
@@ -292,11 +307,26 @@ func show_floating_gold(amount: int) -> void:
 # Risk Pips
 # ---------------------------------------------------------------------------
 
-func _update_risk_pips(stop_count: int, bust_threshold: int) -> void:
-	var ratio: float = 0.0
-	if bust_threshold > 0 and stop_count > 0:
-		ratio = clampf(float(stop_count) / float(bust_threshold), 0.0, 1.0)
-	var filled: int = ceili(ratio * float(RISK_PIP_COUNT))
+func _update_risk_meter(bust_odds: float, details: String) -> void:
+	var ratio: float = clampf(bust_odds, 0.0, 1.0)
+	var percent: int = int(round(ratio * 100.0))
+	_risk_percent_label.text = "RISK %d%%" % percent
+	_risk_tooltip_text = details
+	if _risk_tooltip.visible:
+		_risk_tooltip_label.text = _risk_tooltip_text
+		_position_risk_tooltip()
+	_update_risk_pips(ratio)
+	var border_color: Color = _UITheme.SUCCESS_GREEN
+	if ratio >= 0.66:
+		border_color = _UITheme.DANGER_RED
+	elif ratio >= 0.33:
+		border_color = _UITheme.SCORE_GOLD
+	_risk_meter.add_theme_stylebox_override("panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, border_color, 1))
+
+
+func _update_risk_pips(risk_ratio: float) -> void:
+	var filled: int = ceili(clampf(risk_ratio, 0.0, 1.0) * float(RISK_PIP_COUNT))
 
 	var pip_color: Color = _UITheme.SUCCESS_GREEN
 	if filled >= 4:
@@ -309,6 +339,38 @@ func _update_risk_pips(stop_count: int, bust_threshold: int) -> void:
 	for i: int in RISK_PIP_COUNT:
 		_risk_pips[i].text = "●" if i < filled else "○"
 		_risk_pips[i].add_theme_color_override("font_color", pip_color if i < filled else _UITheme.MUTED_TEXT)
+
+
+func _on_risk_meter_mouse_entered() -> void:
+	if _risk_tooltip_text.is_empty():
+		return
+	_risk_tooltip_label.text = _risk_tooltip_text
+	_risk_tooltip.visible = true
+	_position_risk_tooltip()
+
+
+func _on_risk_meter_mouse_exited() -> void:
+	_risk_tooltip.visible = false
+
+
+func _position_risk_tooltip() -> void:
+	if not _risk_tooltip.visible:
+		return
+	var tooltip_size: Vector2 = _risk_tooltip.get_combined_minimum_size()
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var meter_rect: Rect2 = Rect2(_risk_meter.global_position, _risk_meter.size)
+	var pad: float = 8.0
+	var x: float = clampf(
+		meter_rect.position.x + meter_rect.size.x * 0.5 - tooltip_size.x * 0.5,
+		pad,
+		viewport_size.x - tooltip_size.x - pad
+	)
+	var above_y: float = meter_rect.position.y - tooltip_size.y - 10.0
+	var below_y: float = meter_rect.position.y + meter_rect.size.y + 10.0
+	var y: float = above_y
+	if y < pad:
+		y = minf(below_y, viewport_size.y - tooltip_size.y - pad)
+	_risk_tooltip.global_position = Vector2(x, y)
 
 
 # ---------------------------------------------------------------------------

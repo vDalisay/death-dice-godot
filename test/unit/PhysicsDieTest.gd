@@ -103,6 +103,18 @@ func test_hover_popup_visibility_changes() -> void:
 	assert_bool(_die._name_popup.visible).is_false()
 
 
+func test_hover_popup_is_centered_above_die_even_when_rotated() -> void:
+	var data: DiceData = DiceData.make_standard_d6()
+	_die.setup(0, data)
+	_die.global_position = Vector2(320, 240)
+	_die.rotation = 1.2
+	_die.scale = Vector2(1.1, 1.1)
+	_die._update_name_popup_position()
+	var expected_x: float = _die.global_position.x - _die._name_popup.size.x * 0.5
+	assert_float(_die._name_popup.global_position.x).is_equal(expected_x)
+	assert_float(_die._name_popup.global_position.y).is_less(_die.global_position.y)
+
+
 func test_motion_polish_methods_do_not_error() -> void:
 	_die.setup(0, DiceData.make_standard_d6())
 	_die.play_keep_lock_snap()

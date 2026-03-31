@@ -14,7 +14,7 @@ func test_risk_pips_zero_stops_all_empty() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud._update_risk_pips(0, 3)
+	hud._update_risk_pips(0.0)
 	for pip: Label in hud._risk_pips:
 		assert_str(pip.text).is_equal("○")
 
@@ -23,8 +23,8 @@ func test_risk_pips_one_of_three_fills_two() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud._update_risk_pips(1, 3)
-	# ratio = 1/3 ≈ 0.33, ceil(0.33 * 5) = 2
+	hud._update_risk_pips(0.33)
+	# ratio = 0.33, ceil(0.33 * 5) = 2
 	var filled: int = 0
 	for pip: Label in hud._risk_pips:
 		if pip.text == "●":
@@ -36,7 +36,7 @@ func test_risk_pips_at_threshold_fills_all() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud._update_risk_pips(3, 3)
+	hud._update_risk_pips(1.0)
 	# ratio = 1.0, ceil(1.0 * 5) = 5
 	var filled: int = 0
 	for pip: Label in hud._risk_pips:
@@ -236,8 +236,16 @@ func test_set_active_combos_renders_combo_badges() -> void:
 		RollCombo.make("chain_reaction", "Chain Reaction", {}, Color(1.0, 0.55, 0.15)),
 	]
 	hud.set_active_combos(combos)
-	var combo_container: HFlowContainer = hud.get_node("ComboRow/ComboContainer") as HFlowContainer
+	var combo_container: HFlowContainer = hud.get_node("ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ComboInlineContainer") as HFlowContainer
 	assert_int(combo_container.get_child_count()).is_equal(2)
+
+
+func test_update_turn_sets_risk_percent_label() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.update_turn(5, 1, 3, 0, 2, 0.42, "detail")
+	assert_str(hud._risk_percent_label.text).contains("42")
 
 
 func test_flash_combo_updates_status_text() -> void:

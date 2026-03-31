@@ -40,6 +40,7 @@ const STOP_IMPACT_DURATION: float = 0.18
 const KEEP_LOCK_SNAP_DURATION: float = 0.14
 const KEEP_OPACITY_TWEEN_DURATION: float = 0.12
 const NAME_POPUP_FADE_DURATION: float = 0.1
+const NAME_POPUP_GAP: float = 8.0
 const SHIELD_ABSORB_DURATION: float = 0.3
 const REROLL_LIFT_OPACITY: float = 0.55
 const LAUNCH_BURST_DURATION: float = 0.28
@@ -184,7 +185,8 @@ func _ready() -> void:
 	# Hover popup for die name (hidden by default)
 	_name_popup = Panel.new()
 	_name_popup.size = Vector2(140, 24)
-	_name_popup.position = Vector2(-70, -DIE_SIZE / 2.0 - 34)
+	_name_popup.top_level = true
+	_name_popup.position = Vector2.ZERO
 	_name_popup.pivot_offset = _name_popup.size * 0.5
 	_name_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_name_popup.visible = false
@@ -231,6 +233,7 @@ func setup(index: int, data: DiceData) -> void:
 	rarity_color = data.get_rarity_color_value() if data else Color.TRANSPARENT
 	if _name_popup_label:
 		_name_popup_label.text = data.dice_name if data else ""
+	_update_name_popup_position()
 	if _face_label:
 		_face_label.text = "?"
 	if _glyph_label:
@@ -466,7 +469,7 @@ func _physics_process(delta: float) -> void:
 	if _glyph_label:
 		_glyph_label.rotation = neg_rot
 	if _name_popup:
-		_name_popup.rotation = neg_rot
+		_update_name_popup_position()
 
 	# Update collision cooldowns
 	var expired: Array[RID] = []
@@ -591,6 +594,7 @@ func _on_mouse_entered() -> void:
 	_is_hovered = true
 	if _name_popup and _name_popup_label and die_data:
 		_name_popup_label.text = die_data.dice_name
+		_update_name_popup_position()
 		_name_popup.visible = true
 		_name_popup.modulate.a = 0.0
 		if _popup_tween and _popup_tween.is_valid():
@@ -621,6 +625,16 @@ func _animate_hover(target_scale: Vector2) -> void:
 		_scale_tween.kill()
 	_scale_tween = create_tween()
 	_scale_tween.tween_property(self, "scale", target_scale, SCALE_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _update_name_popup_position() -> void:
+	if _name_popup == null:
+		return
+	var half_height: float = DIE_SIZE * maxf(0.8, scale.y) * 0.5
+	_name_popup.global_position = global_position + Vector2(
+		-_name_popup.size.x * 0.5,
+		-half_height - NAME_POPUP_GAP - _name_popup.size.y
+	)
 
 
 # ---------------------------------------------------------------------------

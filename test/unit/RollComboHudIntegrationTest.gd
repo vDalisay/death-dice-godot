@@ -23,5 +23,5 @@ func test_check_roll_combos_populates_hud_combo_row() -> void:
 		root.dice_stopped[i] = false
 	root._check_roll_combos()
 	runner.simulate_frames(1)
-	var combo_container: HFlowContainer = root.hud.get_node("ComboRow/ComboContainer") as HFlowContainer
+	var combo_container: HFlowContainer = root.hud.get_node("ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ComboInlineContainer") as HFlowContainer
 	assert_int(combo_container.get_child_count()).is_greater(0)

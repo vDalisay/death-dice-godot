@@ -114,9 +114,19 @@ layout_mode = 2
 layout_mode = 2
 text = "Target: 30"
 
-[node name="ProgressBar" type="ProgressBar" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
+[node name="ProgressContentRow" type="HBoxContainer" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ComboInlineContainer" type="HFlowContainer" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
+layout_mode = 2
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
+
+[node name="ProgressBar" type="ProgressBar" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 18)
+size_flags_horizontal = 3
 show_percentage = false
 max_value = 100.0
 
@@ -135,27 +145,28 @@ text = "Stops: 0 / 3"
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RiskLabel" type="Label" parent="InfoRow"]
+[node name="RiskMeter" type="PanelContainer" parent="InfoRow"]
 layout_mode = 2
-text = "RISK:"
+mouse_filter = 0
 
-[node name="RiskContainer" type="HBoxContainer" parent="InfoRow"]
+[node name="RiskMeterMargin" type="MarginContainer" parent="InfoRow/RiskMeter"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="RiskMeterRow" type="HBoxContainer" parent="InfoRow/RiskMeter/RiskMeterMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RiskPercentLabel" type="Label" parent="InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow"]
+layout_mode = 2
+text = "RISK 0%"
+
+[node name="RiskContainer" type="HBoxContainer" parent="InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow"]
 layout_mode = 2
 theme_override_constants/separation = 4
-
-[node name="ComboRow" type="HBoxContainer" parent="."]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="ComboLabel" type="Label" parent="ComboRow"]
-layout_mode = 2
-text = "COMBOS:"
-
-[node name="ComboContainer" type="HFlowContainer" parent="ComboRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/h_separation = 6
-theme_override_constants/v_separation = 6
 
 [node name="StatusLabel" type="Label" parent="."]
 layout_mode = 2
@@ -186,4 +197,22 @@ layout_mode = 2
 [node name="TooltipDescLabel" type="Label" parent="ModifierTooltip/MarginContainer/TooltipVBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(250, 0)
+autowrap_mode = 3
+
+[node name="RiskTooltip" type="PanelContainer" parent="."]
+visible = false
+top_level = true
+z_index = 101
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="RiskTooltip"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="RiskTooltipLabel" type="Label" parent="RiskTooltip/MarginContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 0)
 autowrap_mode = 3

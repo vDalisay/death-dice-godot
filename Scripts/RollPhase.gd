@@ -12,7 +12,7 @@ const HOT_STREAK_MULT_1: float = 1.1
 const HOT_STREAK_MULT_2: float = 1.2
 const JACKPOT_MIN_DICE: int = 5
 const JACKPOT_GOLD_BONUS: float = 0.25
-const ROLL_ANIMATION_LOCK_DURATION: float = 0.9
+const POST_ROLL_EFFECT_LOCK_DURATION: float = 0.2
 const BANK_CASCADE_STEP_DELAY: float = 0.22
 const SHAKE_ROLL: float = 2.0
 const SHAKE_STOP: float = 3.0
@@ -408,6 +408,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		return
 
 	_check_roll_combos()
+	_release_roll_animation_lock(POST_ROLL_EFFECT_LOCK_DURATION)
 
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
@@ -598,6 +599,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 		hud.show_status("CHAIN x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
 
 	_check_roll_combos()
+	_release_roll_animation_lock(POST_ROLL_EFFECT_LOCK_DURATION)
 
 	if turn_state == TurnState.ACTIVE and _all_dice_resolved():
 		_on_bank_pressed()
@@ -654,6 +656,69 @@ func _get_bust_risk_text(effective_stops: int, threshold: int) -> String:
 	else:
 		return "Bust risk: MEDIUM"
 
+
+func _estimate_next_reroll_bust_chance(effective_stops: int, threshold: int) -> float:
+	var stops_needed: int = threshold - effective_stops
+	if stops_needed <= 0:
+		return 1.0
+	var distribution: Array[float] = [1.0]
+	for i: int in GameManager.dice_pool.size():
+		if dice_keep[i] or dice_keep_locked[i]:
+			continue
+		var die_data: DiceData = GameManager.dice_pool[i]
+		if die_data == null or die_data.faces.is_empty():
+			continue
+		var face_count: float = float(die_data.faces.size())
+		var p0: float = 0.0
+		var p1: float = 0.0
+		var p2: float = 0.0
+		for face: DiceFaceData in die_data.faces:
+			if face == null:
+				continue
+			match face.type:
+				DiceFaceData.FaceType.CURSED_STOP:
+					p2 += 1.0 / face_count
+				DiceFaceData.FaceType.STOP:
+					p1 += 1.0 / face_count
+				_:
+					p0 += 1.0 / face_count
+		var next_dist: Array[float] = []
+		next_dist.resize(distribution.size() + 2)
+		next_dist.fill(0.0)
+		for s: int in distribution.size():
+			var base_prob: float = distribution[s]
+			next_dist[s] += base_prob * p0
+			next_dist[s + 1] += base_prob * p1
+			next_dist[s + 2] += base_prob * p2
+		distribution = next_dist
+	var chance: float = 0.0
+	for s: int in distribution.size():
+		if s >= stops_needed:
+			chance += distribution[s]
+	return clampf(chance, 0.0, 1.0)
+
+
+func _estimate_bust_odds(effective_stops: int, threshold: int) -> float:
+	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
+	var horizon_rolls: int = maxi(1, _reroll_count + 1)
+	var survive_all: float = pow(1.0 - next_roll_chance, float(horizon_rolls))
+	return clampf(1.0 - survive_all, 0.0, 1.0)
+
+
+func _build_risk_details(effective_stops: int, shield_count: int, threshold: int, bust_odds: float) -> String:
+	var rerollable_count: int = _get_rerollable_count()
+	var next_roll_odds: int = int(round(_estimate_next_reroll_bust_chance(effective_stops, threshold) * 100.0))
+	var projected_odds: int = int(round(bust_odds * 100.0))
+	return "Bust odds (next reroll): %d%%\nProjected odds (current reroll streak): %d%%\nStops: %d/%d (shields: %d)\nRerollable dice: %d | Rerolls taken: %d" % [
+		next_roll_odds,
+		projected_odds,
+		effective_stops,
+		threshold,
+		shield_count,
+		rerollable_count,
+		_reroll_count,
+	]
+
 ## Sync the i-th PhysicsDie's visual flags to match RollPhase tracking state.
 func _sync_arena_die_state(index: int) -> void:
 	var die: PhysicsDie = dice_arena.get_die(index)
@@ -676,21 +741,18 @@ func _sync_all_dice() -> void:
 func _sync_ui() -> void:
 	var shield_count: int = _count_shields()
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
+	var threshold: int = _get_bust_threshold()
+	var bust_odds: float = _estimate_bust_odds(effective_stops, threshold)
+	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds)
 	var turn_score: int = _calculate_turn_score()
-	hud.update_turn(turn_score, effective_stops, _get_bust_threshold(), shield_count)
+	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details)
 	_sync_buttons()
 
 	match turn_state:
 		TurnState.IDLE:
 			hud.show_status("Press 'Roll All' to begin your turn!")
 		TurnState.ACTIVE:
-			var risk_text: String = _get_bust_risk_text(effective_stops, _get_bust_threshold())
-			var risk_color: Color = Color.WHITE
-			if effective_stops >= _get_bust_threshold() - 1 and effective_stops > 0:
-				risk_color = Color(0.9, 0.3, 0.3)
-			elif effective_stops > 0:
-				risk_color = Color(1.0, 0.7, 0.2)
-			hud.show_status(risk_text, risk_color)
+			pass
 		TurnState.BUST:
 			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:
@@ -814,9 +876,18 @@ func _sync_buttons() -> void:
 func _begin_roll_animation_lock() -> void:
 	_is_roll_animating = true
 	_roll_anim_nonce += 1
-	var nonce: int = _roll_anim_nonce
 	_sync_buttons()
-	get_tree().create_timer(ROLL_ANIMATION_LOCK_DURATION).timeout.connect(func() -> void:
+
+
+func _release_roll_animation_lock(delay: float = 0.0) -> void:
+	var nonce: int = _roll_anim_nonce
+	if delay <= 0.0:
+		if nonce != _roll_anim_nonce:
+			return
+		_is_roll_animating = false
+		_sync_buttons()
+		return
+	get_tree().create_timer(delay).timeout.connect(func() -> void:
 		if nonce != _roll_anim_nonce:
 			return
 		_is_roll_animating = false
