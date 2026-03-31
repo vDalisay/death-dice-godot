@@ -34,7 +34,7 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var target_label: Label       = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/TargetLabel
 @onready var progress_bar: ProgressBar = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressBar
 @onready var progress_hint_label: Label = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressHintLabel
-@onready var _combo_container: HFlowContainer = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ComboInlineContainer
+@onready var _streak_slot: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot
 
 # -- Info row --
 @onready var stop_label: Label            = $InfoRow/StopLabel
@@ -43,6 +43,9 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var _risk_container: HBoxContainer = $InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskContainer
 @onready var _risk_tooltip: PanelContainer = $RiskTooltip
 @onready var _risk_tooltip_label: Label = $RiskTooltip/MarginContainer/RiskTooltipLabel
+
+# -- Combo row --
+@onready var _combo_container: HFlowContainer = $ComboRow/ComboContainer
 
 # -- Status --
 @onready var status_label: Label = $StatusLabel
@@ -202,6 +205,16 @@ func update_turn(
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.text     = message
 	status_label.modulate = colour
+
+
+func attach_streak_display(display: Control) -> void:
+	if display == null or _streak_slot == null:
+		return
+	if display.get_parent() != null:
+		display.get_parent().remove_child(display)
+	_streak_slot.add_child(display)
+	if display.has_method("set_embedded_layout"):
+		display.call("set_embedded_layout")
 
 
 func flash_combo(combo_name: String, colour: Color, combo_id: String = "") -> void:

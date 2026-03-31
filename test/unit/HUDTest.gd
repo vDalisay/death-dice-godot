@@ -236,8 +236,16 @@ func test_set_active_combos_renders_combo_badges() -> void:
 		RollCombo.make("chain_reaction", "Chain Reaction", {}, Color(1.0, 0.55, 0.15)),
 	]
 	hud.set_active_combos(combos)
-	var combo_container: HFlowContainer = hud.get_node("ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ComboInlineContainer") as HFlowContainer
+	var combo_container: HFlowContainer = hud.get_node("ComboRow/ComboContainer") as HFlowContainer
 	assert_int(combo_container.get_child_count()).is_equal(2)
+
+
+func test_hud_has_streak_slot_in_progress_tile() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	var slot: Control = hud.get_node("ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot") as Control
+	assert_object(slot).is_not_null()
 
 
 func test_update_turn_sets_risk_percent_label() -> void:

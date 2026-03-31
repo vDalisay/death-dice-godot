@@ -95,7 +95,7 @@ func _ready() -> void:
 	career_button.visible = false
 	codex_button.visible = false
 	_streak_display = StreakDisplayScript.new()
-	add_child(_streak_display)
+	hud.attach_streak_display(_streak_display)
 	_screen_shake = ScreenShakeScript.new()
 	add_child(_screen_shake)
 	_screen_shake.setup(_roll_content)

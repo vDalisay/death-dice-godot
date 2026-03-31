@@ -118,10 +118,9 @@ text = "Target: 30"
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ComboInlineContainer" type="HFlowContainer" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
+[node name="StreakSlot" type="Control" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
 layout_mode = 2
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 4
+custom_minimum_size = Vector2(96, 62)
 
 [node name="ProgressBar" type="ProgressBar" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
 layout_mode = 2
@@ -167,6 +166,20 @@ text = "RISK 0%"
 [node name="RiskContainer" type="HBoxContainer" parent="InfoRow/RiskMeter/RiskMeterMargin/RiskMeterRow"]
 layout_mode = 2
 theme_override_constants/separation = 4
+
+[node name="ComboRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ComboLabel" type="Label" parent="ComboRow"]
+layout_mode = 2
+text = "COMBOS:"
+
+[node name="ComboContainer" type="HFlowContainer" parent="ComboRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
 
 [node name="StatusLabel" type="Label" parent="."]
 layout_mode = 2

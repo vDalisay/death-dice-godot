@@ -17,6 +17,7 @@ var _mult_label: Label = null
 var _container: Control = null
 var _flicker_timer: float = 0.0
 var _pulse_tween: Tween = null
+var _embedded_layout: bool = false
 
 
 func _ready() -> void:
@@ -46,6 +47,19 @@ func _ready() -> void:
 	_container.add_child(_mult_label)
 
 	visible = false
+	if _embedded_layout:
+		_apply_embedded_layout()
+
+
+func set_embedded_layout() -> void:
+	_embedded_layout = true
+	if _container != null:
+		_apply_embedded_layout()
+
+
+func _apply_embedded_layout() -> void:
+	_container.position = Vector2.ZERO
+	scale = Vector2(0.6, 0.6)
 
 
 func _process(delta: float) -> void:
