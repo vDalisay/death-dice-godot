@@ -9,6 +9,8 @@ const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tsc
 const SCORE_COUNT_DURATION: float = 0.5
 const GOLD_FLOAT_DURATION: float = 1.0
 const GOLD_COUNT_DURATION: float = 0.35
+const PROGRESS_LERP_DURATION: float = 0.4
+const PROGRESS_LERP_MIN_DURATION: float = 0.12
 const ALMOST_THERE_THRESHOLD: float = 0.9
 const RISK_PIP_COUNT: int = 5
 const COMBO_BADGE_HEIGHT: int = 26
@@ -51,6 +53,7 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var _progress_panel: PanelContainer   = $ScoreRow/ProgressPanel
 
 var _score_tween: Tween = null
+var _progress_tween: Tween = null
 var _progress_pulse_tween: Tween = null
 var _combo_flash_tween: Tween = null
 var _gold_tween: Tween = null
@@ -362,8 +365,40 @@ func _refresh_stage_display() -> void:
 
 func _refresh_progress_display() -> void:
 	var target: int = maxi(1, GameManager.stage_target_score)
-	var ratio: float = clampf(float(GameManager.total_score) / float(target), 0.0, 1.0)
-	progress_bar.value = ratio * 100.0
+	var target_value: float = clampf(float(GameManager.total_score) / float(target), 0.0, 1.0) * 100.0
+	if is_equal_approx(progress_bar.value, target_value):
+		_set_progress_bar_value(target_value)
+		return
+	if target_value < progress_bar.value:
+		_stop_progress_tween()
+		_set_progress_bar_value(target_value)
+		return
+	_animate_progress_bar_to(target_value)
+
+
+func _animate_progress_bar_to(target_value: float) -> void:
+	_stop_progress_tween()
+	var delta: float = absf(target_value - progress_bar.value)
+	var duration: float = lerpf(PROGRESS_LERP_MIN_DURATION, PROGRESS_LERP_DURATION, delta / 100.0)
+	_progress_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_progress_tween.tween_method(_set_progress_bar_value, progress_bar.value, target_value, duration)
+	_progress_tween.finished.connect(func() -> void:
+		_progress_tween = null
+	)
+
+
+func _stop_progress_tween() -> void:
+	if _progress_tween != null and _progress_tween.is_valid():
+		_progress_tween.kill()
+	_progress_tween = null
+
+
+func _set_progress_bar_value(value: float) -> void:
+	progress_bar.value = value
+	_update_progress_state(value / 100.0)
+
+
+func _update_progress_state(ratio: float) -> void:
 	var almost_there: bool = ratio >= ALMOST_THERE_THRESHOLD and ratio < 1.0
 	progress_hint_label.text = "ALMOST THERE" if almost_there else ""
 	if almost_there:

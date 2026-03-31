@@ -134,6 +134,36 @@ func test_score_label_total_format() -> void:
 	assert_str(hud.score_label.text).is_equal("Total: 150")
 
 
+func test_progress_bar_lerps_when_score_increases() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.progress_bar.value = 10.0
+	GameManager.total_score = 60
+	hud._refresh_progress_display()
+	assert_object(hud._progress_tween).is_not_null()
+	await get_tree().process_frame
+	assert_float(hud.progress_bar.value).is_greater(10.0)
+	assert_float(hud.progress_bar.value).is_less(60.0)
+	await hud._progress_tween.finished
+	assert_float(hud.progress_bar.value).is_equal(60.0)
+
+
+func test_progress_bar_snaps_when_score_decreases() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.progress_bar.value = 80.0
+	GameManager.total_score = 20
+	hud._refresh_progress_display()
+	assert_object(hud._progress_tween).is_null()
+	assert_float(hud.progress_bar.value).is_equal(20.0)
+
+
 # ---------------------------------------------------------------------------
 # Theme styling applied
 # ---------------------------------------------------------------------------

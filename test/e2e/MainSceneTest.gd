@@ -123,7 +123,8 @@ func test_hud_progress_shows_almost_there_near_target() -> void:
 	var near_target: int = int(float(GameManager.stage_target_score) * 0.9)
 	GameManager.total_score = near_target
 	GameManager.score_changed.emit(near_target)
-	await runner.simulate_frames(1)
+	assert_object(root.hud._progress_tween).is_not_null()
+	await root.hud._progress_tween.finished
 	assert_str(root.hud.progress_hint_label.text).is_equal("ALMOST THERE")
 	assert_int(int(root.hud.progress_bar.value)).is_greater_equal(90)
 

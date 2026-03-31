@@ -42,6 +42,24 @@ func test_overlay_set_enabled_toggles_visibility() -> void:
 	assert_bool(overlay._scanline_rect.visible).is_true()
 
 
+func test_scanline_overlay_covers_full_screen() -> void:
+	var overlay: ScreenOverlay = auto_free(ScreenOverlay.new())
+	add_child(overlay)
+	await get_tree().process_frame
+	assert_float(overlay._scanline_rect.anchor_left).is_equal(0.0)
+	assert_float(overlay._scanline_rect.anchor_top).is_equal(0.0)
+	assert_float(overlay._scanline_rect.anchor_right).is_equal(1.0)
+	assert_float(overlay._scanline_rect.anchor_bottom).is_equal(1.0)
+
+
+func test_scanline_material_uses_configured_intensity() -> void:
+	var overlay: ScreenOverlay = auto_free(ScreenOverlay.new())
+	add_child(overlay)
+	await get_tree().process_frame
+	var intensity: float = overlay._scanline_material.get_shader_parameter("intensity") as float
+	assert_float(intensity).is_equal(ScreenOverlay.SCANLINE_INTENSITY)
+
+
 func test_chromatic_rect_starts_hidden() -> void:
 	var overlay: ScreenOverlay = auto_free(ScreenOverlay.new())
 	add_child(overlay)

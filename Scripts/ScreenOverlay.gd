@@ -7,7 +7,7 @@ const ScanlineShader: Shader = preload("res://Shaders/scanline.gdshader")
 const VignetteShader: Shader = preload("res://Shaders/vignette.gdshader")
 const ChromaticShader: Shader = preload("res://Shaders/chromatic_aberration.gdshader")
 
-const SCANLINE_INTENSITY: float = 0.06
+const SCANLINE_INTENSITY: float = 0.12
 const VIGNETTE_INTENSITY: float = 0.35
 const CHROMATIC_BUST_PEAK: float = 0.025
 const CHROMATIC_JACKPOT_PEAK: float = 0.015
@@ -15,6 +15,7 @@ const CHROMATIC_BUST_DURATION: float = 0.5
 const CHROMATIC_JACKPOT_DURATION: float = 0.4
 
 var _scanline_rect: ColorRect = null
+var _scanline_material: ShaderMaterial = null
 var _vignette_rect: ColorRect = null
 var _chromatic_rect: ColorRect = null
 var _chromatic_material: ShaderMaterial = null
@@ -70,10 +71,10 @@ func _build_scanline() -> void:
 	_scanline_rect = ColorRect.new()
 	_scanline_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scanline_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var mat := ShaderMaterial.new()
-	mat.shader = ScanlineShader
-	mat.set_shader_parameter("intensity", SCANLINE_INTENSITY)
-	_scanline_rect.material = mat
+	_scanline_material = ShaderMaterial.new()
+	_scanline_material.shader = ScanlineShader
+	_scanline_material.set_shader_parameter("intensity", SCANLINE_INTENSITY)
+	_scanline_rect.material = _scanline_material
 	add_child(_scanline_rect)
 
 
