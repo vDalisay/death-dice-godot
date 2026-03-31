@@ -138,12 +138,12 @@ func _finish_roll() -> void:
 
 
 func _play_loss_shake() -> void:
+	_modal.pivot_offset = _modal.size * 0.5
 	var tween: Tween = create_tween()
-	tween.tween_property(_modal, "position", Vector2(-12, 0), 0.04)
-	tween.tween_property(_modal, "position", Vector2(12, 0), 0.05)
-	tween.tween_property(_modal, "position", Vector2(-8, 0), 0.04)
-	tween.tween_property(_modal, "position", Vector2(8, 0), 0.04)
-	tween.tween_property(_modal, "position", Vector2.ZERO, 0.05)
+	tween.tween_property(_modal, "rotation_degrees", 15.0, 0.6) \
+		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_modal, "rotation_degrees", 0.0, 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 
 func _on_close_pressed() -> void:

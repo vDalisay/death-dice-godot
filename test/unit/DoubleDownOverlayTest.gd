@@ -32,3 +32,19 @@ func test_close_button_hidden_on_open() -> void:
 	overlay.open(12)
 	var close_button: Button = overlay.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/CloseButton") as Button
 	assert_bool(close_button.visible).is_false()
+
+
+func test_loss_shake_uses_rotation_not_position() -> void:
+	var overlay: DoubleDownOverlay = auto_free(DoubleDownScene.instantiate()) as DoubleDownOverlay
+	add_child(overlay)
+	await await_idle_frame()
+	overlay.open(20)
+	await await_idle_frame()
+	var modal: PanelContainer = overlay.get_node("CenterContainer/Modal") as PanelContainer
+	var pos_before: Vector2 = modal.position
+	overlay.call("_play_loss_shake")
+	await await_idle_frame()
+	# Modal position should stay unchanged (no position-based shaking).
+	assert_vector(modal.position).is_equal(pos_before)
+	# Pivot should be set to center of modal for proper rotation.
+	assert_vector(modal.pivot_offset).is_equal(modal.size * 0.5)
