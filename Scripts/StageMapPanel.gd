@@ -9,8 +9,8 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const NODE_SIZE: float = 56.0
 const NODE_SPACING_X: float = 120.0
-const NODE_SPACING_Y: float = 72.0
 const MAP_TOP_MARGIN: float = 20.0
+const MAP_BOTTOM_MARGIN: float = 20.0
 const LINE_COLOR: Color = Color("#555577")
 const LINE_COLOR_VISITED: Color = Color("#00E676", 0.5)
 const LINE_WIDTH: float = 2.0
@@ -66,7 +66,11 @@ func _rebuild_map() -> void:
 		return
 
 	var map_width: float = _map_container.size.x
+	var map_height: float = _map_container.size.y
 	var row_count: int = _stage_map.get_row_count()
+	# Dynamically compute vertical spacing to fill the full map area.
+	var usable_height: float = map_height - MAP_TOP_MARGIN - MAP_BOTTOM_MARGIN - NODE_SIZE
+	var row_spacing_y: float = usable_height / float(maxi(row_count - 1, 1))
 
 	# Build node buttons row by row.
 	for r: int in row_count:
@@ -75,7 +79,7 @@ func _rebuild_map() -> void:
 		var node_count: int = row.size()
 		var total_width: float = float(node_count - 1) * NODE_SPACING_X
 		var start_x: float = (map_width - total_width) * 0.5
-		var y: float = MAP_TOP_MARGIN + float(r) * NODE_SPACING_Y
+		var y: float = MAP_TOP_MARGIN + float(r) * row_spacing_y
 
 		for c: int in node_count:
 			var node: MapNodeData = row[c] as MapNodeData
@@ -204,8 +208,8 @@ func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> vo
 # ---------------------------------------------------------------------------
 
 func _apply_theme_styling() -> void:
-	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
-	_backdrop.color = Color(0, 0, 0, 0.92)
+	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(_UITheme.BACKGROUND, 0))
+	_backdrop.color = Color(0, 0, 0, 0.0)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 28)
 	_title_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
