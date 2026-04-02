@@ -35,6 +35,7 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 	7: "←×",        # MULTIPLY_LEFT
 	8: "☠",         # CURSED_STOP
 	9: "!",         # INSURANCE
+	10: "🍀",        # LUCK
 }
 
 ## State fill colors (dark-on-dark palette)

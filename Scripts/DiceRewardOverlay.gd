@@ -26,7 +26,7 @@ const MIN_GREY_WEIGHT: float = 0.10
 
 # Dice pools per rarity tier — factory method names.
 const GREY_POOL: Array[String] = ["make_simple_d6", "make_standard_d6", "make_blank_canvas_d6"]
-const GREEN_POOL: Array[String] = ["make_lucky_d6", "make_heavy_d6"]
+const GREEN_POOL: Array[String] = ["make_lucky_d6", "make_heavy_d6", "make_fortune_d6"]
 const BLUE_POOL: Array[String] = ["make_gambler_d6", "make_golden_d6", "make_insurance_d6"]
 const PURPLE_POOL: Array[String] = ["make_explosive_d6", "make_pink_d6"]
 
@@ -272,4 +272,6 @@ static func _face_color(face: DiceFaceData) -> Color:
 			return Color(1.0, 0.5, 0.0)
 		DiceFaceData.FaceType.INSURANCE:
 			return Color(0.3, 1.0, 0.6)
+		DiceFaceData.FaceType.LUCK:
+			return Color(0.4, 0.9, 0.3)
 	return Color(0.9, 0.9, 0.9)

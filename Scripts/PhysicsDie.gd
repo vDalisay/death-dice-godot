@@ -704,6 +704,8 @@ static func face_type_color(ft: DiceFaceData.FaceType) -> Color:
 			return _UITheme.NEON_PURPLE
 		DiceFaceData.FaceType.INSURANCE:
 			return _UITheme.ACTION_CYAN
+		DiceFaceData.FaceType.LUCK:
+			return Color(0.4, 0.9, 0.3)
 	return _UITheme.MUTED_TEXT
 
 

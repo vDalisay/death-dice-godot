@@ -1,7 +1,7 @@
 class_name DiceFaceData
 extends Resource
 
-enum FaceType { NUMBER, BLANK, STOP, AUTO_KEEP, SHIELD, MULTIPLY, EXPLODE, MULTIPLY_LEFT, CURSED_STOP, INSURANCE }
+enum FaceType { NUMBER, BLANK, STOP, AUTO_KEEP, SHIELD, MULTIPLY, EXPLODE, MULTIPLY_LEFT, CURSED_STOP, INSURANCE, LUCK }
 
 @export var type: FaceType = FaceType.NUMBER
 @export var value: int = 0
@@ -28,4 +28,6 @@ func get_display_text() -> String:
 			return "☠STOP"
 		FaceType.INSURANCE:
 			return "INS"
+		FaceType.LUCK:
+			return "LK" if value <= 1 else "LK%d" % value
 	return "?"

@@ -18,6 +18,7 @@ enum ItemType {
 	BUY_MODIFIER,
 	CLEANSE_CURSE,
 	DOUBLE_DOWN,
+	BUY_FORTUNE_DIE,
 }
 
 @export var item_name: String = ""
@@ -115,6 +116,15 @@ static func make_buy_simple_die() -> ShopItemData:
 	item.description = "Cheap and safe. No stops! (1, 1, 1, —, —, —)"
 	item.cost = 8
 	item.item_type = ItemType.BUY_SIMPLE_DIE
+	return item
+
+
+static func make_buy_fortune_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Fortune Die"
+	item.description = "Luck faces boost reward rarity. (LK, LK, 2, 2, STOP, STOP)"
+	item.cost = 35
+	item.item_type = ItemType.BUY_FORTUNE_DIE
 	return item
 
 

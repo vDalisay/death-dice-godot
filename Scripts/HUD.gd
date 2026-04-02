@@ -19,6 +19,7 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var stage_label: Label      = $TopBar/TopBarMargin/TopBarRow/StageLabel
 @onready var lives_label: Label      = $TopBar/TopBarMargin/TopBarRow/LivesLabel
 @onready var gold_label: Label       = $TopBar/TopBarMargin/TopBarRow/GoldLabel
+@onready var luck_label: Label       = $TopBar/TopBarMargin/TopBarRow/LuckLabel
 @onready var highscore_label: Label  = $TopBar/TopBarMargin/TopBarRow/HighscoreLabel
 
 # -- Modifier row --
@@ -75,6 +76,7 @@ func _ready() -> void:
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.lives_changed.connect(_on_lives_changed)
 	GameManager.gold_changed.connect(_on_gold_changed)
+	GameManager.luck_changed.connect(_on_luck_changed)
 	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
@@ -83,6 +85,7 @@ func _ready() -> void:
 	_on_score_changed(GameManager.total_score)
 	_on_lives_changed(GameManager.lives)
 	_on_gold_changed(GameManager.gold)
+	_refresh_luck_display()
 	_refresh_stage_display()
 	_refresh_modifier_display()
 	set_active_combos([])
@@ -413,6 +416,20 @@ func _on_gold_changed(new_gold: int) -> void:
 	_gold_tween.tween_method(func(v: float) -> void:
 		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(v)]
 	, float(from_val), float(new_gold), GOLD_COUNT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _on_luck_changed(_new_luck: int) -> void:
+	_refresh_luck_display()
+
+
+func _refresh_luck_display() -> void:
+	if GameManager.luck > 0:
+		luck_label.text = "🍀%d" % GameManager.luck
+		luck_label.visible = true
+	else:
+		luck_label.text = ""
+		luck_label.visible = false
+
 
 func _on_stage_advanced(_new_stage: int) -> void:
 	_refresh_stage_display()

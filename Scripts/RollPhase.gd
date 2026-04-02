@@ -176,6 +176,8 @@ func _on_bank_pressed() -> void:
 	var banked: int = int(base_banked * streak_mult)
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
+	# Accumulate LUCK face values for dice reward rarity.
+	_accumulate_luck()
 	# Gambler's Rush: +1g per survived stop.
 	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
 		var rush_gold: int = accumulated_stop_count
@@ -341,7 +343,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE:
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.LUCK:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 			DiceFaceData.FaceType.EXPLODE:
@@ -368,7 +370,8 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 					SFXManager.play_stop_face()
 			if face and (face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
 					or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
-					or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.EXPLODE):
+					or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.EXPLODE \
+					or face.type == DiceFaceData.FaceType.LUCK):
 				die.pop()
 
 	# Accumulated bust check: add new stops from this roll to running total
@@ -528,6 +531,18 @@ func _count_shields() -> int:
 	return count
 
 
+func _accumulate_luck() -> void:
+	var luck_total: int = 0
+	for i: int in GameManager.dice_pool.size():
+		if dice_stopped[i]:
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type == DiceFaceData.FaceType.LUCK:
+			luck_total += maxi(1, face.value)
+	if luck_total > 0:
+		GameManager.add_luck(luck_total)
+
+
 func _find_insurance_face_index() -> int:
 	for i: int in GameManager.dice_pool.size():
 		var face: DiceFaceData = current_results[i]
@@ -593,7 +608,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 					die.play_stop_impact(face.type == DiceFaceData.FaceType.CURSED_STOP)
 					die.tumble(face)
 					_sync_arena_die_state(i)
-			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE:
+			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.LUCK:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				if die:
@@ -1168,8 +1183,7 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 func _show_dice_reward() -> void:
 	var reward_overlay: ColorRect = DiceRewardScene.instantiate() as ColorRect
 	add_child(reward_overlay)
-	var luck: int = GameManager.luck if "luck" in GameManager else 0
-	reward_overlay.call("open", luck)
+	reward_overlay.call("open", GameManager.luck)
 	reward_overlay.connect("reward_chosen", func(die: DiceData) -> void:
 		GameManager.add_dice(die)
 		_open_stage_map()
@@ -1201,6 +1215,7 @@ const REST_HEAL_LIVES: int = 1
 const REST_GOLD_BONUS: int = 10
 
 func _open_stage_map() -> void:
+	GameManager.reset_luck()
 	if GameManager.stage_map == null:
 		GameManager.generate_stage_map()
 	# Check if we've completed all rows (loop complete).

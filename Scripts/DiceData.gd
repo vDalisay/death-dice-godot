@@ -10,6 +10,7 @@ const MAX_SHIELD_VALUE: int = 3
 const MAX_MULTIPLY_VALUE: int = 4
 const MAX_EXPLODE_VALUE: int = 5
 const MAX_MULTIPLY_LEFT_VALUE: int = 4
+const MAX_LUCK_VALUE: int = 3
 const MAX_CHAIN_ROLLS: int = 10
 
 enum Rarity { GREY, GREEN, BLUE, PURPLE }
@@ -103,6 +104,10 @@ func upgrade_weakest_face() -> bool:
 		DiceFaceData.FaceType.INSURANCE:
 			face.type = DiceFaceData.FaceType.SHIELD
 			face.value = 1
+		DiceFaceData.FaceType.LUCK:
+			if face.value >= MAX_LUCK_VALUE:
+				return false
+			face.value += 1
 		DiceFaceData.FaceType.MULTIPLY_LEFT:
 			if face.value >= MAX_MULTIPLY_LEFT_VALUE:
 				return false
@@ -124,6 +129,8 @@ func _face_power(face: DiceFaceData) -> int:
 			return 8 + face.value
 		DiceFaceData.FaceType.INSURANCE:
 			return 10
+		DiceFaceData.FaceType.LUCK:
+			return 6 + face.value
 		DiceFaceData.FaceType.AUTO_KEEP:
 			return 12 + face.value
 		DiceFaceData.FaceType.MULTIPLY:
@@ -314,6 +321,27 @@ static func make_insurance_d6() -> DiceData:
 	return die
 
 
+## Fortune die — LUCK faces improve dice reward rarity. 2 stops.
+static func make_fortune_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Fortune D6"
+	die.rarity = Rarity.GREEN
+	var configs: Array = [
+		[DiceFaceData.FaceType.LUCK,   1],
+		[DiceFaceData.FaceType.LUCK,   1],
+		[DiceFaceData.FaceType.NUMBER, 2],
+		[DiceFaceData.FaceType.NUMBER, 2],
+		[DiceFaceData.FaceType.STOP,   0],
+		[DiceFaceData.FaceType.STOP,   0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
 ## Blank canvas — cheapest die, minimal use until upgraded. 1 stop minimum.
 static func make_blank_canvas_d6() -> DiceData:
 	var die := DiceData.new()
@@ -348,6 +376,7 @@ static func get_all_known_dice() -> Array[DiceData]:
 		make_insurance_d6(),
 		make_explosive_d6(),
 		make_pink_d6(),
+		make_fortune_d6(),
 	]
 	return all
 

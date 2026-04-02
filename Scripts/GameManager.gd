@@ -39,6 +39,7 @@ signal stage_advanced(new_stage: int)
 signal run_ended()
 signal stage_cleared()
 signal loop_advanced(new_loop: int)
+signal luck_changed(new_luck: int)
 
 var total_score: int = 0
 var lives: int = MAX_LIVES
@@ -55,6 +56,7 @@ var best_turn_score: int = 0
 var run_busts: int = 0
 var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
+var luck: int = 0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
 var _shop_gold_spent: int = 0
 ## Whether the Miser bonus is pending for the next shop.
@@ -116,6 +118,16 @@ func add_score(points: int) -> void:
 func add_gold(amount: int) -> void:
 	gold += amount
 	gold_changed.emit(gold)
+
+
+func add_luck(amount: int) -> void:
+	luck += amount
+	luck_changed.emit(luck)
+
+
+func reset_luck() -> void:
+	luck = 0
+	luck_changed.emit(luck)
 
 
 func spend_gold(amount: int) -> bool:
@@ -212,6 +224,7 @@ func reset_run() -> void:
 	lives = MAX_LIVES
 	gold = 0
 	best_turn_score = 0
+	luck = 0
 	active_modifiers.clear()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
