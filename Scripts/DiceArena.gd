@@ -142,17 +142,25 @@ func throw_dice(pool: Array[DiceData]) -> void:
 
 
 func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
-	var reroll_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, indices.size())
-	var reroll_slot: int = 0
+	# Filter valid indices.
+	var valid_indices: Array[int] = []
 	for i: int in indices:
-		if i < 0 or i >= _dice.size():
-			continue
+		if i >= 0 and i < _dice.size():
+			valid_indices.append(i)
+
+	if valid_indices.is_empty():
+		return
+
+	var total: int = valid_indices.size()
+
+	for slot: int in total:
+		var i: int = valid_indices[slot]
 		var die: PhysicsDie = _dice[i]
 		die.is_stopped = false
 		die._bump_count = 0
 		die._wall_bounce_count = 0
 
-		# Roll new face
+		# Roll new face.
 		var face: DiceFaceData = pool[i].roll()
 		die.current_face = face
 
@@ -161,28 +169,18 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			die.freeze = true
 			die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
 		else:
-			# Move to spawn origin and re-throw
-			var origin: SpawnOrigin = default_spawn_origin
-			die.position = reroll_positions[reroll_slot]
-			reroll_slot += 1
-			die.physics_state = PhysicsDie.DiePhysicsState.FLYING
-			die.freeze = false
-			die._settle_timer = 0.0
-			die.play_reroll_lift()
-			die.tumble(face)
-			var target: Vector2 = _throw_target_for_origin(origin)
-			var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.7, THROW_IMPULSE_MAX * 0.9)
-			var lift_delay: float = REROLL_LIFT_DELAY + randf_range(0.0, REROLL_LIFT_RANDOM_MAX)
-			get_tree().create_timer(lift_delay).timeout.connect(func() -> void:
-				if not is_instance_valid(die) or die.freeze:
-					return
-				die.play_launch_burst()
-				var direction: Vector2 = (target - die.position).normalized()
-				var spread: float = randf_range(-0.4, 0.4)
-				direction = direction.rotated(spread)
-				die.apply_central_impulse(direction * magnitude)
-				die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
-			)
+			# Schedule sweep launch for this die.
+			var captured_slot: int = slot
+			var captured_die: PhysicsDie = die
+			var captured_face: DiceFaceData = face
+			var captured_total: int = total
+			if slot == 0:
+				_reroll_volley_launch(captured_die, captured_face, captured_slot, captured_total)
+			else:
+				var cumulative: float = volley_cumulative_delay(slot, total) + randf_range(0.0, VOLLEY_DELAY_JITTER)
+				get_tree().create_timer(cumulative).timeout.connect(
+					func() -> void: _reroll_volley_launch(captured_die, captured_face, captured_slot, captured_total)
+				)
 
 	if instant_mode:
 		all_dice_settled.emit()
@@ -324,6 +322,37 @@ func _volley_launch(index: int) -> void:
 ## Emitter position for the volley: lower center of the arena.
 func _volley_emitter() -> Vector2:
 	return Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT - SPAWN_MARGIN - BOTTOM_SPAWN_LIFT)
+
+
+## Launch a single rerolled die using the sweep volley pattern.
+func _reroll_volley_launch(die: PhysicsDie, face: DiceFaceData, slot: int, total: int) -> void:
+	if not is_instance_valid(die):
+		return
+
+	# Move die to emitter with jitter.
+	var emitter: Vector2 = _volley_emitter()
+	die.position = emitter + Vector2(
+		randf_range(-VOLLEY_EMITTER_JITTER_X, VOLLEY_EMITTER_JITTER_X),
+		randf_range(-VOLLEY_EMITTER_JITTER_Y, VOLLEY_EMITTER_JITTER_Y))
+
+	die.physics_state = PhysicsDie.DiePhysicsState.FLYING
+	die.freeze = false
+	die._settle_timer = 0.0
+	die.tumble(face)
+	die.play_launch_burst()
+
+	# Cone direction with sweep bias.
+	var target: Vector2 = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT * 0.4)
+	var base_dir: Vector2 = (target - emitter).normalized()
+	var base_angle: float = base_dir.angle()
+	var sweep_t: float = lerpf(-1.0, 1.0, float(slot) / float(maxi(total - 1, 1)))
+	var cone_angle: float = base_angle + VOLLEY_CONE_HALF_ANGLE * sweep_t + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
+	var direction: Vector2 = Vector2.from_angle(cone_angle)
+
+	var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.7, THROW_IMPULSE_MAX * 0.9)
+	die.linear_velocity = direction * magnitude
+	die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
+	SFXManager.play_roll()
 
 
 ## Compute cumulative volley delay for a given die index (used by tests).
