@@ -48,33 +48,36 @@ static func generate(_loop: int) -> StageMapData:
 			row.append(node)
 		map.rows.append(row)
 
-	# Step 4: wire connections (each node connects to 1-2 nodes in the next row).
+	# Step 4: wire connections — Slay the Spire style.
+	# Each node connects only to nodes in the next row at the same column
+	# or diagonally adjacent (col ± 1). Never sideways within same row.
 	for r: int in ROWS_PER_LOOP - 1:
 		var current_row: Array = map.rows[r]
 		var next_row: Array = map.rows[r + 1]
+		var cur_count: int = current_row.size()
 		var next_count: int = next_row.size()
 		# Ensure every node in the next row is reachable by at least one parent.
 		var reachable: Array[bool] = []
 		reachable.resize(next_count)
 		reachable.fill(false)
-		for n_idx: int in current_row.size():
+		for n_idx: int in cur_count:
 			var node: MapNodeData = current_row[n_idx] as MapNodeData
-			# Pick 1-2 connections.
-			var num_connections: int = 1 if next_count == 1 else randi_range(1, mini(2, next_count))
-			var candidates: Array[int] = []
-			for j: int in next_count:
-				candidates.append(j)
-			candidates.shuffle()
 			node.connections.clear()
+			# Candidate targets: columns in next row that are within ±1 of
+			# this node's proportional position (scaled for different row widths).
+			var candidates: Array[int] = _adjacent_candidates(n_idx, cur_count, next_count)
+			candidates.shuffle()
+			# Pick 1-2 connections from the valid candidates.
+			var num_connections: int = 1 if candidates.size() <= 1 else randi_range(1, mini(2, candidates.size()))
 			for j: int in num_connections:
 				node.connections.append(candidates[j])
 				reachable[candidates[j]] = true
 		# Patch: ensure all next-row nodes are reachable.
 		for j: int in next_count:
 			if not reachable[j]:
-				# Connect a random parent to this unreachable node.
-				var parent_idx: int = randi() % current_row.size()
-				var parent: MapNodeData = current_row[parent_idx] as MapNodeData
+				# Find the nearest parent that can reach this column.
+				var best_parent: int = _nearest_parent(j, cur_count, next_count)
+				var parent: MapNodeData = current_row[best_parent] as MapNodeData
 				if not parent.connections.has(j):
 					parent.connections.append(j)
 		# Sort connections for deterministic rendering.
@@ -83,6 +86,38 @@ static func generate(_loop: int) -> StageMapData:
 			node.connections.sort()
 
 	return map
+
+
+## Returns valid connection targets in the next row for a node at (col) in a
+## row of (cur_count) nodes connecting to a row of (next_count) nodes.
+## Uses proportional mapping: node at position p in current row maps to the
+## same proportional position in the next row, ±1 column.
+static func _adjacent_candidates(col: int, cur_count: int, next_count: int) -> Array[int]:
+	# Map current column to proportional position in [0, 1].
+	var t: float = float(col) / float(maxi(cur_count - 1, 1))
+	# Map to next row column space.
+	var center: float = t * float(maxi(next_count - 1, 1))
+	var center_col: int = roundi(center)
+	var result: Array[int] = []
+	for c: int in [center_col - 1, center_col, center_col + 1]:
+		if c >= 0 and c < next_count and not result.has(c):
+			result.append(c)
+	return result
+
+
+## Find the nearest parent node (by proportional column distance) that could
+## plausibly connect to target_col in the next row.
+static func _nearest_parent(target_col: int, cur_count: int, next_count: int) -> int:
+	var target_t: float = float(target_col) / float(maxi(next_count - 1, 1))
+	var best: int = 0
+	var best_dist: float = 999.0
+	for p: int in cur_count:
+		var p_t: float = float(p) / float(maxi(cur_count - 1, 1))
+		var dist: float = absf(p_t - target_t)
+		if dist < best_dist:
+			best_dist = dist
+			best = p
+	return best
 
 
 static func _allocate_node_types(total: int) -> Array[MapNodeData.NodeType]:

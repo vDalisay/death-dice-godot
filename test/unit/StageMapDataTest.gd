@@ -198,3 +198,19 @@ func test_generate_loop_2() -> void:
 	assert_int(map.get_row_count()).is_equal(StageMapData.ROWS_PER_LOOP)
 	# Should still obey all the same constraints.
 	assert_int(map.count_type(MapNodeData.NodeType.NORMAL_STAGE)).is_greater_equal(StageMapData.MIN_NORMAL_STAGES)
+
+
+func test_connections_are_proportionally_adjacent() -> void:
+	# StS-style: connections only go to columns within ±1 of proportional mapping.
+	for _i: int in 30:
+		var map: StageMapData = StageMapData.generate(1)
+		for r: int in map.get_row_count() - 1:
+			var current_row: Array = map.get_row(r)
+			var next_row: Array = map.get_row(r + 1)
+			var cur_count: int = current_row.size()
+			var next_count: int = next_row.size()
+			for c: int in cur_count:
+				var node: MapNodeData = current_row[c] as MapNodeData
+				var valid: Array[int] = StageMapData._adjacent_candidates(c, cur_count, next_count)
+				for conn: int in node.connections:
+					assert_bool(valid.has(conn)).is_true()

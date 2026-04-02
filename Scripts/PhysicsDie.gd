@@ -456,6 +456,7 @@ func play_explode_charge() -> void:
 		glyph_tween.tween_property(_glyph_label, "scale", Vector2(1.2, 1.2), EXPLODE_CHARGE_DURATION * 0.45)
 		glyph_tween.tween_property(_glyph_label, "scale", Vector2.ONE, EXPLODE_CHARGE_DURATION * 0.55)
 	_spawn_explode_burst()
+	_spawn_explode_ring()
 
 
 func start_glow_pulse(color: Color) -> void:
@@ -990,6 +991,13 @@ func _spawn_explode_burst() -> void:
 	ParticlePool.release_after(burst, 0.5)
 
 
+func _spawn_explode_ring() -> void:
+	var ring: _ExplodeRing = _ExplodeRing.new()
+	ring.position = Vector2.ZERO
+	add_child(ring)
+	ring.play(DIE_SIZE * 0.55)
+
+
 func _spawn_stop_smoke(color: Color) -> void:
 	var puff: CPUParticles2D = ParticlePool.acquire(self)
 	if puff == null:
@@ -1072,3 +1080,40 @@ func _play_visual_offset_pulse_xy(offset_x: float, offset_y: float, duration: fl
 	tween.parallel().tween_property(_bg_panel, "position:y", base_bg.y, duration * 0.55).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_face_label, "position:y", base_face.y, duration * 0.55).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_glyph_label, "position:y", base_glyph.y, duration * 0.55).set_ease(Tween.EASE_IN)
+
+
+# ---------------------------------------------------------------------------
+# Inner class: expanding explosion ring VFX
+# ---------------------------------------------------------------------------
+class _ExplodeRing extends Node2D:
+	const RING_COLOR: Color = Color("#FF6D00")
+	const RING_DURATION: float = 0.28
+	const RING_WIDTH_START: float = 6.0
+	const RING_WIDTH_END: float = 2.0
+	const RING_ARC_POINTS: int = 32
+
+	var _radius: float = 0.0
+	var _max_radius: float = 45.0
+	var _alpha: float = 1.0
+	var _width: float = RING_WIDTH_START
+
+	func play(target_radius: float) -> void:
+		_max_radius = target_radius
+		_radius = target_radius * 0.15
+		_alpha = 1.0
+		_width = RING_WIDTH_START
+		var tw: Tween = create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(self, "_radius", _max_radius, RING_DURATION).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		tw.tween_property(self, "_alpha", 0.0, RING_DURATION).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		tw.tween_property(self, "_width", RING_WIDTH_END, RING_DURATION)
+		tw.chain().tween_callback(queue_free)
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if _alpha <= 0.0:
+			return
+		var col: Color = Color(RING_COLOR, _alpha)
+		draw_arc(Vector2.ZERO, _radius, 0.0, TAU, RING_ARC_POINTS, col, _width, true)

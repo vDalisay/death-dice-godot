@@ -20,10 +20,9 @@ const ICON_FONT_SIZE: int = 22
 const LABEL_FONT_SIZE: int = 12
 
 @onready var _backdrop: ColorRect = $Backdrop
-@onready var _modal: PanelContainer = $CenterContainer/Modal
-@onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
-@onready var _map_container: Control = $CenterContainer/Modal/MarginContainer/VBoxContainer/MapArea
-@onready var _hint_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HintLabel
+@onready var _title_label: Label = $MarginContainer/VBoxContainer/HeaderRow/TitleLabel
+@onready var _map_container: Control = $MarginContainer/VBoxContainer/MapArea
+@onready var _hint_label: Label = $MarginContainer/VBoxContainer/HintLabel
 
 var _stage_map: StageMapData = null
 var _current_row: int = 0
@@ -206,14 +205,10 @@ func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> vo
 
 func _apply_theme_styling() -> void:
 	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
-	_backdrop.color = Color(0, 0, 0, 0.80)
-	_modal.add_theme_stylebox_override(
-		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
-	)
+	_backdrop.color = Color(0, 0, 0, 0.92)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
-	_title_label.add_theme_font_size_override("font_size", 20)
+	_title_label.add_theme_font_size_override("font_size", 28)
 	_title_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 	_hint_label.add_theme_font_override("font", _UITheme.font_mono())
-	_hint_label.add_theme_font_size_override("font_size", 14)
+	_hint_label.add_theme_font_size_override("font_size", 16)
 	_hint_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
