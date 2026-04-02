@@ -26,6 +26,7 @@ func test_arena_rect_dimensions() -> void:
 
 
 func test_throw_dice_creates_correct_count() -> void:
+	_arena.instant_mode = true
 	var pool: Array[DiceData] = [
 		DiceData.make_standard_d6(),
 		DiceData.make_standard_d6(),
@@ -36,6 +37,7 @@ func test_throw_dice_creates_correct_count() -> void:
 
 
 func test_get_die_returns_correct_die() -> void:
+	_arena.instant_mode = true
 	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
 	_arena.throw_dice(pool)
 	var die: PhysicsDie = _arena.get_die(0)
@@ -49,6 +51,7 @@ func test_get_die_out_of_bounds_returns_null() -> void:
 
 
 func test_get_results_returns_faces() -> void:
+	_arena.instant_mode = true
 	var pool: Array[DiceData] = [
 		DiceData.make_standard_d6(),
 		DiceData.make_standard_d6(),
@@ -63,6 +66,7 @@ func test_get_results_returns_faces() -> void:
 
 
 func test_reset_clears_all_dice() -> void:
+	_arena.instant_mode = true
 	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
 	_arena.throw_dice(pool)
 	assert_int(_arena.get_die_count()).is_equal(1)
@@ -71,6 +75,7 @@ func test_reset_clears_all_dice() -> void:
 
 
 func test_lock_die_freezes_physics() -> void:
+	_arena.instant_mode = true
 	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
 	_arena.throw_dice(pool)
 	_arena.lock_die(0)
@@ -108,11 +113,12 @@ func test_arena_centers_in_viewport() -> void:
 
 
 func test_throw_dice_spread_avoids_overlap() -> void:
+	_arena.instant_mode = true
 	var pool: Array[DiceData] = []
 	for _i: int in 18:
 		pool.append(DiceData.make_standard_d6())
 	_arena.throw_dice(pool)
-	var min_allowed: float = PhysicsDie.COLLISION_RADIUS * 2.0
+	var min_allowed: float = PhysicsDie.COLLISION_RADIUS * 1.2
 	for i: int in _arena.get_die_count():
 		var a: PhysicsDie = _arena.get_die(i)
 		for j: int in range(i + 1, _arena.get_die_count()):

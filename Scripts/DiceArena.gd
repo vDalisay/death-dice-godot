@@ -52,6 +52,15 @@ const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
 
+# Dealer's sweep volley parameters
+const VOLLEY_DELAY_START: float = 0.055
+const VOLLEY_DELAY_END: float = 0.012
+const VOLLEY_DELAY_JITTER: float = 0.008
+const VOLLEY_CONE_HALF_ANGLE: float = 0.55
+const VOLLEY_CONE_JITTER: float = 0.15
+const VOLLEY_EMITTER_JITTER_X: float = 15.0
+const VOLLEY_EMITTER_JITTER_Y: float = 8.0
+
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
 enum SpawnOrigin { CENTER_BOTTOM, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT, RIGHT, TOP, CENTER_TOP }
@@ -64,6 +73,7 @@ var default_spawn_origin: SpawnOrigin = SpawnOrigin.CENTER_BOTTOM
 # ---------------------------------------------------------------------------
 
 var _dice: Array[PhysicsDie] = []
+var _pending_pool: Array[DiceData] = []
 var _settle_check_active: bool = false
 var _bg_panel: Panel = null
 var _bg_style: StyleBoxFlat = null
@@ -107,27 +117,28 @@ func _physics_process(_delta: float) -> void:
 
 func throw_dice(pool: Array[DiceData]) -> void:
 	_clear_dice()
-	var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, pool.size())
-	for i: int in pool.size():
-		var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
-		add_child(die)
-		die.setup(i, pool[i])
-		_dice.append(die)
-
-		# Connect signals
-		die.toggled_keep.connect(_on_die_toggled)
-		die.shift_toggled_keep.connect(_on_die_shift_toggled)
-		die.collision_rerolled.connect(_on_die_collision_rerolled)
-
-		# Spawn with spread to avoid overlap bursts at high dice counts.
-		die.position = spawn_positions[i]
-
-		# Roll the die face
-		var face: DiceFaceData = pool[i].roll()
-		die.current_face = face
-
-	# Stagger the throws
-	_stagger_throw()
+	if instant_mode:
+		# Instant mode: spawn all dice at once in grid and settle (used by tests).
+		var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, pool.size())
+		for i: int in pool.size():
+			var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
+			add_child(die)
+			die.setup(i, pool[i])
+			_dice.append(die)
+			die.toggled_keep.connect(_on_die_toggled)
+			die.shift_toggled_keep.connect(_on_die_shift_toggled)
+			die.collision_rerolled.connect(_on_die_collision_rerolled)
+			die.position = spawn_positions[i]
+			var face: DiceFaceData = pool[i].roll()
+			die.current_face = face
+			die.show_face(face)
+			die.freeze = true
+			die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+		all_dice_settled.emit()
+	else:
+		# Dealer's sweep: store pool and launch dice one at a time.
+		_pending_pool = pool.duplicate()
+		_start_volley()
 
 
 func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
@@ -252,27 +263,76 @@ func get_arena_rect() -> Rect2:
 # Throw helpers
 # ---------------------------------------------------------------------------
 
-func _stagger_throw() -> void:
-	if instant_mode:
-		# Skip physics entirely — place dice in grid and settle immediately.
-		for i: int in _dice.size():
-			var die: PhysicsDie = _dice[i]
-			die.show_face(die.current_face)
-			die.freeze = true
-			die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
-		all_dice_settled.emit()
-		return
-
+## Start the dealer's sweep volley — launch dice one at a time from emitter.
+func _start_volley() -> void:
 	_settle_check_active = true
-	for i: int in _dice.size():
-		var die: PhysicsDie = _dice[i]
-		# Stagger: use a timer callback
+	var total: int = _pending_pool.size()
+	var cumulative_delay: float = 0.0
+	for i: int in total:
 		if i == 0:
-			_launch_die(die, default_spawn_origin, i, _dice.size())
+			_volley_launch(0)
 		else:
-			var delay: float = THROW_STAGGER_DELAY * i + randf_range(0.0, THROW_STAGGER_RANDOM_MAX)
-			var timer: SceneTreeTimer = get_tree().create_timer(delay)
-			timer.timeout.connect(_launch_die.bind(die, default_spawn_origin, i, _dice.size()))
+			var progress: float = float(i) / float(maxi(total - 1, 1))
+			var base_delay: float = lerpf(VOLLEY_DELAY_START, VOLLEY_DELAY_END, progress)
+			cumulative_delay += base_delay + randf_range(0.0, VOLLEY_DELAY_JITTER)
+			var captured_index: int = i
+			get_tree().create_timer(cumulative_delay).timeout.connect(
+				func() -> void: _volley_launch(captured_index)
+			)
+
+
+## Instantiate and launch a single die as part of the volley.
+func _volley_launch(index: int) -> void:
+	if index < 0 or index >= _pending_pool.size():
+		return
+	var data: DiceData = _pending_pool[index]
+	var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
+	add_child(die)
+	die.setup(index, data)
+	_dice.append(die)
+	die.toggled_keep.connect(_on_die_toggled)
+	die.shift_toggled_keep.connect(_on_die_shift_toggled)
+	die.collision_rerolled.connect(_on_die_collision_rerolled)
+
+	# Position at emitter with jitter.
+	var emitter: Vector2 = _volley_emitter()
+	die.position = emitter + Vector2(
+		randf_range(-VOLLEY_EMITTER_JITTER_X, VOLLEY_EMITTER_JITTER_X),
+		randf_range(-VOLLEY_EMITTER_JITTER_Y, VOLLEY_EMITTER_JITTER_Y))
+
+	# Roll and set face.
+	var face: DiceFaceData = data.roll()
+	die.current_face = face
+	die.tumble(face)
+	die.play_launch_burst()
+
+	# Cone direction: sweep left-to-right across the volley.
+	var total: int = _pending_pool.size()
+	var target: Vector2 = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT * 0.4)
+	var base_dir: Vector2 = (target - emitter).normalized()
+	var base_angle: float = base_dir.angle()
+	var sweep_t: float = lerpf(-1.0, 1.0, float(index) / float(maxi(total - 1, 1)))
+	var cone_angle: float = base_angle + VOLLEY_CONE_HALF_ANGLE * sweep_t + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
+	var direction: Vector2 = Vector2.from_angle(cone_angle)
+
+	var magnitude: float = randf_range(THROW_IMPULSE_MIN, THROW_IMPULSE_MAX)
+	die.linear_velocity = direction * magnitude
+	die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
+	SFXManager.play_roll()
+
+
+## Emitter position for the volley: lower center of the arena.
+func _volley_emitter() -> Vector2:
+	return Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT - SPAWN_MARGIN - BOTTOM_SPAWN_LIFT)
+
+
+## Compute cumulative volley delay for a given die index (used by tests).
+func volley_cumulative_delay(index: int, total: int) -> float:
+	var cumulative: float = 0.0
+	for i: int in range(1, index + 1):
+		var progress: float = float(i) / float(maxi(total - 1, 1))
+		cumulative += lerpf(VOLLEY_DELAY_START, VOLLEY_DELAY_END, progress)
+	return cumulative
 
 
 func _launch_die(
