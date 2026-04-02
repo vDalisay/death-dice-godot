@@ -69,6 +69,7 @@ var _screen_overlay: Node = null
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
 const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
+const DiceRewardScene: PackedScene = preload("res://Scenes/DiceRewardOverlay.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
@@ -1160,6 +1161,17 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 	overlay.call("setup", bonus_gold, surplus, is_loop)
 	overlay.connect("proceed_requested", func() -> void:
 		overlay.queue_free()
+		_show_dice_reward()
+	)
+
+
+func _show_dice_reward() -> void:
+	var reward_overlay: ColorRect = DiceRewardScene.instantiate() as ColorRect
+	add_child(reward_overlay)
+	var luck: int = GameManager.luck if "luck" in GameManager else 0
+	reward_overlay.call("open", luck)
+	reward_overlay.connect("reward_chosen", func(die: DiceData) -> void:
+		GameManager.add_dice(die)
 		_open_stage_map()
 	)
 
