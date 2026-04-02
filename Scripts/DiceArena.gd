@@ -159,10 +159,24 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 	var reroll_set: Dictionary = {}
 	for idx: int in indices:
 		reroll_set[idx] = true
+	var has_bag_animation: bool = false
 	for i: int in _dice.size():
 		if not reroll_set.has(i) and is_instance_valid(_dice[i]):
 			_move_die_to_bag(_dice[i])
+			has_bag_animation = true
 
+	if instant_mode or not has_bag_animation:
+		_execute_reroll(indices, pool)
+	else:
+		# Wait for the bag animation to finish, then reroll.
+		var captured_indices: Array[int] = indices.duplicate()
+		var captured_pool: Array[DiceData] = pool.duplicate()
+		get_tree().create_timer(BAG_MOVE_DURATION).timeout.connect(
+			func() -> void: _execute_reroll(captured_indices, captured_pool)
+		)
+
+
+func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:
 	# Filter valid indices.
 	var valid_indices: Array[int] = []
 	for i: int in indices:
