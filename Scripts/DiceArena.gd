@@ -52,6 +52,14 @@ const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
 
+# Dice bag (kept-dice staging area)
+const BAG_PANEL_W: float = 176.0
+const BAG_PANEL_H: float = 150.0
+const BAG_PANEL_PADDING: float = 8.0
+const BAG_DIE_SCALE: float = 0.52
+const BAG_MOVE_DURATION: float = 0.28
+const BAG_STACK_MAX_RADIUS: float = 22.0
+
 # Dealer's sweep volley parameters
 const VOLLEY_DELAY_START: float = 0.055
 const VOLLEY_DELAY_END: float = 0.012
@@ -78,6 +86,10 @@ var _settle_check_active: bool = false
 var _bg_panel: Panel = null
 var _bg_style: StyleBoxFlat = null
 var _boundary_glow_energy: float = 0.0
+var _bag_panel: Panel = null
+var _bag_count_label: Label = null
+var _bag_kept_label: Label = null
+var _bag_dice_count: int = 0
 ## When true, dice settle instantly (no physics). Set by tests.
 var instant_mode: bool = false
 
@@ -88,6 +100,7 @@ var instant_mode: bool = false
 func _ready() -> void:
 	_build_background()
 	_build_walls()
+	_build_dice_bag()
 	_update_centering()
 	var viewport: Viewport = get_viewport()
 	if viewport and not viewport.size_changed.is_connected(_update_centering):
@@ -142,6 +155,14 @@ func throw_dice(pool: Array[DiceData]) -> void:
 
 
 func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
+	# Move all kept (non-rerolled) dice to the dice bag.
+	var reroll_set: Dictionary = {}
+	for idx: int in indices:
+		reroll_set[idx] = true
+	for i: int in _dice.size():
+		if not reroll_set.has(i) and is_instance_valid(_dice[i]):
+			_move_die_to_bag(_dice[i])
+
 	# Filter valid indices.
 	var valid_indices: Array[int] = []
 	for i: int in indices:
@@ -515,6 +536,83 @@ func _build_background() -> void:
 	move_child(_bg_panel, 0)
 
 
+func _build_dice_bag() -> void:
+	var px: float = ARENA_WIDTH - WALL_THICKNESS - BAG_PANEL_W - BAG_PANEL_PADDING
+	var py: float = ARENA_HEIGHT - WALL_THICKNESS - BAG_PANEL_H - BAG_PANEL_PADDING
+
+	# "KEPT" label above the panel.
+	_bag_kept_label = Label.new()
+	_bag_kept_label.position = Vector2(px, py - 24.0)
+	_bag_kept_label.size = Vector2(BAG_PANEL_W, 20.0)
+	_bag_kept_label.text = "KEPT"
+	_bag_kept_label.add_theme_font_override("font", _UITheme.font_mono())
+	_bag_kept_label.add_theme_font_size_override("font_size", 13)
+	_bag_kept_label.add_theme_color_override("font_color", Color("#8888aa"))
+	_bag_kept_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bag_kept_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_bag_kept_label)
+
+	# Bag panel.
+	_bag_panel = Panel.new()
+	_bag_panel.position = Vector2(px, py)
+	_bag_panel.size = Vector2(BAG_PANEL_W, BAG_PANEL_H)
+	_bag_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.07, 0.15, 0.88)
+	style.border_color = Color("#333355")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	_bag_panel.add_theme_stylebox_override("panel", style)
+	add_child(_bag_panel)
+
+	# Count label inside the panel.
+	_bag_count_label = Label.new()
+	_bag_count_label.position = Vector2.ZERO
+	_bag_count_label.size = Vector2(BAG_PANEL_W, BAG_PANEL_H)
+	_bag_count_label.text = "0"
+	_bag_count_label.add_theme_font_override("font", _UITheme.font_stats())
+	_bag_count_label.add_theme_font_size_override("font_size", 42)
+	_bag_count_label.add_theme_color_override("font_color", Color("#00E676"))
+	_bag_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bag_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_bag_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bag_panel.add_child(_bag_count_label)
+
+
+func _bag_center() -> Vector2:
+	var px: float = ARENA_WIDTH - WALL_THICKNESS - BAG_PANEL_W - BAG_PANEL_PADDING
+	var py: float = ARENA_HEIGHT - WALL_THICKNESS - BAG_PANEL_H - BAG_PANEL_PADDING
+	return Vector2(px + BAG_PANEL_W * 0.5, py + BAG_PANEL_H * 0.5)
+
+
+func _bag_slot_position(slot: int) -> Vector2:
+	if slot == 0:
+		return _bag_center()
+	var angle: float = float(slot) * 2.39996
+	var radius: float = minf(float(slot) * 4.0, BAG_STACK_MAX_RADIUS)
+	return _bag_center() + Vector2(cos(angle), sin(angle)) * radius
+
+
+func _move_die_to_bag(die: PhysicsDie) -> void:
+	die.collision_layer = 0
+	die.collision_mask = 0
+	die.freeze = true
+	die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+	var target: Vector2 = _bag_slot_position(_bag_dice_count)
+	_bag_dice_count += 1
+	if _bag_count_label:
+		_bag_count_label.text = str(_bag_dice_count)
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(die, "position", target, BAG_MOVE_DURATION).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(die, "scale", Vector2(BAG_DIE_SCALE, BAG_DIE_SCALE), BAG_MOVE_DURATION).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+
+
+func _reset_bag() -> void:
+	_bag_dice_count = 0
+	if _bag_count_label:
+		_bag_count_label.text = "0"
+
+
 func _build_walls() -> void:
 	# Four walls as StaticBody2D with RectangleShape2D
 	_add_wall(  # Top
@@ -567,6 +665,7 @@ func _clear_dice() -> void:
 		if is_instance_valid(die):
 			die.queue_free()
 	_dice.clear()
+	_reset_bag()
 
 
 func _enforce_arena_containment() -> void:
