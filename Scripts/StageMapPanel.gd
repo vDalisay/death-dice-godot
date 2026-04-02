@@ -1,39 +1,45 @@
 class_name StageMapPanel
 extends PanelContainer
-## Renders the branching stage map. Player picks a node in the current row.
-## Self-contained modal panel — call open() and listen for node_selected.
+## Full-screen branching stage map. Player picks a node in the current row.
+## Call open() and listen for node_selected.
 
 signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
-const NODE_SIZE: float = 56.0
-const NODE_SPACING_X: float = 120.0
-const MAP_TOP_MARGIN: float = 20.0
-const MAP_BOTTOM_MARGIN: float = 20.0
-const LINE_COLOR: Color = Color("#555577")
-const LINE_COLOR_VISITED: Color = Color("#00E676", 0.5)
-const LINE_WIDTH: float = 2.0
-const VISITED_ALPHA: float = 0.35
+# Layout tuning — all spacing is computed dynamically from container size.
+const NODE_SIZE: float = 60.0
+const NODE_CORNER: int = 10
+const MIN_H_SPACING: float = 100.0
+const LINE_WIDTH: float = 2.5
+const LINE_WIDTH_ACTIVE: float = 3.5
+const LINE_COLOR: Color = Color("#3A3A55")
+const LINE_COLOR_VISITED: Color = Color("#00E676", 0.45)
+const LINE_COLOR_ACTIVE: Color = Color("#00E5FF", 0.7)
+const VISITED_ALPHA: float = 0.30
+const FUTURE_ALPHA: float = 0.22
+const UNREACHABLE_ALPHA: float = 0.35
 const CURRENT_ROW_GLOW: Color = Color("#00E5FF")
-const ICON_FONT_SIZE: int = 22
-const LABEL_FONT_SIZE: int = 12
+const ICON_FONT_SIZE: int = 24
+const LABEL_FONT_SIZE: int = 11
 
 @onready var _backdrop: ColorRect = $Backdrop
-@onready var _title_label: Label = $MarginContainer/VBoxContainer/HeaderRow/TitleLabel
-@onready var _map_container: Control = $MarginContainer/VBoxContainer/MapArea
+@onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
+@onready var _map_area: Control = $MarginContainer/VBoxContainer/MapArea
 @onready var _hint_label: Label = $MarginContainer/VBoxContainer/HintLabel
 
 var _stage_map: StageMapData = null
 var _current_row: int = 0
-var _current_col: int = -1  ## Column chosen in previous row (-1 = first row).
+var _current_col: int = -1
 var _node_buttons: Array = []  # Array of Array[Button]
 var _connection_lines: Array[Line2D] = []
+var _pending_open: bool = false
 
 
 func _ready() -> void:
 	visible = false
 	_apply_theme_styling()
+	_map_area.resized.connect(_on_map_area_resized)
 
 
 func open(stage_map: StageMapData, current_row: int, previous_col: int) -> void:
@@ -41,9 +47,18 @@ func open(stage_map: StageMapData, current_row: int, previous_col: int) -> void:
 	_current_row = current_row
 	_current_col = previous_col
 	_title_label.text = "LOOP %d — Choose Your Path" % GameManager.current_loop
-	_hint_label.text = "Row %d / %d" % [current_row + 1, StageMapData.ROWS_PER_LOOP]
-	_rebuild_map()
+	_hint_label.text = "Stage %d / %d" % [current_row + 1, StageMapData.ROWS_PER_LOOP]
 	visible = true
+	# Defer rebuild so the layout pass resolves _map_area.size first.
+	_pending_open = true
+	await get_tree().process_frame
+	_pending_open = false
+	_rebuild_map()
+
+
+func _on_map_area_resized() -> void:
+	if visible and _stage_map != null and not _pending_open:
+		_rebuild_map()
 
 
 # ---------------------------------------------------------------------------
@@ -51,151 +66,202 @@ func open(stage_map: StageMapData, current_row: int, previous_col: int) -> void:
 # ---------------------------------------------------------------------------
 
 func _rebuild_map() -> void:
-	# Clear previous.
+	_clear_map()
+	if _stage_map == null:
+		return
+
+	var area_w: float = _map_area.size.x
+	var area_h: float = _map_area.size.y
+	if area_w < 1.0 or area_h < 1.0:
+		return
+
+	var row_count: int = _stage_map.get_row_count()
+	# Vertical: distribute rows evenly across the full height.
+	var v_padding: float = NODE_SIZE * 0.5
+	var usable_h: float = area_h - v_padding * 2.0
+	var row_step_y: float = usable_h / float(maxi(row_count - 1, 1))
+
+	# Build buttons per row.
+	for r: int in row_count:
+		var row_data: Array = _stage_map.get_row(r)
+		var row_btns: Array[Button] = []
+		var n: int = row_data.size()
+		var h_spacing: float = maxf(MIN_H_SPACING, area_w * 0.25)
+		var total_w: float = float(n - 1) * h_spacing
+		var start_x: float = (area_w - total_w) * 0.5
+		var y: float = v_padding + float(r) * row_step_y - NODE_SIZE * 0.5
+
+		for c: int in n:
+			var node: MapNodeData = row_data[c] as MapNodeData
+			var x: float = start_x + float(c) * h_spacing - NODE_SIZE * 0.5
+			var btn: Button = _make_node_button(node, r, c)
+			btn.position = Vector2(x, y)
+			_map_area.add_child(btn)
+			row_btns.append(btn)
+		_node_buttons.append(row_btns)
+
+	# Connection lines (drawn behind buttons).
+	_draw_connections()
+
+
+func _clear_map() -> void:
 	for line: Line2D in _connection_lines:
 		if is_instance_valid(line):
 			line.queue_free()
 	_connection_lines.clear()
-	for row_buttons: Variant in _node_buttons:
-		for btn: Variant in row_buttons as Array:
+	for row_btns: Variant in _node_buttons:
+		for btn: Variant in row_btns as Array:
 			if is_instance_valid(btn as Node):
 				(btn as Node).queue_free()
 	_node_buttons.clear()
 
-	if _stage_map == null:
-		return
 
-	var map_width: float = _map_container.size.x
-	var map_height: float = _map_container.size.y
+func _draw_connections() -> void:
 	var row_count: int = _stage_map.get_row_count()
-	# Dynamically compute vertical spacing to fill the full map area.
-	var usable_height: float = map_height - MAP_TOP_MARGIN - MAP_BOTTOM_MARGIN - NODE_SIZE
-	var row_spacing_y: float = usable_height / float(maxi(row_count - 1, 1))
-
-	# Build node buttons row by row.
-	for r: int in row_count:
-		var row: Array = _stage_map.get_row(r)
-		var row_btns: Array[Button] = []
-		var node_count: int = row.size()
-		var total_width: float = float(node_count - 1) * NODE_SPACING_X
-		var start_x: float = (map_width - total_width) * 0.5
-		var y: float = MAP_TOP_MARGIN + float(r) * row_spacing_y
-
-		for c: int in node_count:
-			var node: MapNodeData = row[c] as MapNodeData
-			var x: float = start_x + float(c) * NODE_SPACING_X
-			var btn: Button = _create_node_button(node, r, c, Vector2(x - NODE_SIZE * 0.5, y))
-			row_btns.append(btn)
-		_node_buttons.append(row_btns)
-
-	# Draw connection lines between rows.
 	for r: int in row_count - 1:
-		var current_btns: Array = _node_buttons[r]
-		var next_btns: Array = _node_buttons[r + 1]
+		var cur_btns: Array = _node_buttons[r]
+		var nxt_btns: Array = _node_buttons[r + 1]
 		var row_data: Array = _stage_map.get_row(r)
 		for c: int in row_data.size():
 			var node: MapNodeData = row_data[c] as MapNodeData
-			var from_btn: Button = current_btns[c] as Button
-			var from_center: Vector2 = from_btn.position + Vector2(NODE_SIZE * 0.5, NODE_SIZE)
+			var from_btn: Button = cur_btns[c] as Button
+			var from_pt: Vector2 = from_btn.position + Vector2(NODE_SIZE * 0.5, NODE_SIZE)
 			for conn: int in node.connections:
-				if conn >= 0 and conn < next_btns.size():
-					var to_btn: Button = next_btns[conn] as Button
-					var to_center: Vector2 = to_btn.position + Vector2(NODE_SIZE * 0.5, 0.0)
-					var line: Line2D = Line2D.new()
-					line.add_point(from_center)
-					line.add_point(to_center)
+				if conn < 0 or conn >= nxt_btns.size():
+					continue
+				var to_btn: Button = nxt_btns[conn] as Button
+				var to_pt: Vector2 = to_btn.position + Vector2(NODE_SIZE * 0.5, 0.0)
+				var line: Line2D = Line2D.new()
+				line.add_point(from_pt)
+				line.add_point(to_pt)
+				# Color: visited path, active choice, or dim future.
+				if node.visited:
+					line.default_color = LINE_COLOR_VISITED
 					line.width = LINE_WIDTH
-					line.default_color = LINE_COLOR_VISITED if node.visited else LINE_COLOR
-					_map_container.add_child(line)
-					# Lines behind buttons.
-					_map_container.move_child(line, 0)
-					_connection_lines.append(line)
+				elif r == _current_row - 1 and node.visited:
+					line.default_color = LINE_COLOR_ACTIVE
+					line.width = LINE_WIDTH_ACTIVE
+				elif r >= _current_row:
+					# Check if this is a reachable connection from current row.
+					if r == _current_row and _can_reach(r, c):
+						line.default_color = LINE_COLOR_ACTIVE
+						line.width = LINE_WIDTH_ACTIVE
+					else:
+						line.default_color = LINE_COLOR
+						line.width = LINE_WIDTH
+				else:
+					line.default_color = LINE_COLOR
+					line.width = LINE_WIDTH
+				_map_area.add_child(line)
+				_map_area.move_child(line, 0)
+				_connection_lines.append(line)
 
 
-func _create_node_button(node: MapNodeData, row: int, col: int, pos: Vector2) -> Button:
+# ---------------------------------------------------------------------------
+# Node buttons
+# ---------------------------------------------------------------------------
+
+func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
 	var btn: Button = Button.new()
-	btn.position = pos
 	btn.custom_minimum_size = Vector2(NODE_SIZE, NODE_SIZE)
 	btn.size = Vector2(NODE_SIZE, NODE_SIZE)
 	btn.text = node.get_icon()
 	btn.add_theme_font_size_override("font_size", ICON_FONT_SIZE)
-
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.set_corner_radius_all(8)
-
-	if node.visited:
-		# Visited — dimmed.
-		style.bg_color = _UITheme.PANEL_SURFACE
-		style.border_color = node.get_color() * Color(1, 1, 1, VISITED_ALPHA)
-		style.set_border_width_all(2)
-		btn.disabled = true
-		btn.modulate = Color(1, 1, 1, VISITED_ALPHA)
-	elif row == _current_row and _can_reach(row, col):
-		# Current row + reachable — clickable with glow.
-		style.bg_color = _UITheme.ELEVATED
-		style.border_color = CURRENT_ROW_GLOW
-		style.set_border_width_all(3)
-		btn.disabled = false
-		var captured_row: int = row
-		var captured_col: int = col
-		var captured_type: MapNodeData.NodeType = node.type
-		btn.pressed.connect(func() -> void: _on_node_pressed(captured_row, captured_col, captured_type))
-	elif row == _current_row:
-		# Current row but unreachable — dimmed.
-		style.bg_color = _UITheme.PANEL_SURFACE
-		style.border_color = Color("#555555")
-		style.set_border_width_all(1)
-		btn.disabled = true
-		btn.modulate = Color(1, 1, 1, 0.4)
-	elif row > _current_row:
-		# Future row — faded.
-		style.bg_color = Color(_UITheme.PANEL_SURFACE, 0.5)
-		style.border_color = Color("#333344")
-		style.set_border_width_all(1)
-		btn.disabled = true
-		btn.modulate = Color(1, 1, 1, 0.3)
-	else:
-		# Past row, not visited — skip.
-		style.bg_color = _UITheme.PANEL_SURFACE
-		style.border_color = Color("#444455")
-		style.set_border_width_all(1)
-		btn.disabled = true
-		btn.modulate = Color(1, 1, 1, 0.25)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style)
-	btn.add_theme_stylebox_override("pressed", style)
-	btn.add_theme_stylebox_override("disabled", style)
-	btn.add_theme_color_override("font_color", node.get_color())
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_color_override("font_disabled_color", node.get_color() * Color(1, 1, 1, 0.5))
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Add type label below the button.
-	var type_label: Label = Label.new()
-	type_label.text = node.get_display_name()
-	type_label.add_theme_font_override("font", _UITheme.font_mono())
-	type_label.add_theme_font_size_override("font_size", LABEL_FONT_SIZE)
-	type_label.add_theme_color_override("font_color", node.get_color() * Color(1, 1, 1, 0.7))
-	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	type_label.position = Vector2(0, NODE_SIZE + 2)
-	type_label.size = Vector2(NODE_SIZE, 16)
-	btn.add_child(type_label)
+	var node_color: Color = node.get_color()
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.set_corner_radius_all(NODE_CORNER)
 
-	_map_container.add_child(btn)
+	if node.visited:
+		_style_visited(style, btn, node_color)
+	elif row == _current_row and _can_reach(row, col):
+		_style_active(style, btn, node_color, row, col, node.type)
+	elif row == _current_row:
+		_style_unreachable(style, btn, node_color)
+	elif row > _current_row:
+		_style_future(style, btn, node_color)
+	else:
+		_style_past(style, btn, node_color)
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style.duplicate())
+	btn.add_theme_stylebox_override("pressed", style.duplicate())
+	btn.add_theme_stylebox_override("disabled", style)
+	btn.add_theme_color_override("font_color", node_color)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_color_override("font_disabled_color", Color(node_color, 0.5))
+
+	# Type label below the icon.
+	var lbl: Label = Label.new()
+	lbl.text = node.get_display_name()
+	lbl.add_theme_font_override("font", _UITheme.font_mono())
+	lbl.add_theme_font_size_override("font_size", LABEL_FONT_SIZE)
+	lbl.add_theme_color_override("font_color", Color(node_color, 0.7))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, NODE_SIZE + 2)
+	lbl.size = Vector2(NODE_SIZE, 16)
+	btn.add_child(lbl)
+
 	return btn
+
+
+func _style_visited(style: StyleBoxFlat, btn: Button, color: Color) -> void:
+	style.bg_color = _UITheme.PANEL_SURFACE
+	style.border_color = Color(color, VISITED_ALPHA)
+	style.set_border_width_all(2)
+	btn.disabled = true
+	btn.modulate = Color(1, 1, 1, VISITED_ALPHA)
+
+
+func _style_active(style: StyleBoxFlat, btn: Button, _color: Color, row: int, col: int, ntype: MapNodeData.NodeType) -> void:
+	style.bg_color = _UITheme.ELEVATED
+	style.border_color = CURRENT_ROW_GLOW
+	style.set_border_width_all(3)
+	btn.disabled = false
+	var r: int = row
+	var c: int = col
+	var t: MapNodeData.NodeType = ntype
+	btn.pressed.connect(func() -> void: _on_node_pressed(r, c, t))
+	# Hover variant.
+	var hover_style: StyleBoxFlat = style.duplicate()
+	hover_style.bg_color = _UITheme.ELEVATED.lightened(0.12)
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+
+func _style_unreachable(style: StyleBoxFlat, btn: Button, _color: Color) -> void:
+	style.bg_color = Color(_UITheme.PANEL_SURFACE, 0.6)
+	style.border_color = Color("#444455")
+	style.set_border_width_all(1)
+	btn.disabled = true
+	btn.modulate = Color(1, 1, 1, UNREACHABLE_ALPHA)
+
+
+func _style_future(style: StyleBoxFlat, btn: Button, _color: Color) -> void:
+	style.bg_color = Color(_UITheme.PANEL_SURFACE, 0.4)
+	style.border_color = Color("#2A2A3E")
+	style.set_border_width_all(1)
+	btn.disabled = true
+	btn.modulate = Color(1, 1, 1, FUTURE_ALPHA)
+
+
+func _style_past(style: StyleBoxFlat, btn: Button, _color: Color) -> void:
+	style.bg_color = _UITheme.PANEL_SURFACE
+	style.border_color = Color("#333344")
+	style.set_border_width_all(1)
+	btn.disabled = true
+	btn.modulate = Color(1, 1, 1, 0.2)
 
 
 func _can_reach(row: int, col: int) -> bool:
 	if row == 0:
-		return true  # First row: all nodes reachable.
+		return true
 	if _current_col < 0:
-		return true  # No previous column (shouldn't happen after row 0).
+		return true
 	return _stage_map.is_reachable(row, col, row - 1, _current_col)
 
 
 func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> void:
-	# Mark node as visited.
 	var node: MapNodeData = _stage_map.get_node_at(row, col)
 	if node:
 		node.visited = true
@@ -208,11 +274,14 @@ func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> vo
 # ---------------------------------------------------------------------------
 
 func _apply_theme_styling() -> void:
-	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(_UITheme.BACKGROUND, 0))
-	_backdrop.color = Color(0, 0, 0, 0.0)
+	# Transparent root panel — backdrop provides the dark overlay.
+	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color.TRANSPARENT, 0))
+	_backdrop.color = Color(_UITheme.BACKGROUND, 0.95)
+
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
-	_title_label.add_theme_font_size_override("font_size", 28)
+	_title_label.add_theme_font_size_override("font_size", 20)
 	_title_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+
 	_hint_label.add_theme_font_override("font", _UITheme.font_mono())
 	_hint_label.add_theme_font_size_override("font_size", 16)
 	_hint_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
