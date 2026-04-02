@@ -177,9 +177,14 @@ func _on_bank_pressed() -> void:
 	base_banked += combo_bonus
 	# Hot Streak multiplier: 3+ consecutive banks = x1.1, 5+ = x1.2.
 	var streak_mult: float = _get_streak_multiplier()
-	var banked: int = int(base_banked * streak_mult)
+	# Momentum multiplier: grows +5% per consecutive bank this stage.
+	var momentum_mult: float = _get_momentum_multiplier()
+	var banked: int = int(base_banked * streak_mult * momentum_mult)
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
+	# Increment momentum after banking.
+	GameManager.momentum += 1
+	GameManager.momentum_changed.emit(GameManager.momentum)
 	# Accumulate LUCK face values for dice reward rarity.
 	_accumulate_luck()
 	# Gambler's Rush: +1g per survived stop.
@@ -210,6 +215,8 @@ func _on_bank_pressed() -> void:
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
 	if streak_mult > 1.0:
 		status_parts.append("ON FIRE x%.1f" % streak_mult)
+	if momentum_mult > 1.0:
+		status_parts.append("MOMENTUM x%.2f" % momentum_mult)
 	status_parts.append("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score])
 	if not is_jackpot:
 		hud.show_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
@@ -756,6 +763,15 @@ func _get_streak_multiplier() -> float:
 	elif bank_streak >= HOT_STREAK_TIER_1:
 		return HOT_STREAK_MULT_1
 	return 1.0
+
+
+## Momentum multiplier: +5% per previous consecutive bank this stage.
+const MOMENTUM_STEP: float = 0.05
+
+func _get_momentum_multiplier() -> float:
+	if GameManager.momentum <= 0:
+		return 1.0
+	return 1.0 + float(GameManager.momentum) * MOMENTUM_STEP
 
 
 func _update_streak_display() -> void:

@@ -20,6 +20,7 @@ const COMBO_BADGE_HEIGHT: int = 26
 @onready var lives_label: Label      = $TopBar/TopBarMargin/TopBarRow/LivesLabel
 @onready var gold_label: Label       = $TopBar/TopBarMargin/TopBarRow/GoldLabel
 @onready var luck_label: Label       = $TopBar/TopBarMargin/TopBarRow/LuckLabel
+@onready var momentum_label: Label   = $TopBar/TopBarMargin/TopBarRow/MomentumLabel
 @onready var highscore_label: Label  = $TopBar/TopBarMargin/TopBarRow/HighscoreLabel
 
 # -- Modifier row --
@@ -77,6 +78,7 @@ func _ready() -> void:
 	GameManager.lives_changed.connect(_on_lives_changed)
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.luck_changed.connect(_on_luck_changed)
+	GameManager.momentum_changed.connect(_on_momentum_changed)
 	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
@@ -86,6 +88,7 @@ func _ready() -> void:
 	_on_lives_changed(GameManager.lives)
 	_on_gold_changed(GameManager.gold)
 	_refresh_luck_display()
+	_refresh_momentum_display()
 	_refresh_stage_display()
 	_refresh_modifier_display()
 	set_active_combos([])
@@ -429,6 +432,21 @@ func _refresh_luck_display() -> void:
 	else:
 		luck_label.text = ""
 		luck_label.visible = false
+
+
+func _on_momentum_changed(_new_momentum: int) -> void:
+	_refresh_momentum_display()
+
+
+func _refresh_momentum_display() -> void:
+	if GameManager.momentum > 0:
+		var mult: float = 1.0 + float(GameManager.momentum) * 0.05
+		momentum_label.text = "⚡x%.2f" % mult
+		momentum_label.modulate = Color(1.0, 0.9, 0.3)
+		momentum_label.visible = true
+	else:
+		momentum_label.text = ""
+		momentum_label.visible = false
 
 
 func _on_stage_advanced(_new_stage: int) -> void:

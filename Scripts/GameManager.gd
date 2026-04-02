@@ -40,6 +40,7 @@ signal run_ended()
 signal stage_cleared()
 signal loop_advanced(new_loop: int)
 signal luck_changed(new_luck: int)
+signal momentum_changed(new_momentum: int)
 
 var total_score: int = 0
 var lives: int = MAX_LIVES
@@ -60,6 +61,8 @@ var luck: int = 0
 ## Event flags — temporary effects that reset each loop.
 var event_free_bust: bool = false
 var event_target_multiplier: float = 1.0
+## Momentum: consecutive banks this stage. Resets on bust / stage transition.
+var momentum: int = 0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
 var _shop_gold_spent: int = 0
 ## Whether the Miser bonus is pending for the next shop.
@@ -165,6 +168,8 @@ func advance_stage() -> void:
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
+	momentum = 0
+	momentum_changed.emit(momentum)
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
@@ -180,6 +185,8 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
+	momentum = 0
+	momentum_changed.emit(momentum)
 	_reset_event_flags()
 	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
@@ -208,6 +215,8 @@ func get_stage_clear_bonus() -> int:
 func lose_life() -> void:
 	lives -= 1
 	run_busts += 1
+	momentum = 0
+	momentum_changed.emit(momentum)
 	lives_changed.emit(lives)
 	if lives <= 0:
 		run_ended.emit()
@@ -231,6 +240,7 @@ func reset_run() -> void:
 	luck = 0
 	event_free_bust = false
 	event_target_multiplier = 1.0
+	momentum = 0
 	active_modifiers.clear()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
@@ -240,6 +250,7 @@ func reset_run() -> void:
 	score_changed.emit(total_score)
 	lives_changed.emit(lives)
 	gold_changed.emit(gold)
+	momentum_changed.emit(momentum)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
 

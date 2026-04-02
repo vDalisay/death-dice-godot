@@ -193,3 +193,56 @@ func test_best_turn_score_resets_on_run_reset() -> void:
 	_gm.best_turn_score = 42
 	_gm.reset_run()
 	assert_int(_gm.best_turn_score).is_equal(0)
+
+
+# ---------------------------------------------------------------------------
+# Momentum
+# ---------------------------------------------------------------------------
+
+func test_momentum_starts_at_zero() -> void:
+	assert_int(_gm.momentum).is_equal(0)
+
+
+func test_momentum_resets_on_lose_life() -> void:
+	_gm.momentum = 3
+	_gm.lose_life()
+	assert_int(_gm.momentum).is_equal(0)
+
+
+func test_momentum_resets_on_advance_stage() -> void:
+	_gm.momentum = 5
+	_gm.advance_stage()
+	assert_int(_gm.momentum).is_equal(0)
+
+
+func test_momentum_resets_on_advance_loop() -> void:
+	_gm.momentum = 4
+	_gm.advance_loop()
+	assert_int(_gm.momentum).is_equal(0)
+
+
+func test_momentum_resets_on_run_reset() -> void:
+	_gm.momentum = 7
+	_gm.reset_run()
+	assert_int(_gm.momentum).is_equal(0)
+
+
+func test_momentum_changed_emitted_on_lose_life() -> void:
+	_gm.momentum = 2
+	monitor_signals(_gm, false)
+	_gm.lose_life()
+	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+
+
+func test_momentum_changed_emitted_on_advance_stage() -> void:
+	_gm.momentum = 3
+	monitor_signals(_gm, false)
+	_gm.advance_stage()
+	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+
+
+func test_momentum_changed_emitted_on_reset_run() -> void:
+	_gm.momentum = 5
+	monitor_signals(_gm, false)
+	_gm.reset_run()
+	await assert_signal(_gm).is_emitted("momentum_changed", [0])

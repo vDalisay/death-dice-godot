@@ -42,6 +42,10 @@ text = "G 0"
 layout_mode = 2
 text = ""
 
+[node name="MomentumLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = ""
+
 [node name="HighscoreLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
 layout_mode = 2
 text = "HI: 0"
