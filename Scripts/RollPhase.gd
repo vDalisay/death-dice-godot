@@ -183,6 +183,14 @@ func _on_bank_pressed() -> void:
 	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
 		var rush_gold: int = accumulated_stop_count
 		GameManager.add_gold(rush_gold)
+	# Scavenger: +1g per kept (non-stopped) die.
+	if GameManager.has_modifier(RunModifier.ModifierType.SCAVENGER):
+		var kept_count: int = 0
+		for i: int in GameManager.dice_pool.size():
+			if not dice_stopped[i] and (dice_keep[i] or dice_keep_locked[i]):
+				kept_count += 1
+		if kept_count > 0:
+			GameManager.add_gold(kept_count)
 	# Jackpot check: first roll only (no rerolls), 5+ dice, 0 stops.
 	var is_jackpot: bool = _reroll_count == 0 and GameManager.dice_pool.size() >= JACKPOT_MIN_DICE and accumulated_stop_count == 0
 	AchievementManager.on_bank(banked, _reroll_count, accumulated_stop_count, GameManager.dice_pool.size(), bank_streak)
@@ -303,6 +311,9 @@ func _reroll_selected_dice() -> void:
 		# No dice to reroll — all are kept/locked, so auto-bank.
 		_on_bank_pressed()
 		return
+	# Recycler: +1g per die rerolled.
+	if GameManager.has_modifier(RunModifier.ModifierType.RECYCLER):
+		GameManager.add_gold(rerolled.size())
 	_begin_roll_animation_lock()
 	dice_arena.reroll_dice(rerolled, GameManager.dice_pool)
 	# Results will be processed when all_dice_settled signal fires
@@ -479,6 +490,8 @@ func _all_dice_resolved() -> bool:
 func _calculate_turn_score() -> int:
 	var pool_size: int = GameManager.dice_pool.size()
 	var glass_cannon: bool = GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON)
+	var high_roller: bool = GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER)
+	var overcharge: bool = GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE)
 	# Pass 1: compute per-die base scores
 	var base_scores: Array[int] = []
 	base_scores.resize(pool_size)
@@ -492,9 +505,16 @@ func _calculate_turn_score() -> int:
 			continue
 		match face.type:
 			DiceFaceData.FaceType.NUMBER:
-				base_scores[i] = face.value + (2 if glass_cannon else 0)
-			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+				var bonus: int = 0
+				if glass_cannon:
+					bonus += 2
+				if high_roller and face.value >= 4:
+					bonus += 3
+				base_scores[i] = face.value + bonus
+			DiceFaceData.FaceType.AUTO_KEEP:
 				base_scores[i] = face.value
+			DiceFaceData.FaceType.EXPLODE:
+				base_scores[i] = face.value * (2 if overcharge else 1)
 			DiceFaceData.FaceType.MULTIPLY:
 				multiplier *= face.value
 	# Pass 2: apply MULTIPLY_LEFT — multiply the left neighbor's base score
@@ -506,6 +526,21 @@ func _calculate_turn_score() -> int:
 			continue
 		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT and i > 0 and not dice_stopped[i - 1]:
 			base_scores[i - 1] *= face.value
+	# Pass 3: Chain Lightning — 3+ kept dice with same face value get +3 each
+	if GameManager.has_modifier(RunModifier.ModifierType.CHAIN_LIGHTNING):
+		var value_groups: Dictionary = {}
+		for i: int in pool_size:
+			if dice_stopped[i] or base_scores[i] == 0:
+				continue
+			var val: int = base_scores[i]
+			if not value_groups.has(val):
+				value_groups[val] = []
+			value_groups[val].append(i)
+		for val: int in value_groups:
+			var indices: Array = value_groups[val]
+			if indices.size() >= 3:
+				for idx: int in indices:
+					base_scores[idx] += 3
 	# Sum all per-die scores, then apply global multiplier
 	var score: int = 0
 	for s: int in base_scores:
@@ -697,6 +732,9 @@ func _get_bust_threshold() -> int:
 	# Glass Cannon: threshold -1
 	if GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON):
 		base = maxi(1, base - 1)
+	# Last Stand: threshold +2 at 1 life
+	if GameManager.has_modifier(RunModifier.ModifierType.LAST_STAND) and GameManager.lives == 1:
+		base += 2
 	return base
 
 
@@ -1075,6 +1113,8 @@ func _play_multiply_face_vfx() -> void:
 func _get_per_die_scores() -> Array[int]:
 	var pool_size: int = GameManager.dice_pool.size()
 	var glass_cannon: bool = GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON)
+	var high_roller: bool = GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER)
+	var overcharge: bool = GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE)
 	var base_scores: Array[int] = []
 	base_scores.resize(pool_size)
 	base_scores.fill(0)
@@ -1087,9 +1127,16 @@ func _get_per_die_scores() -> Array[int]:
 			continue
 		match face.type:
 			DiceFaceData.FaceType.NUMBER:
-				base_scores[i] = face.value + (2 if glass_cannon else 0)
-			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+				var bonus: int = 0
+				if glass_cannon:
+					bonus += 2
+				if high_roller and face.value >= 4:
+					bonus += 3
+				base_scores[i] = face.value + bonus
+			DiceFaceData.FaceType.AUTO_KEEP:
 				base_scores[i] = face.value
+			DiceFaceData.FaceType.EXPLODE:
+				base_scores[i] = face.value * (2 if overcharge else 1)
 			DiceFaceData.FaceType.MULTIPLY:
 				multiplier *= face.value
 	for i: int in pool_size:

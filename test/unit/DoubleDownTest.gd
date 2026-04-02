@@ -27,7 +27,7 @@ func test_double_down_not_in_modifier_factories() -> void:
 
 func test_all_factories_count_reduced() -> void:
 	var factories: Array[Callable] = RunModifier.all_factories()
-	assert_int(factories.size()).is_equal(6)
+	assert_int(factories.size()).is_equal(12)
 	var seen_types: Array[int] = []
 	for factory: Callable in factories:
 		var mod: RunModifier = factory.call() as RunModifier
