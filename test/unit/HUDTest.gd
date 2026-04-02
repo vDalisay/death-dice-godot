@@ -98,7 +98,7 @@ func test_stage_label_format() -> void:
 	add_child(hud)
 	await await_idle_frame()
 	hud._refresh_stage_display()
-	assert_str(hud.stage_label.text).contains("STAGE")
+	assert_str(hud.stage_label.text).contains("ROW")
 
 
 func test_update_turn_sets_turn_score() -> void:

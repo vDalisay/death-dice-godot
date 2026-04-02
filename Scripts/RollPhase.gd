@@ -39,6 +39,7 @@ enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 @onready var codex_panel: DiceCodexPanel = $DiceCodexPanel
 @onready var highlights_panel: HighlightsPanel = $HighlightsPanel
 @onready var forge_panel: ForgePanel = $ForgePanel
+@onready var stage_map_panel: StageMapPanel = $StageMapPanel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -89,6 +90,7 @@ func _ready() -> void:
 	codex_panel.closed.connect(_on_codex_closed)
 	highlights_panel.closed.connect(_on_highlights_closed)
 	forge_panel.forge_closed.connect(_on_forge_closed)
+	stage_map_panel.node_selected.connect(_on_map_node_selected)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
@@ -839,22 +841,9 @@ func _open_shop(is_loop_complete: bool = false) -> void:
 	shop_panel.open(GameManager.current_stage, is_loop_complete)
 
 func _on_shop_closed() -> void:
-	if _loop_complete_pending:
-		GameManager.advance_loop()
-		AchievementManager.on_loop_advanced(GameManager.current_loop)
-		_loop_complete_pending = false
-		# Curse event: ~20% chance on loop transition.
-		_maybe_apply_curse()
-	else:
-		GameManager.advance_stage()
 	shop_panel.visible = false
-	_roll_content.visible = true
-	_update_streak_display()
-	_run_active = true
-	turn_number = 0
-	bank_streak = 0
-	_update_streak_display()
-	_start_new_turn()
+	# Return to the path map for the next node.
+	_open_stage_map()
 
 func _on_new_run_pressed() -> void:
 	_record_run_snapshot_if_needed()
@@ -1171,7 +1160,7 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 	overlay.call("setup", bonus_gold, surplus, is_loop)
 	overlay.connect("proceed_requested", func() -> void:
 		overlay.queue_free()
-		_maybe_open_forge(is_loop)
+		_open_stage_map()
 	)
 
 
@@ -1187,9 +1176,102 @@ func _maybe_open_forge(is_loop: bool) -> void:
 
 
 func _on_forge_closed() -> void:
-	var is_loop: bool = _loop_complete_pending
 	forge_panel.visible = false
-	_open_shop(is_loop)
+	# After forge, return to the path map for next row.
+	_open_stage_map()
+
+
+# ---------------------------------------------------------------------------
+# Path map
+# ---------------------------------------------------------------------------
+
+const REST_HEAL_LIVES: int = 1
+const REST_GOLD_BONUS: int = 10
+
+func _open_stage_map() -> void:
+	if GameManager.stage_map == null:
+		GameManager.generate_stage_map()
+	# Check if we've completed all rows (loop complete).
+	if GameManager.current_row >= StageMapData.ROWS_PER_LOOP:
+		_complete_loop()
+		return
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	stage_map_panel.open(GameManager.stage_map, GameManager.current_row, GameManager.previous_col)
+
+
+func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType) -> void:
+	GameManager.advance_row(col)
+	stage_map_panel.visible = false
+	match node_type:
+		MapNodeData.NodeType.NORMAL_STAGE:
+			_start_stage_from_map()
+		MapNodeData.NodeType.SHOP:
+			_open_shop_from_map()
+		MapNodeData.NodeType.FORGE:
+			_open_forge_from_map()
+		MapNodeData.NodeType.REST:
+			_execute_rest_node()
+		MapNodeData.NodeType.RANDOM_EVENT:
+			# Placeholder — treated as a Normal Stage until events are implemented.
+			_start_stage_from_map()
+
+
+func _start_stage_from_map() -> void:
+	GameManager.total_stages_cleared += 1
+	GameManager.current_stage += 1
+	GameManager.total_score = 0
+	GameManager.stage_target_score = GameManager._calculate_stage_target(GameManager.current_stage)
+	GameManager.score_changed.emit(GameManager.total_score)
+	GameManager.stage_advanced.emit(GameManager.current_stage)
+	_roll_content.visible = true
+	_update_streak_display()
+	_run_active = true
+	turn_number = 0
+	bank_streak = 0
+	_update_streak_display()
+	_start_new_turn()
+
+
+func _open_shop_from_map() -> void:
+	_loop_complete_pending = false
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	shop_panel.open(GameManager.current_stage, false)
+
+
+func _open_forge_from_map() -> void:
+	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE:
+		_roll_content.visible = false
+		if _streak_display != null:
+			_streak_display.visible = false
+		forge_panel.open()
+	else:
+		# Not enough dice for forge — open map for next node.
+		hud.show_status("Not enough dice to forge (need %d)." % ForgePanel.MIN_DICE_FOR_FORGE, Color(1.0, 0.6, 0.0))
+		_open_stage_map()
+
+
+func _execute_rest_node() -> void:
+	GameManager.lives = mini(GameManager.lives + REST_HEAL_LIVES, GameManager.MAX_LIVES)
+	GameManager.lives_changed.emit(GameManager.lives)
+	GameManager.add_gold(REST_GOLD_BONUS)
+	hud.show_status("Rested! +%d life, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
+	SFXManager.play_stage_clear()
+	_open_stage_map()
+
+
+func _complete_loop() -> void:
+	GameManager.advance_loop()
+	AchievementManager.on_loop_advanced(GameManager.current_loop)
+	_maybe_apply_curse()
+	hud.show_status(
+		"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop - 1, GameManager.current_loop],
+		Color(1.0, 0.85, 0.0))
+	# Open the new loop's map.
+	_open_stage_map()
 
 
 # ---------------------------------------------------------------------------

@@ -44,6 +44,9 @@ var total_score: int = 0
 var lives: int = MAX_LIVES
 var current_stage: int = 1
 var current_loop: int = 1
+var current_row: int = 0
+var previous_col: int = -1
+var stage_map: StageMapData = null
 var gold: int = 0
 var stage_target_score: int = BASE_STAGE_TARGET
 var dice_pool: Array[DiceData] = []
@@ -63,6 +66,13 @@ var skip_archetype_picker: bool = false
 
 func _ready() -> void:
 	_build_starting_pool()
+	generate_stage_map()
+
+
+func generate_stage_map() -> void:
+	stage_map = StageMapData.generate(current_loop)
+	current_row = 0
+	previous_col = -1
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +142,8 @@ func _loop_multiplier() -> float:
 
 func _calculate_stage_target(stage: int) -> int:
 	var mult: float = _loop_multiplier()
-	return int(BASE_STAGE_TARGET * mult) + (stage - 1) * int(STAGE_TARGET_STEP * mult)
+	var row: int = current_row if stage_map else (stage - 1)
+	return int(BASE_STAGE_TARGET * mult) + row * int(STAGE_TARGET_STEP * mult)
 
 
 func advance_stage() -> void:
@@ -144,11 +155,17 @@ func advance_stage() -> void:
 	stage_advanced.emit(current_stage)
 
 
+func advance_row(col: int) -> void:
+	previous_col = col
+	current_row += 1
+
+
 func advance_loop() -> void:
 	total_stages_cleared += 1
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
+	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
@@ -156,6 +173,8 @@ func advance_loop() -> void:
 
 
 func is_final_stage() -> bool:
+	if stage_map:
+		return current_row >= stage_map.get_row_count() - 1
 	return current_stage >= get_stages_in_current_loop()
 
 
@@ -185,6 +204,8 @@ func lose_life() -> void:
 func reset_run() -> void:
 	current_stage = 1
 	current_loop = 1
+	current_row = 0
+	previous_col = -1
 	total_score = 0
 	total_stages_cleared = 0
 	run_busts = 0
@@ -196,6 +217,7 @@ func reset_run() -> void:
 	_miser_bonus_pending = false
 	stage_target_score = _calculate_stage_target(current_stage)
 	_build_starting_pool()
+	generate_stage_map()
 	score_changed.emit(total_score)
 	lives_changed.emit(lives)
 	gold_changed.emit(gold)

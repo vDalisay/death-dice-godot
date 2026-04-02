@@ -434,7 +434,9 @@ func _on_highscore_changed(new_highscore: int) -> void:
 
 func _refresh_stage_display() -> void:
 	var loop_text: String = " L%d" % GameManager.current_loop if GameManager.current_loop > 1 else ""
-	stage_label.text = "STAGE %d/%d%s" % [GameManager.current_stage, GameManager.get_stages_in_current_loop(), loop_text]
+	var row_count: int = StageMapData.ROWS_PER_LOOP if GameManager.stage_map else GameManager.get_stages_in_current_loop()
+	var row_display: int = mini(GameManager.current_row + 1, row_count)
+	stage_label.text = "ROW %d/%d%s" % [row_display, row_count, loop_text]
 	target_label.text = "Target: %d" % GameManager.stage_target_score
 
 

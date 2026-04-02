@@ -170,5 +170,5 @@ func test_hud_shows_stage_label() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _get_root(runner)
-	assert_str(root.hud.stage_label.text).contains("STAGE")
+	assert_str(root.hud.stage_label.text).contains("ROW")
 	assert_str(root.hud.stage_label.text).contains("1")
