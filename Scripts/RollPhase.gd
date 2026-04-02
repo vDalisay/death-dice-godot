@@ -71,6 +71,7 @@ const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
 const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
 const DiceRewardScene: PackedScene = preload("res://Scenes/DiceRewardOverlay.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
+const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
@@ -394,15 +395,25 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			_sync_buttons()
 			_schedule_auto_advance()
 		else:
-			turn_state = TurnState.BUST
-			bank_streak = 0
-			_update_streak_display()
-			GameManager.lose_life()
-			AchievementManager.on_bust()
-			SFXManager.play_bust()
-			_show_bust_overlay(effective_stops)
-			_sync_buttons()
-			_schedule_auto_advance()
+			if GameManager.event_free_bust:
+				GameManager.event_free_bust = false
+				turn_state = TurnState.BANKED
+				bank_streak = 0
+				_update_streak_display()
+				hud.show_status("GUARDIAN ANGEL! Bust absorbed — turn score forfeited.", Color(0.4, 0.8, 1.0))
+				SFXManager.play_close_call()
+				_sync_buttons()
+				_schedule_auto_advance()
+			else:
+				turn_state = TurnState.BUST
+				bank_streak = 0
+				_update_streak_display()
+				GameManager.lose_life()
+				AchievementManager.on_bust()
+				SFXManager.play_bust()
+				_show_bust_overlay(effective_stops)
+				_sync_buttons()
+				_schedule_auto_advance()
 	else:
 		turn_state = TurnState.ACTIVE
 
@@ -1207,6 +1218,16 @@ func _on_forge_closed() -> void:
 	_open_stage_map()
 
 
+func _show_stage_event() -> void:
+	var event_overlay: ColorRect = StageEventScene.instantiate() as ColorRect
+	add_child(event_overlay)
+	event_overlay.call("open")
+	event_overlay.connect("event_resolved", func() -> void:
+		event_overlay.queue_free()
+		_open_stage_map()
+	)
+
+
 # ---------------------------------------------------------------------------
 # Path map
 # ---------------------------------------------------------------------------
@@ -1241,8 +1262,7 @@ func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType)
 		MapNodeData.NodeType.REST:
 			_execute_rest_node()
 		MapNodeData.NodeType.RANDOM_EVENT:
-			# Placeholder — treated as a Normal Stage until events are implemented.
-			_start_stage_from_map()
+			_show_stage_event()
 
 
 func _start_stage_from_map() -> void:

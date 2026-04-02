@@ -57,6 +57,9 @@ var run_busts: int = 0
 var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
 var luck: int = 0
+## Event flags — temporary effects that reset each loop.
+var event_free_bust: bool = false
+var event_target_multiplier: float = 1.0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
 var _shop_gold_spent: int = 0
 ## Whether the Miser bonus is pending for the next shop.
@@ -177,6 +180,7 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
+	_reset_event_flags()
 	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
@@ -225,6 +229,8 @@ func reset_run() -> void:
 	gold = 0
 	best_turn_score = 0
 	luck = 0
+	event_free_bust = false
+	event_target_multiplier = 1.0
 	active_modifiers.clear()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
@@ -279,3 +285,12 @@ func on_shop_exited() -> void:
 ## Track gold spent in shop (for Miser modifier).
 func track_shop_spend(amount: int) -> void:
 	_shop_gold_spent += amount
+
+
+# ---------------------------------------------------------------------------
+# Event flags
+# ---------------------------------------------------------------------------
+
+func _reset_event_flags() -> void:
+	event_free_bust = false
+	event_target_multiplier = 1.0
