@@ -192,12 +192,14 @@ func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:
 		var i: int = valid_indices[slot]
 		var die: PhysicsDie = _dice[i]
 		die.is_stopped = false
+		die.is_kept = false
 		die._bump_count = 0
 		die._wall_bounce_count = 0
 
 		# Roll new face.
 		var face: DiceFaceData = pool[i].roll()
 		die.current_face = face
+		die._apply_visual()
 
 		if instant_mode:
 			die.show_face(face)
