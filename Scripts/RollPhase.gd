@@ -172,6 +172,9 @@ func _on_bank_pressed() -> void:
 	# Iron Bank: +50% score if no rerolls.
 	if GameManager.has_modifier(RunModifier.ModifierType.IRON_BANK) and _reroll_count == 0:
 		base_banked = int(base_banked * 1.5)
+	# Cascade combo bonus: active combos award bonus points with escalation.
+	var combo_bonus: int = _calculate_combo_bonus()
+	base_banked += combo_bonus
 	# Hot Streak multiplier: 3+ consecutive banks = x1.1, 5+ = x1.2.
 	var streak_mult: float = _get_streak_multiplier()
 	var banked: int = int(base_banked * streak_mult)
@@ -723,6 +726,15 @@ func _update_combo_hud() -> void:
 		if combo != null and not combo.combo_id.is_empty() and _triggered_combo_ids.has(combo.combo_id):
 			active_combos.append(combo)
 	hud.set_active_combos(active_combos)
+
+
+func _calculate_combo_bonus() -> int:
+	var active_combos: Array[RollCombo] = []
+	var all_combos: Array[RollCombo] = RollComboRegistry.get_all_combos()
+	for combo: RollCombo in all_combos:
+		if combo != null and not combo.combo_id.is_empty() and _triggered_combo_ids.has(combo.combo_id):
+			active_combos.append(combo)
+	return RollComboRegistry.calculate_combo_bonus(active_combos)
 
 
 func _get_bust_threshold() -> int:
