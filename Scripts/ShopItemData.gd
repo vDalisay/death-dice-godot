@@ -19,6 +19,9 @@ enum ItemType {
 	CLEANSE_CURSE,
 	DOUBLE_DOWN,
 	BUY_FORTUNE_DIE,
+	INSURANCE_BET,
+	HEAT_BET,
+	EVEN_ODD_BET,
 }
 
 @export var item_name: String = ""
@@ -163,4 +166,31 @@ static func make_double_down() -> ShopItemData:
 	item.description = "Gamble your gold! Pick even/odd, roll a die."
 	item.cost = 0
 	item.item_type = ItemType.DOUBLE_DOWN
+	return item
+
+
+static func make_insurance_bet() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Insurance Bet"
+	item.description = "Pay 10g now. If you bust this stage, recover 25g. Net +15g on bust."
+	item.cost = 10
+	item.item_type = ItemType.INSURANCE_BET
+	return item
+
+
+static func make_heat_bet() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Heat Bet"
+	item.description = "Wager 15g. Predict your exact stop count when you bank. Hit it: 3:1 payout (45g)."
+	item.cost = 15
+	item.item_type = ItemType.HEAT_BET
+	return item
+
+
+static func make_even_odd_bet() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Even/Odd Bet"
+	item.description = "Bet on parity of your kept NUMBER dice. ~50/50 — ties push. 2:1 payout."
+	item.cost = 0
+	item.item_type = ItemType.EVEN_ODD_BET
 	return item

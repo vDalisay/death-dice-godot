@@ -3,6 +3,7 @@ extends Node
 
 const SAVE_PATH: String = "user://save_data.json"
 const RunSaveDataScript: GDScript = preload("res://Scripts/RunSaveData.gd")
+const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 
 # Mastery milestone definitions: runs_used -> unlock cosmetics
 const MASTERY_MILESTONES: Dictionary = {
@@ -12,8 +13,12 @@ const MASTERY_MILESTONES: Dictionary = {
 	40: {"level": 4, "cosmetics": ["particle_trail"]},
 	100: {"level": 5, "cosmetics": ["legendary_shine"]},
 }
+const PRESTIGE_COSMETIC_UNLOCKS: Dictionary = {
+	"skull_shimmer": "skull_cosmetic",
+}
 
 signal highscore_changed(new_highscore: int)
+signal prestige_currency_changed(new_total: int)
 
 var highscore: int = 0
 var gauntlet_highscore: int = 0
@@ -31,6 +36,8 @@ var unlocked_achievements: Dictionary = {}
 var dice_mastery: Dictionary = {}
 var purchased_cosmetics: Dictionary = {}  # die_name -> Array[cosmetic_id]
 var equipped_cosmetics: Dictionary = {}  # die_name -> cosmetic_id (or "" for none)
+var prestige_currency: int = 0
+var prestige_unlocks: Array[String] = []
 
 func _ready() -> void:
 	_load()
@@ -61,6 +68,10 @@ func record_run(run: RunSaveData) -> void:
 			gauntlet_best_loop = run.loops_completed
 	if run.loops_completed > max_loops_completed:
 		max_loops_completed = run.loops_completed
+	var skulls_earned: int = _calculate_prestige_earnings(run.loops_completed, run.busts)
+	run.prestige_skulls_earned = skulls_earned
+	if skulls_earned > 0:
+		add_prestige_currency(skulls_earned)
 	_save()
 
 func make_run_snapshot() -> RunSaveData:
@@ -185,6 +196,9 @@ func get_die_total_runs_used(die_name: String) -> int:
 
 func is_cosmetic_unlocked(die_name: String, cosmetic: String) -> bool:
 	"""Check if a specific cosmetic is unlocked for a die."""
+	if PRESTIGE_COSMETIC_UNLOCKS.has(cosmetic):
+		var unlock_id: String = PRESTIGE_COSMETIC_UNLOCKS[cosmetic] as String
+		return has_prestige_unlock(unlock_id)
 	if not dice_mastery.has(die_name):
 		return false
 	var unlocked: Array = (dice_mastery[die_name] as Dictionary).get("unlocked_cosmetics", []) as Array
@@ -258,6 +272,53 @@ func get_purchased_cosmetics_for_die(die_name: String) -> Array:
 	return (purchased_cosmetics[die_name] as Array).duplicate()
 
 
+func add_prestige_currency(amount: int) -> void:
+	if amount <= 0:
+		return
+	prestige_currency += amount
+	prestige_currency_changed.emit(prestige_currency)
+
+
+func spend_prestige_currency(amount: int) -> bool:
+	if amount <= 0:
+		return false
+	if prestige_currency < amount:
+		return false
+	prestige_currency -= amount
+	prestige_currency_changed.emit(prestige_currency)
+	return true
+
+
+func has_prestige_unlock(unlock_id: String) -> bool:
+	return unlock_id in prestige_unlocks
+
+
+func purchase_prestige_unlock(unlock_id: String) -> bool:
+	if has_prestige_unlock(unlock_id):
+		return false
+	var all_unlocks: Array = PrestigeUnlockDataScript.get_all()
+	for unlock: Resource in all_unlocks:
+		if unlock.unlock_id != unlock_id:
+			continue
+		if not spend_prestige_currency(unlock.skull_cost):
+			return false
+		prestige_unlocks.append(unlock_id)
+		_save()
+		return true
+	return false
+
+
+func _calculate_prestige_earnings(loops_completed: int, busts: int) -> int:
+	var skulls: int = loops_completed * 3
+	if busts == 0:
+		skulls += 2
+	if loops_completed >= 3:
+		skulls += 3
+	if loops_completed >= 5:
+		skulls += 5
+	return skulls
+
+
 
 
 func _save() -> void:
@@ -280,6 +341,8 @@ func _save() -> void:
 		"dice_mastery": dice_mastery,
 		"purchased_cosmetics": purchased_cosmetics,
 		"equipped_cosmetics": equipped_cosmetics,
+		"prestige_currency": prestige_currency,
+		"prestige_unlocks": prestige_unlocks,
 		"runs": runs_array,
 	}
 	var file: FileAccess = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -314,6 +377,10 @@ func _load() -> void:
 	dice_mastery = data.get("dice_mastery", {}) as Dictionary
 	purchased_cosmetics = data.get("purchased_cosmetics", {}) as Dictionary
 	equipped_cosmetics = data.get("equipped_cosmetics", {}) as Dictionary
+	prestige_currency = data.get("prestige_currency", 0) as int
+	prestige_unlocks.clear()
+	for unlock: Variant in data.get("prestige_unlocks", []) as Array:
+		prestige_unlocks.append(unlock as String)
 	var runs: Array = data.get("runs", []) as Array
 	run_history.clear()
 	for entry: Variant in runs:
@@ -330,5 +397,7 @@ func _load() -> void:
 			save.best_turn_score = (entry as Dictionary).get("best_turn_score", 0) as int
 			save.final_dice_names = final_names
 			save.run_mode = (entry as Dictionary).get("run_mode", int(GameManager.RunMode.CLASSIC)) as int
+			save.prestige_skulls_earned = (entry as Dictionary).get("prestige_skulls_earned", 0) as int
 			run_history.append(save)
 	highscore_changed.emit(highscore)
+	prestige_currency_changed.emit(prestige_currency)

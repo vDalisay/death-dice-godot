@@ -24,11 +24,11 @@ func test_show_highlights_makes_visible_with_stat_cards() -> void:
 	var bests: Dictionary = {"highscore": 200, "best_stages": 3, "best_loop": 1, "best_turn": 80}
 	panel.show_highlights(run, bests)
 	assert_bool(panel.visible).is_true()
-	# Should have 6 stat cards: Score, Stages, Loops, Best Turn, Busts, Final Dice.
+	# Should have 7 stat cards: Score, Stages, Loops, Best Turn, Busts, Final Dice, Skulls.
 	var stat_container: HFlowContainer = panel.find_child("StatCards", true, false) as HFlowContainer
 	# Cards are added via code, wait a frame for them to materialize.
 	await await_idle_frame()
-	assert_int(stat_container.get_child_count()).is_equal(6)
+	assert_int(stat_container.get_child_count()).is_equal(7)
 
 
 func test_new_best_badge_exists_when_beating_record() -> void:

@@ -14,3 +14,8 @@ Mcp/godot-mcp-runtime
 # Test artifacts
 test_stderr.txt
 test_stdout.txt
+
+# Local planning notes
+PRESTIGE_SIDEBETS_PLAN.md
+market-research-summary.md
+plan-revisedFunDesignBacklog.prompt.md

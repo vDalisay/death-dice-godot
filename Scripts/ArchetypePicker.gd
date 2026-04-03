@@ -5,6 +5,7 @@ extends ColorRect
 signal selection_confirmed(run_mode: int, archetype: int)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const PrestigePanelScene: PackedScene = preload("res://Scenes/PrestigePanel.tscn")
 
 const PANEL_MIN_SIZE: Vector2 = Vector2(860, 420)
 const CARD_MIN_SIZE: Vector2 = Vector2(220, 180)
@@ -22,13 +23,16 @@ const MODE_PULSE_SCALE: float = 1.06
 @onready var _gauntlet_button: Button = $CenterContainer/Card/MarginContainer/Content/ModeRow/GauntletButton
 @onready var _mode_description: Label = $CenterContainer/Card/MarginContainer/Content/ModeDescription
 @onready var _archetype_row: HBoxContainer = $CenterContainer/Card/MarginContainer/Content/ArchetypeRow
+@onready var _content: VBoxContainer = $CenterContainer/Card/MarginContainer/Content
 
 var _selected_mode: int = int(GameManager.RunMode.CLASSIC)
 var _mode_buttons: Array[Button] = []
+var _prestige_button: Button = null
 
 
 func _ready() -> void:
 	_apply_theme()
+	_add_prestige_button()
 	_classic_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.CLASSIC)))
 	_gauntlet_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.GAUNTLET)))
 	_mode_buttons = [_classic_button, _gauntlet_button]
@@ -91,6 +95,8 @@ func _rebuild_archetype_cards() -> void:
 		GameManager.Archetype.RISK_IT,
 		GameManager.Archetype.BLANK_SLATE,
 	]
+	if SaveManager.has_prestige_unlock("new_archetype"):
+		archetypes.append(GameManager.Archetype.FORTUNE_FOOL)
 	for arch: GameManager.Archetype in archetypes:
 		_archetype_row.add_child(_build_archetype_card(arch))
 	_prepare_cards_for_intro()
@@ -99,6 +105,8 @@ func _rebuild_archetype_cards() -> void:
 func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
 	var unlock_req: int = GameManager.ARCHETYPE_UNLOCK_LOOPS[archetype]
 	var unlocked: bool = SaveManager.max_loops_completed >= unlock_req
+	if archetype == GameManager.Archetype.FORTUNE_FOOL:
+		unlocked = SaveManager.has_prestige_unlock("new_archetype")
 
 	var card := PanelContainer.new()
 	card.custom_minimum_size = CARD_MIN_SIZE
@@ -128,7 +136,12 @@ func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
 	card_box.add_child(name_label)
 
 	var description_label := Label.new()
-	description_label.text = GameManager.ARCHETYPE_DESCRIPTIONS[archetype] if unlocked else "Locked - complete %d loop(s)" % unlock_req
+	if unlocked:
+		description_label.text = GameManager.ARCHETYPE_DESCRIPTIONS[archetype]
+	elif archetype == GameManager.Archetype.FORTUNE_FOOL:
+		description_label.text = "Locked - buy New Archetype in Prestige Shop"
+	else:
+		description_label.text = "Locked - complete %d loop(s)" % unlock_req
 	description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description_label.add_theme_font_override("font", _UITheme.font_body())
@@ -147,7 +160,6 @@ func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
 	)
 	card_box.add_child(select_button)
 	return card
-
 
 func _prepare_cards_for_intro() -> void:
 	for child: Node in _archetype_row.get_children():
@@ -196,3 +208,21 @@ func _play_mode_pulse(button: Button) -> void:
 	var tween: Tween = create_tween()
 	tween.tween_property(button, "scale", Vector2(MODE_PULSE_SCALE, MODE_PULSE_SCALE), 0.09).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "scale", Vector2.ONE, 0.14).set_ease(Tween.EASE_IN)
+
+
+func _add_prestige_button() -> void:
+	_prestige_button = Button.new()
+	_prestige_button.text = "Prestige Shop"
+	_prestige_button.custom_minimum_size = Vector2(220, 42)
+	_prestige_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_prestige_button.add_theme_font_override("font", _UITheme.font_display())
+	_prestige_button.add_theme_font_size_override("font_size", 14)
+	_prestige_button.pressed.connect(_open_prestige_panel)
+	_content.add_child(_prestige_button)
+	_content.move_child(_prestige_button, 3)
+
+
+func _open_prestige_panel() -> void:
+	var panel: Node = PrestigePanelScene.instantiate()
+	add_child(panel)
+	panel.connect("closed", Callable(self, "_rebuild_archetype_cards"))

@@ -37,13 +37,17 @@ const PURPLE_POOL: Array[String] = ["make_explosive_d6", "make_pink_d6"]
 @onready var _hint_label: Label = $CenterContainer/Card/MarginContainer/Content/HintLabel
 @onready var _card_row: HBoxContainer = $CenterContainer/Card/MarginContainer/Content/CardRow
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
+@onready var _content: VBoxContainer = $CenterContainer/Card/MarginContainer/Content
 
 var _cards: Array[PanelContainer] = []
 var _dice_options: Array[DiceData] = []
+var _reroll_button: Button = null
+var _current_luck: int = 0
 
 
 func _ready() -> void:
 	_apply_theme_styling()
+	_build_reroll_button()
 
 
 func _apply_theme_styling() -> void:
@@ -60,6 +64,25 @@ func _apply_theme_styling() -> void:
 
 
 func open(luck: int) -> void:
+	_current_luck = luck
+	_rebuild_reward_cards(luck)
+	if _reroll_button != null:
+		_reroll_button.visible = GameManager.prestige_reward_reroll_available
+		_reroll_button.disabled = not GameManager.prestige_reward_reroll_available
+
+	# Animate entrance.
+	color = Color(0, 0, 0, 0)
+	_card_panel.modulate.a = 0.0
+	_card_panel.scale = Vector2(1.15, 1.15)
+	_card_panel.pivot_offset = _card_panel.size * 0.5
+
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "color:a", BACKDROP_ALPHA, 0.2)
+	tween.parallel().tween_property(_card_panel, "modulate:a", 1.0, 0.2)
+	tween.parallel().tween_property(_card_panel, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+func _rebuild_reward_cards(luck: int) -> void:
 	_dice_options.clear()
 	for _card: PanelContainer in _cards:
 		_card.queue_free()
@@ -74,11 +97,6 @@ func open(luck: int) -> void:
 		_card_row.add_child(card)
 		_cards.append(card)
 
-	# Animate entrance.
-	color = Color(0, 0, 0, 0)
-	_card_panel.modulate.a = 0.0
-	_card_panel.scale = Vector2(1.15, 1.15)
-	_card_panel.pivot_offset = _card_panel.size * 0.5
 	for index: int in _cards.size():
 		var card: PanelContainer = _cards[index]
 		card.modulate.a = 0.0
@@ -86,11 +104,28 @@ func open(luck: int) -> void:
 		card.scale = Vector2(0.94, 0.94)
 
 	var tween: Tween = create_tween()
-	tween.tween_property(self, "color:a", BACKDROP_ALPHA, 0.2)
-	tween.parallel().tween_property(_card_panel, "modulate:a", 1.0, 0.2)
-	tween.parallel().tween_property(_card_panel, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	for index: int in _cards.size():
 		tween.tween_callback(Callable(self, "_reveal_option_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
+
+func _build_reroll_button() -> void:
+	_reroll_button = Button.new()
+	_reroll_button.text = "Reroll Choices"
+	_reroll_button.custom_minimum_size = Vector2(220, 38)
+	_reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_reroll_button.visible = false
+	_reroll_button.add_theme_font_override("font", _UITheme.font_display())
+	_reroll_button.add_theme_font_size_override("font_size", 12)
+	_reroll_button.pressed.connect(_on_reroll_pressed)
+	_content.add_child(_reroll_button)
+
+
+func _on_reroll_pressed() -> void:
+	if not GameManager.prestige_reward_reroll_available:
+		return
+	GameManager.apply_prestige_reward_reroll_used()
+	_rebuild_reward_cards(_current_luck)
+	if _reroll_button != null:
+		_reroll_button.visible = false
 
 
 # ---------------------------------------------------------------------------

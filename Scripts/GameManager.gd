@@ -15,23 +15,26 @@ const MAX_MODIFIERS: int = 3
 const MISER_SPEND_THRESHOLD: int = 15
 const MISER_BONUS_GOLD: int = 20
 
-enum Archetype { CAUTION, RISK_IT, BLANK_SLATE }
+enum Archetype { CAUTION, RISK_IT, BLANK_SLATE, FORTUNE_FOOL }
 enum RunMode { CLASSIC, GAUNTLET }
 const ARCHETYPE_NAMES: Dictionary = {
 	Archetype.CAUTION: "Caution",
 	Archetype.RISK_IT: "Risk It",
 	Archetype.BLANK_SLATE: "Blank Slate",
+	Archetype.FORTUNE_FOOL: "Fortune's Fool",
 }
 const ARCHETYPE_DESCRIPTIONS: Dictionary = {
 	Archetype.CAUTION: "6 Standard dice, bust immunity to turn 3.",
 	Archetype.RISK_IT: "5 Gambler dice, 2x gold per turn.",
 	Archetype.BLANK_SLATE: "8 Blank Canvas dice, shop gold doubled.",
+	Archetype.FORTUNE_FOOL: "10 Fortune dice, LUCK x2, but start with only 15 gold.",
 }
 ## Loops required to unlock each archetype (0 = always available).
 const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
 	Archetype.CAUTION: 0,
 	Archetype.RISK_IT: 1,
 	Archetype.BLANK_SLATE: 3,
+	Archetype.FORTUNE_FOOL: 0,
 }
 const RUN_MODE_NAMES: Dictionary = {
 	RunMode.CLASSIC: "Classic",
@@ -81,6 +84,26 @@ var _miser_bonus_pending: bool = false
 ## When true, RollPhase skips the archetype picker and starts immediately.
 ## Set by tests to avoid UI blocking.
 var skip_archetype_picker: bool = false
+
+# ---------------------------------------------------------------------------
+# Side-bet state (cleared on shop_entered and reset_run)
+# ---------------------------------------------------------------------------
+## Insurance: payout awarded on bust. 0 = no active bet.
+var insurance_payout: int = 0
+## Heat Bet: stop count target (-1 = no active bet) and payout on hit.
+var heat_bet_target_stops: int = -1
+var heat_bet_payout: int = 0
+## Even/Odd Bet: is_even = player's pick; wager = 0 means no active bet.
+var even_odd_bet_is_even: bool = true
+var even_odd_bet_wager: int = 0
+
+# ---------------------------------------------------------------------------
+# Prestige run flags (refreshed on reset_run)
+# ---------------------------------------------------------------------------
+var prestige_starting_gold_bonus: int = 0
+var prestige_shop_tier_active: bool = false
+var prestige_reward_reroll_available: bool = false
+var prestige_reroute_uses: int = 0
 
 
 func set_archetype(archetype: Archetype) -> void:
@@ -166,6 +189,9 @@ func _build_starting_pool() -> void:
 		Archetype.BLANK_SLATE:
 			for i: int in 8:
 				dice_pool.append(DiceData.make_blank_canvas_d6())
+		Archetype.FORTUNE_FOOL:
+			for i: int in 10:
+				dice_pool.append(DiceData.make_fortune_d6())
 
 
 func add_dice(die: DiceData) -> void:
@@ -194,7 +220,10 @@ func add_gold(amount: int) -> void:
 
 
 func add_luck(amount: int) -> void:
-	luck += amount
+	var gain: int = amount
+	if chosen_archetype == Archetype.FORTUNE_FOOL:
+		gain *= 2
+	luck += gain
 	luck_changed.emit(luck)
 
 
@@ -321,8 +350,17 @@ func reset_run() -> void:
 	active_modifiers.clear()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
+	_clear_side_bets()
+	prestige_starting_gold_bonus = 20 if SaveManager.has_prestige_unlock("starting_gold") else 0
+	prestige_shop_tier_active = SaveManager.has_prestige_unlock("shop_tier")
+	prestige_reward_reroll_available = SaveManager.has_prestige_unlock("reward_reroll")
+	prestige_reroute_uses = 1 if SaveManager.has_prestige_unlock("reroute_token") else 0
 	stage_target_score = _calculate_stage_target(current_stage)
 	_build_starting_pool()
+	if chosen_archetype == Archetype.FORTUNE_FOOL:
+		gold = 15 + prestige_starting_gold_bonus
+	else:
+		gold = prestige_starting_gold_bonus
 	generate_stage_map()
 	score_changed.emit(total_score)
 	lives_changed.emit(lives)
@@ -359,6 +397,7 @@ func on_shop_entered() -> void:
 	if _miser_bonus_pending:
 		_miser_bonus_pending = false
 		add_gold(MISER_BONUS_GOLD)
+	_clear_side_bets()
 
 
 ## Called when leaving the shop. Checks Miser condition for next shop.
@@ -381,3 +420,86 @@ func track_shop_spend(amount: int) -> void:
 func _reset_event_flags() -> void:
 	event_free_bust = false
 	event_target_multiplier = 1.0
+
+
+func apply_prestige_reward_reroll_used() -> void:
+	prestige_reward_reroll_available = false
+
+
+func use_reroute_token() -> bool:
+	if prestige_reroute_uses <= 0:
+		return false
+	prestige_reroute_uses -= 1
+	return true
+
+
+# ---------------------------------------------------------------------------
+# Side-bet helpers
+# ---------------------------------------------------------------------------
+
+func _clear_side_bets() -> void:
+	insurance_payout = 0
+	heat_bet_target_stops = -1
+	heat_bet_payout = 0
+	even_odd_bet_wager = 0
+
+
+## Place Insurance Bet: deduct premium, store payout for bust resolution.
+func set_insurance_bet(premium: int, payout: int) -> void:
+	insurance_payout = payout
+	remove_gold(premium)
+
+
+## Called on bust. Returns the insurance payout (0 if no bet).
+func resolve_insurance_bet() -> int:
+	var payout: int = insurance_payout
+	if payout > 0:
+		add_gold(payout)
+		insurance_payout = 0
+	return payout
+
+
+## Place Heat Bet: deduct wager, store target and payout.
+func set_heat_bet(target_stops: int, wager: int, payout: int) -> void:
+	heat_bet_target_stops = target_stops
+	heat_bet_payout = payout
+	remove_gold(wager)
+
+
+## Called on bank. Returns payout if stop count matches target (0 otherwise).
+func resolve_heat_bet(actual_stops: int) -> int:
+	if heat_bet_target_stops < 0:
+		return 0
+	var payout: int = heat_bet_payout if actual_stops == heat_bet_target_stops else 0
+	if payout > 0:
+		add_gold(payout)
+	heat_bet_target_stops = -1
+	heat_bet_payout = 0
+	return payout
+
+
+## Place Even/Odd Bet: store pick and wager amount (not deducted yet — deducted on resolution).
+func set_even_odd_bet(is_even: bool, wager: int) -> void:
+	even_odd_bet_is_even = is_even
+	even_odd_bet_wager = wager
+	remove_gold(wager)
+
+
+## Called on bank. Counts NUMBER-face parity among kept dice values.
+## Returns net gold change: +wager on win, 0 on push, -0 on loss (wager already deducted).
+## even_count / odd_count are the counts of even/odd NUMBER-face dice kept.
+func resolve_even_odd_bet(even_count: int, odd_count: int) -> int:
+	if even_odd_bet_wager <= 0:
+		return 0
+	var wager: int = even_odd_bet_wager
+	even_odd_bet_wager = 0
+	if even_count == odd_count:
+		# Push: refund the wager
+		add_gold(wager)
+		return 0
+	var player_wins: bool = (even_odd_bet_is_even and even_count > odd_count) or \
+		(not even_odd_bet_is_even and odd_count > even_count)
+	if player_wins:
+		add_gold(wager * 2)
+		return wager
+	return -wager

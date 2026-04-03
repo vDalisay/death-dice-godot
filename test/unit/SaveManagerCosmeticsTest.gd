@@ -82,7 +82,7 @@ func test_equip_cosmetic_after_purchase() -> void:
 	var result: bool = manager.equip_cosmetic("Lucky Die", "glow")
 	
 	assert_bool(result).is_true()
-	assert_string(manager.get_equipped_cosmetic("Lucky Die")).is_equal("glow")
+	assert_str(manager.get_equipped_cosmetic("Lucky Die")).is_equal("glow")
 
 
 func test_equip_cosmetic_fails_if_not_purchased() -> void:
@@ -110,7 +110,7 @@ func test_unequip_cosmetic() -> void:
 	# Unequip
 	manager.unequip_cosmetic("Golden Die")
 	
-	assert_string(manager.get_equipped_cosmetic("Golden Die")).is_equal("")
+	assert_str(manager.get_equipped_cosmetic("Golden Die")).is_equal("")
 
 
 func test_get_equipped_cosmetic_returns_empty_if_none() -> void:
@@ -119,7 +119,7 @@ func test_get_equipped_cosmetic_returns_empty_if_none() -> void:
 	
 	var cosmetic: String = manager.get_equipped_cosmetic("Explosive Die")
 	
-	assert_string(cosmetic).is_equal("")
+	assert_str(cosmetic).is_equal("")
 
 
 func test_get_purchased_cosmetics_for_die() -> void:
@@ -176,7 +176,7 @@ func test_cosmetics_persist_across_save_load() -> void:
 	manager.equipped_cosmetics = saved_equipped
 	
 	assert_bool(manager.is_cosmetic_purchased("Standard Die", "glow")).is_true()
-	assert_string(manager.get_equipped_cosmetic("Standard Die")).is_equal("glow")
+	assert_str(manager.get_equipped_cosmetic("Standard Die")).is_equal("glow")
 
 
 func test_multiple_dice_independent_cosmetics() -> void:
@@ -197,5 +197,5 @@ func test_multiple_dice_independent_cosmetics() -> void:
 	manager.equip_cosmetic("Die A", "glow")
 	manager.equip_cosmetic("Die B", "color_shift")
 	
-	assert_string(manager.get_equipped_cosmetic("Die A")).is_equal("glow")
-	assert_string(manager.get_equipped_cosmetic("Die B")).is_equal("color_shift")
+	assert_str(manager.get_equipped_cosmetic("Die A")).is_equal("glow")
+	assert_str(manager.get_equipped_cosmetic("Die B")).is_equal("color_shift")

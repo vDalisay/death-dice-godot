@@ -207,6 +207,33 @@ func _on_bank_pressed() -> void:
 	GameManager.reset_momentum()
 	# Accumulate LUCK face values for dice reward rarity.
 	_accumulate_luck()
+	# Side-bets resolve on bank.
+	var heat_payout: int = GameManager.resolve_heat_bet(accumulated_stop_count)
+	if heat_payout > 0:
+		hud.show_status("HEAT BET HIT! +%dg" % heat_payout, Color(1.0, 0.8, 0.2))
+
+	var even_count: int = 0
+	var odd_count: int = 0
+	for i: int in GameManager.dice_pool.size():
+		if dice_stopped[i]:
+			continue
+		if not (dice_keep[i] or dice_keep_locked[i]):
+			continue
+		var parity_face: DiceFaceData = current_results[i]
+		if parity_face == null or parity_face.type != DiceFaceData.FaceType.NUMBER:
+			continue
+		if parity_face.value % 2 == 0:
+			even_count += 1
+		else:
+			odd_count += 1
+	var had_even_odd_bet: bool = GameManager.even_odd_bet_wager > 0
+	var eo_result: int = GameManager.resolve_even_odd_bet(even_count, odd_count)
+	if eo_result > 0:
+		hud.show_status("EVEN/ODD WIN! +%dg" % eo_result, Color(0.95, 0.85, 0.2))
+	elif eo_result < 0:
+		hud.show_status("EVEN/ODD LOST", Color(1.0, 0.4, 0.4))
+	elif had_even_odd_bet and even_count == odd_count and (even_count + odd_count) > 0:
+		hud.show_status("EVEN/ODD PUSH (tie)", Color(0.6, 0.9, 1.0))
 	# Gambler's Rush: +1g per survived stop.
 	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
 		var rush_gold: int = accumulated_stop_count
@@ -586,9 +613,12 @@ func _apply_bust_outcome(effective_stops: int) -> void:
 	bank_streak = 0
 	_update_streak_display()
 	GameManager.lose_life()
+	var insurance_payout: int = GameManager.resolve_insurance_bet()
 	AchievementManager.on_bust()
 	SFXManager.play_bust()
 	_show_bust_overlay(effective_stops)
+	if insurance_payout > 0:
+		hud.show_status("Insurance paid out: +%dg" % insurance_payout, Color(0.25, 0.95, 0.6))
 	_sync_buttons()
 	_schedule_auto_advance()
 
@@ -1211,8 +1241,10 @@ func _show_stage_event() -> void:
 	var event_overlay: ColorRect = StageEventScene.instantiate() as ColorRect
 	add_child(event_overlay)
 	event_overlay.call("open")
-	event_overlay.connect("event_resolved", func() -> void:
+	event_overlay.connect("event_resolved", func(summary: String, status_color: Color) -> void:
 		event_overlay.queue_free()
+		if summary != "":
+			hud.show_status(summary, status_color)
 		_open_stage_map()
 	)
 
@@ -1235,10 +1267,18 @@ func _open_stage_map() -> void:
 	_roll_content.visible = false
 	if _streak_display != null:
 		_streak_display.visible = false
-	stage_map_panel.open(GameManager.stage_map, GameManager.current_row, GameManager.previous_col)
+	stage_map_panel.open(
+		GameManager.stage_map,
+		GameManager.current_row,
+		GameManager.previous_col,
+		GameManager.prestige_reroute_uses
+	)
 
 
-func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType) -> void:
+func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool) -> void:
+	if used_reroute:
+		GameManager.use_reroute_token()
+		hud.show_status("REROUTE SPENT! Path broken for this pick.", Color(1.0, 0.72, 0.35))
 	_stage_flow.advance_row(col)
 	stage_map_panel.visible = false
 	match node_type:
