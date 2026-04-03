@@ -65,6 +65,7 @@ var _roll_anim_nonce: int = 0
 var _triggered_combo_ids: Dictionary = {}
 var _screen_shake: Node = null
 var _screen_overlay: Node = null
+var _picker_selected_mode: int = GameManager.RunMode.CLASSIC
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -1431,6 +1432,7 @@ func _show_archetype_picker() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
+	_picker_selected_mode = int(GameManager.run_mode)
 	var overlay: ColorRect = ColorRect.new()
 	overlay.color = Color(0.1, 0.1, 0.15, 0.92)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1446,6 +1448,27 @@ func _show_archetype_picker() -> void:
 	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
+	var mode_row: HBoxContainer = HBoxContainer.new()
+	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	mode_row.add_theme_constant_override("separation", 12)
+	var classic_btn: Button = Button.new()
+	classic_btn.text = "Classic"
+	classic_btn.custom_minimum_size = Vector2(140, 40)
+	var gauntlet_btn: Button = Button.new()
+	gauntlet_btn.text = "Gauntlet"
+	gauntlet_btn.custom_minimum_size = Vector2(140, 40)
+	classic_btn.pressed.connect(_on_mode_picker_selected.bind(int(GameManager.RunMode.CLASSIC), classic_btn, gauntlet_btn))
+	gauntlet_btn.pressed.connect(_on_mode_picker_selected.bind(int(GameManager.RunMode.GAUNTLET), classic_btn, gauntlet_btn))
+	mode_row.add_child(classic_btn)
+	mode_row.add_child(gauntlet_btn)
+	vbox.add_child(mode_row)
+	var mode_desc: Label = Label.new()
+	mode_desc.text = "Gauntlet: steeper stage scaling, separate records"
+	mode_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mode_desc.add_theme_font_size_override("font_size", 14)
+	mode_desc.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
+	vbox.add_child(mode_desc)
+	_refresh_mode_picker_buttons(classic_btn, gauntlet_btn)
 	var card_row: HBoxContainer = HBoxContainer.new()
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_row.add_theme_constant_override("separation", 24)
@@ -1492,7 +1515,19 @@ func _show_archetype_picker() -> void:
 	add_child(overlay)
 
 
+func _on_mode_picker_selected(mode: int, classic_btn: Button, gauntlet_btn: Button) -> void:
+	_picker_selected_mode = mode
+	_refresh_mode_picker_buttons(classic_btn, gauntlet_btn)
+
+
+func _refresh_mode_picker_buttons(classic_btn: Button, gauntlet_btn: Button) -> void:
+	var classic_selected: bool = _picker_selected_mode == int(GameManager.RunMode.CLASSIC)
+	classic_btn.modulate = Color(1.0, 0.9, 0.35) if classic_selected else Color(0.8, 0.8, 0.8)
+	gauntlet_btn.modulate = Color(1.0, 0.35, 0.35) if not classic_selected else Color(0.8, 0.8, 0.8)
+
+
 func _on_archetype_chosen(arch: GameManager.Archetype, overlay: ColorRect) -> void:
+	GameManager.set_run_mode(_picker_selected_mode)
 	GameManager.chosen_archetype = arch
 	GameManager.reset_run()
 	_run_snapshot_recorded = false

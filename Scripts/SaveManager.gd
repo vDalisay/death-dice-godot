@@ -7,7 +7,9 @@ const RunSaveDataScript: GDScript = preload("res://Scripts/RunSaveData.gd")
 signal highscore_changed(new_highscore: int)
 
 var highscore: int = 0
+var gauntlet_highscore: int = 0
 var max_loops_completed: int = 0
+var gauntlet_best_loop: int = 0
 var run_history: Array = []
 var total_runs: int = 0
 var total_busts: int = 0
@@ -38,6 +40,12 @@ func record_run(run: RunSaveData) -> void:
 	if run.score > highscore:
 		highscore = run.score
 		highscore_changed.emit(highscore)
+	if run.run_mode == GameManager.RunMode.GAUNTLET:
+		if run.score > gauntlet_highscore:
+			gauntlet_highscore = run.score
+			highscore_changed.emit(gauntlet_highscore)
+		if run.loops_completed > gauntlet_best_loop:
+			gauntlet_best_loop = run.loops_completed
 	if run.loops_completed > max_loops_completed:
 		max_loops_completed = run.loops_completed
 	_save()
@@ -50,6 +58,7 @@ func make_run_snapshot() -> RunSaveData:
 	run.loops_completed = GameManager.current_loop - 1
 	run.busts = GameManager.run_busts
 	run.best_turn_score = GameManager.best_turn_score
+	run.run_mode = int(GameManager.run_mode)
 	var names: Array[String] = []
 	for die: DiceData in GameManager.dice_pool:
 		names.append(die.dice_name)
@@ -71,6 +80,12 @@ func is_achievement_unlocked(key: String) -> bool:
 
 func get_unlocked_achievement_count() -> int:
 	return unlocked_achievements.size()
+
+
+func get_mode_highscore(mode: int) -> int:
+	if mode == GameManager.RunMode.GAUNTLET:
+		return gauntlet_highscore
+	return highscore
 
 
 func get_favorite_die_type() -> String:
@@ -111,7 +126,9 @@ func _save() -> void:
 		runs_array.append(run.to_dict())
 	var data: Dictionary = {
 		"highscore": highscore,
+		"gauntlet_highscore": gauntlet_highscore,
 		"max_loops_completed": max_loops_completed,
+		"gauntlet_best_loop": gauntlet_best_loop,
 		"total_runs": total_runs,
 		"total_busts": total_busts,
 		"total_stages_cleared": total_stages_cleared,
@@ -140,7 +157,9 @@ func _load() -> void:
 		return
 	var data: Dictionary = json.data as Dictionary
 	highscore = data.get("highscore", 0) as int
+	gauntlet_highscore = data.get("gauntlet_highscore", 0) as int
 	max_loops_completed = data.get("max_loops_completed", 0) as int
+	gauntlet_best_loop = data.get("gauntlet_best_loop", 0) as int
 	total_runs = data.get("total_runs", 0) as int
 	total_busts = data.get("total_busts", 0) as int
 	total_stages_cleared = data.get("total_stages_cleared", 0) as int
@@ -164,5 +183,6 @@ func _load() -> void:
 			save.busts = (entry as Dictionary).get("busts", 0) as int
 			save.best_turn_score = (entry as Dictionary).get("best_turn_score", 0) as int
 			save.final_dice_names = final_names
+			save.run_mode = (entry as Dictionary).get("run_mode", int(GameManager.RunMode.CLASSIC)) as int
 			run_history.append(save)
 	highscore_changed.emit(highscore)

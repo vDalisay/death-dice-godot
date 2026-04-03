@@ -15,6 +15,7 @@ func test_initial_state() -> void:
 	assert_int(_gm.stage_target_score).is_equal(30)
 	assert_int(_gm.current_stage).is_equal(1)
 	assert_int(_gm.gold).is_equal(0)
+	assert_int(_gm.run_mode).is_equal(_gm.RunMode.CLASSIC)
 
 
 func test_add_score_updates_total() -> void:
@@ -136,6 +137,19 @@ func test_stage_target_scales() -> void:
 	assert_int(_gm._calculate_stage_target(1)).is_equal(30)
 	assert_int(_gm._calculate_stage_target(2)).is_equal(55)
 	assert_int(_gm._calculate_stage_target(5)).is_equal(130)
+
+
+func test_gauntlet_stage_targets_scale_steeper() -> void:
+	_gm.set_run_mode(_gm.RunMode.GAUNTLET)
+	assert_int(_gm._calculate_stage_target(1)).is_equal(30)
+	assert_int(_gm._calculate_stage_target(2)).is_equal(61)
+	assert_int(_gm._calculate_stage_target(5)).is_equal(154)
+
+
+func test_set_run_mode_emits_signal() -> void:
+	monitor_signals(_gm, false)
+	_gm.set_run_mode(_gm.RunMode.GAUNTLET)
+	await assert_signal(_gm).is_emitted("run_mode_changed", [_gm.RunMode.GAUNTLET])
 
 
 # ---------------------------------------------------------------------------

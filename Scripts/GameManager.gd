@@ -14,6 +14,7 @@ const MISER_SPEND_THRESHOLD: int = 15
 const MISER_BONUS_GOLD: int = 20
 
 enum Archetype { CAUTION, RISK_IT, BLANK_SLATE }
+enum RunMode { CLASSIC, GAUNTLET }
 const ARCHETYPE_NAMES: Dictionary = {
 	Archetype.CAUTION: "Caution",
 	Archetype.RISK_IT: "Risk It",
@@ -30,6 +31,12 @@ const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
 	Archetype.RISK_IT: 1,
 	Archetype.BLANK_SLATE: 3,
 }
+const RUN_MODE_NAMES: Dictionary = {
+	RunMode.CLASSIC: "Classic",
+	RunMode.GAUNTLET: "Gauntlet",
+}
+const GAUNTLET_LOOP_MULT_STEP: float = 0.75
+const GAUNTLET_STAGE_STEP_MULT: float = 1.25
 
 signal score_changed(new_total: int)
 signal turn_banked(points: int, new_total: int)
@@ -41,6 +48,7 @@ signal stage_cleared()
 signal loop_advanced(new_loop: int)
 signal luck_changed(new_luck: int)
 signal momentum_changed(new_momentum: int)
+signal run_mode_changed(new_mode: int)
 
 var total_score: int = 0
 var lives: int = MAX_LIVES
@@ -57,6 +65,7 @@ var best_turn_score: int = 0
 var run_busts: int = 0
 var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
+var run_mode: RunMode = RunMode.CLASSIC
 var luck: int = 0
 ## Event flags — temporary effects that reset each loop.
 var event_free_bust: bool = false
@@ -155,13 +164,25 @@ func get_stages_in_current_loop() -> int:
 
 
 func _loop_multiplier() -> float:
+	if run_mode == RunMode.GAUNTLET:
+		return 1.0 + GAUNTLET_LOOP_MULT_STEP * (current_loop - 1)
 	return 1.0 + 0.5 * (current_loop - 1)
 
 
 func _calculate_stage_target(stage: int) -> int:
 	var mult: float = _loop_multiplier()
 	var row: int = current_row if stage_map else (stage - 1)
-	return int(BASE_STAGE_TARGET * mult) + row * int(STAGE_TARGET_STEP * mult)
+	var step_mult: float = GAUNTLET_STAGE_STEP_MULT if run_mode == RunMode.GAUNTLET else 1.0
+	return int(BASE_STAGE_TARGET * mult) + row * int(STAGE_TARGET_STEP * mult * step_mult)
+
+
+func set_run_mode(mode: int) -> void:
+	run_mode = mode as RunMode
+	run_mode_changed.emit(run_mode)
+
+
+func get_run_mode_name() -> String:
+	return str(RUN_MODE_NAMES.get(run_mode, "Classic"))
 
 
 func advance_stage() -> void:
@@ -192,6 +213,7 @@ func advance_loop() -> void:
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
+	run_mode_changed.emit(run_mode)
 	loop_advanced.emit(current_loop)
 
 

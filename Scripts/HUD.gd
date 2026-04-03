@@ -79,6 +79,7 @@ func _ready() -> void:
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.luck_changed.connect(_on_luck_changed)
 	GameManager.momentum_changed.connect(_on_momentum_changed)
+	GameManager.run_mode_changed.connect(_on_run_mode_changed)
 	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
@@ -95,7 +96,7 @@ func _ready() -> void:
 	_refresh_progress_display()
 	_risk_meter.mouse_entered.connect(_on_risk_meter_mouse_entered)
 	_risk_meter.mouse_exited.connect(_on_risk_meter_mouse_exited)
-	highscore_label.text = "HI: %d" % SaveManager.highscore
+	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
 
 
 # ---------------------------------------------------------------------------
@@ -467,11 +468,17 @@ func _on_highscore_changed(new_highscore: int) -> void:
 	highscore_label.text = "HI: %d" % new_highscore
 
 
+func _on_run_mode_changed(_new_mode: int) -> void:
+	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
+	_refresh_stage_display()
+
+
 func _refresh_stage_display() -> void:
 	var loop_text: String = " L%d" % GameManager.current_loop if GameManager.current_loop > 1 else ""
 	var row_count: int = StageMapData.ROWS_PER_LOOP if GameManager.stage_map else GameManager.get_stages_in_current_loop()
 	var row_display: int = mini(GameManager.current_row + 1, row_count)
-	stage_label.text = "ROW %d/%d%s" % [row_display, row_count, loop_text]
+	var mode_text: String = " [%s]" % GameManager.get_run_mode_name().to_upper() if GameManager.run_mode == GameManager.RunMode.GAUNTLET else ""
+	stage_label.text = "ROW %d/%d%s%s" % [row_display, row_count, loop_text, mode_text]
 	target_label.text = "Target: %d" % GameManager.stage_target_score
 
 

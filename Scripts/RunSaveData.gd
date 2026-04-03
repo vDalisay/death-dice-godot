@@ -9,6 +9,7 @@ extends Resource
 @export var busts: int = 0
 @export var best_turn_score: int = 0
 @export var final_dice_names: Array[String] = []
+@export var run_mode: int = 0
 
 func to_dict() -> Dictionary:
 	return {
@@ -19,4 +20,5 @@ func to_dict() -> Dictionary:
 		"busts": busts,
 		"best_turn_score": best_turn_score,
 		"final_dice_names": final_dice_names,
+		"run_mode": run_mode,
 	}
