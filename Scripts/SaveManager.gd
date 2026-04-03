@@ -29,6 +29,8 @@ var dice_type_counts: Dictionary = {}
 var discovered_dice: Dictionary = {}
 var unlocked_achievements: Dictionary = {}
 var dice_mastery: Dictionary = {}
+var purchased_cosmetics: Dictionary = {}  # die_name -> Array[cosmetic_id]
+var equipped_cosmetics: Dictionary = {}  # die_name -> cosmetic_id (or "" for none)
 
 func _ready() -> void:
 	_load()
@@ -189,6 +191,73 @@ func is_cosmetic_unlocked(die_name: String, cosmetic: String) -> bool:
 	return cosmetic in unlocked
 
 
+# ---------------------------------------------------------------------------
+# Cosmetics Purchasing & Equipping (Feature #11)
+# ---------------------------------------------------------------------------
+
+func is_cosmetic_purchasable(die_name: String, cosmetic_id: String) -> bool:
+	"""Check if a cosmetic can be purchased for a die (must be mastery-unlocked but not yet bought)."""
+	# First check: die must have this cosmetic unlocked through mastery
+	if not is_cosmetic_unlocked(die_name, cosmetic_id):
+		return false
+	# Second check: cosmetic must not already be purchased
+	if is_cosmetic_purchased(die_name, cosmetic_id):
+		return false
+	return true
+
+
+func is_cosmetic_purchased(die_name: String, cosmetic_id: String) -> bool:
+	"""Check if a cosmetic has been purchased for a die."""
+	if not purchased_cosmetics.has(die_name):
+		return false
+	var owned: Array = purchased_cosmetics[die_name] as Array
+	return cosmetic_id in owned
+
+
+func purchase_cosmetic(die_name: String, cosmetic_id: String) -> bool:
+	"""Purchase a cosmetic for a die. Returns true if successful."""
+	if not is_cosmetic_purchasable(die_name, cosmetic_id):
+		return false
+	if not purchased_cosmetics.has(die_name):
+		purchased_cosmetics[die_name] = []
+	(purchased_cosmetics[die_name] as Array).append(cosmetic_id)
+	_save()
+	return true
+
+
+func equip_cosmetic(die_name: String, cosmetic_id: String) -> bool:
+	"""Equip a cosmetic for a die. Cosmetic must be purchased."""
+	if not is_cosmetic_purchased(die_name, cosmetic_id):
+		return false
+	if not equipped_cosmetics.has(die_name):
+		equipped_cosmetics[die_name] = ""
+	equipped_cosmetics[die_name] = cosmetic_id
+	_save()
+	return true
+
+
+func unequip_cosmetic(die_name: String) -> void:
+	"""Unequip current cosmetic for a die."""
+	if not equipped_cosmetics.has(die_name):
+		equipped_cosmetics[die_name] = ""
+	equipped_cosmetics[die_name] = ""
+	_save()
+
+
+func get_equipped_cosmetic(die_name: String) -> String:
+	"""Get the currently equipped cosmetic ID for a die. Returns empty string if none."""
+	if not equipped_cosmetics.has(die_name):
+		return ""
+	return equipped_cosmetics[die_name] as String
+
+
+func get_purchased_cosmetics_for_die(die_name: String) -> Array:
+	"""Get array of purchased cosmetic IDs for a die."""
+	if not purchased_cosmetics.has(die_name):
+		return []
+	return (purchased_cosmetics[die_name] as Array).duplicate()
+
+
 
 
 func _save() -> void:
@@ -209,6 +278,8 @@ func _save() -> void:
 		"discovered_dice": discovered_dice,
 		"unlocked_achievements": unlocked_achievements,
 		"dice_mastery": dice_mastery,
+		"purchased_cosmetics": purchased_cosmetics,
+		"equipped_cosmetics": equipped_cosmetics,
 		"runs": runs_array,
 	}
 	var file: FileAccess = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -241,6 +312,8 @@ func _load() -> void:
 	discovered_dice = data.get("discovered_dice", {}) as Dictionary
 	unlocked_achievements = data.get("unlocked_achievements", {}) as Dictionary
 	dice_mastery = data.get("dice_mastery", {}) as Dictionary
+	purchased_cosmetics = data.get("purchased_cosmetics", {}) as Dictionary
+	equipped_cosmetics = data.get("equipped_cosmetics", {}) as Dictionary
 	var runs: Array = data.get("runs", []) as Array
 	run_history.clear()
 	for entry: Variant in runs:
