@@ -219,7 +219,7 @@ func _apply_effect(event: Dictionary) -> void:
 		EffectType.GAIN_RANDOM_DICE:
 			_gain_random_dice(2)
 		EffectType.FREE_BUST:
-			GameManager.event_free_bust = true
+			GameManager.set_event_free_bust(true)
 		EffectType.BOOST_SHIELDS:
 			_boost_shield_faces(1)
 		EffectType.GAIN_GOLD:
@@ -229,16 +229,11 @@ func _apply_effect(event: Dictionary) -> void:
 		EffectType.ADD_CURSED_STOP:
 			_add_cursed_stop_to_random_die()
 		EffectType.BOOST_TARGETS:
-			GameManager.event_target_multiplier = 1.15
-			GameManager.stage_target_score = roundi(float(GameManager.stage_target_score) * 1.15)
+			GameManager.apply_event_target_multiplier(1.15)
 		EffectType.LOSE_LIFE:
-			GameManager.lives = maxi(GameManager.lives - 1, 0)
-			GameManager.lives_changed.emit(GameManager.lives)
-			if GameManager.lives <= 0:
-				GameManager.run_ended.emit()
+			GameManager.lose_life()
 		EffectType.LOSE_GOLD:
-			GameManager.gold = maxi(GameManager.gold - 20, 0)
-			GameManager.gold_changed.emit(GameManager.gold)
+			GameManager.remove_gold(20)
 
 
 func _boost_number_faces(amount: int) -> void:

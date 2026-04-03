@@ -116,7 +116,7 @@ func _ready() -> void:
 		_start_new_turn()
 	elif SaveManager.run_history.is_empty():
 		# First run ever — skip archetype picker, use default Caution.
-		GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+		GameManager.set_archetype(GameManager.Archetype.CAUTION)
 		GameManager.reset_run()
 		_run_snapshot_recorded = false
 		_run_active = true
@@ -184,8 +184,7 @@ func _on_bank_pressed() -> void:
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
 	# Reset momentum after banking (cashes out the bonus).
-	GameManager.momentum = 0
-	GameManager.momentum_changed.emit(GameManager.momentum)
+	GameManager.reset_momentum()
 	# Accumulate LUCK face values for dice reward rarity.
 	_accumulate_luck()
 	# Gambler's Rush: +1g per survived stop.
@@ -223,8 +222,7 @@ func _on_bank_pressed() -> void:
 		hud.show_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
 	SFXManager.play_bank()
 	# Personal best turn score check.
-	if banked > GameManager.best_turn_score:
-		GameManager.best_turn_score = banked
+	if GameManager.register_turn_score(banked):
 		hud.show_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
 		SFXManager.play_personal_best()
 	if banked >= 50:
@@ -276,15 +274,15 @@ func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 			# Pick up stopped dice of matching type.
 			dice_stopped[i] = false
 			dice_keep[i] = false
-			var die: PhysicsDie = dice_arena.get_die(i)
-			if die:
-				die.is_stopped = false
-				die.is_kept = false
+			var stopped_die: PhysicsDie = dice_arena.get_die(i)
+			if stopped_die:
+				stopped_die.is_stopped = false
+				stopped_die.is_kept = false
 			continue
 		dice_keep[i] = is_kept
-		var die: PhysicsDie = dice_arena.get_die(i)
-		if die:
-			die.is_kept = is_kept
+		var toggle_die: PhysicsDie = dice_arena.get_die(i)
+		if toggle_die:
+			toggle_die.is_kept = is_kept
 	_sync_all_dice()
 	_sync_ui()
 
@@ -323,8 +321,7 @@ func _reroll_selected_dice() -> void:
 		_on_bank_pressed()
 		return
 	# Increment momentum on each reroll.
-	GameManager.momentum += 1
-	GameManager.momentum_changed.emit(GameManager.momentum)
+	GameManager.add_momentum()
 	# Recycler: +1g per die rerolled.
 	if GameManager.has_modifier(RunModifier.ModifierType.RECYCLER):
 		GameManager.add_gold(rerolled.size())
@@ -420,8 +417,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			_sync_buttons()
 			_schedule_auto_advance()
 		else:
-			if GameManager.event_free_bust:
-				GameManager.event_free_bust = false
+			if GameManager.consume_event_free_bust():
 				turn_state = TurnState.BANKED
 				bank_streak = 0
 				_update_streak_display()
@@ -1345,12 +1341,7 @@ func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType)
 
 
 func _start_stage_from_map() -> void:
-	GameManager.total_stages_cleared += 1
-	GameManager.current_stage += 1
-	GameManager.total_score = 0
-	GameManager.stage_target_score = GameManager._calculate_stage_target(GameManager.current_stage)
-	GameManager.score_changed.emit(GameManager.total_score)
-	GameManager.stage_advanced.emit(GameManager.current_stage)
+	GameManager.begin_stage_from_map()
 	_roll_content.visible = true
 	_update_streak_display()
 	_run_active = true
@@ -1381,8 +1372,7 @@ func _open_forge_from_map() -> void:
 
 
 func _execute_rest_node() -> void:
-	GameManager.lives = mini(GameManager.lives + REST_HEAL_LIVES, GameManager.MAX_LIVES)
-	GameManager.lives_changed.emit(GameManager.lives)
+	GameManager.heal_lives(REST_HEAL_LIVES)
 	GameManager.add_gold(REST_GOLD_BONUS)
 	hud.show_status("Rested! +%d life, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
 	SFXManager.play_stage_clear()
@@ -1528,7 +1518,7 @@ func _refresh_mode_picker_buttons(classic_btn: Button, gauntlet_btn: Button) -> 
 
 func _on_archetype_chosen(arch: GameManager.Archetype, overlay: ColorRect) -> void:
 	GameManager.set_run_mode(_picker_selected_mode)
-	GameManager.chosen_archetype = arch
+	GameManager.set_archetype(arch)
 	GameManager.reset_run()
 	_run_snapshot_recorded = false
 	overlay.queue_free()
