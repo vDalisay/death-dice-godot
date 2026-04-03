@@ -11,6 +11,8 @@ This document defines boundaries that should stay true during architecture refac
 ## Scene Responsibilities
 
 - `RollPhase` coordinates run-phase flow, but logic should be decomposed into focused collaborators as complexity grows.
+- `RollPhase` should remain a coordinator and delegate probability, bust-resolution routing, and score math to helper services.
+- Mode/archetype selection UI should live in a dedicated picker scene (`ArchetypePicker`) rather than procedural construction inside `RollPhase`.
 - UI panels and overlays (`ShopPanel`, `CareerPanel`, `StageEventOverlay`, etc.) should be presentation-first and avoid owning run-wide state.
 - Scene communication should use typed signals rather than direct sibling/parent reach-ins.
 
