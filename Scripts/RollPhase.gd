@@ -177,14 +177,11 @@ func _on_bank_pressed() -> void:
 	base_banked += combo_bonus
 	# Hot Streak multiplier: 3+ consecutive banks = x1.1, 5+ = x1.2.
 	var streak_mult: float = _get_streak_multiplier()
-	# Momentum multiplier: grows +5% per consecutive bank this stage.
+	# Momentum multiplier: grows +5% per reroll this stage.
 	var momentum_mult: float = _get_momentum_multiplier()
 	var banked: int = int(base_banked * streak_mult * momentum_mult)
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
-	# Increment momentum after banking.
-	GameManager.momentum += 1
-	GameManager.momentum_changed.emit(GameManager.momentum)
 	# Accumulate LUCK face values for dice reward rarity.
 	_accumulate_luck()
 	# Gambler's Rush: +1g per survived stop.
@@ -321,6 +318,9 @@ func _reroll_selected_dice() -> void:
 		# No dice to reroll — all are kept/locked, so auto-bank.
 		_on_bank_pressed()
 		return
+	# Increment momentum on each reroll.
+	GameManager.momentum += 1
+	GameManager.momentum_changed.emit(GameManager.momentum)
 	# Recycler: +1g per die rerolled.
 	if GameManager.has_modifier(RunModifier.ModifierType.RECYCLER):
 		GameManager.add_gold(rerolled.size())
@@ -765,7 +765,7 @@ func _get_streak_multiplier() -> float:
 	return 1.0
 
 
-## Momentum multiplier: +5% per previous consecutive bank this stage.
+## Momentum multiplier: +5% per reroll this stage.
 const MOMENTUM_STEP: float = 0.05
 
 func _get_momentum_multiplier() -> float:
