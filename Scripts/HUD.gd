@@ -4,6 +4,7 @@ extends VBoxContainer
 ## Redesigned as a compact 3-zone dashboard with themed panels and risk pips.
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
 
 const SCORE_COUNT_DURATION: float = 0.5
@@ -301,9 +302,13 @@ func animate_score_count(old_value: int, new_value: int) -> void:
 		_score_tween.kill()
 	_score_tween = create_tween()
 	_score_tween.tween_method(
-		func(val: float) -> void: score_label.text = "Total: %d" % int(val),
+		_set_total_score_label,
 		float(old_value), float(new_value), SCORE_COUNT_DURATION
 	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+
+func _set_total_score_label(value: float) -> void:
+	score_label.text = "Total: %d" % int(value)
 
 
 func show_floating_gold(amount: int) -> void:
@@ -417,9 +422,14 @@ func _on_gold_changed(new_gold: int) -> void:
 		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, new_gold]
 		return
 	_gold_tween = create_tween()
-	_gold_tween.tween_method(func(v: float) -> void:
-		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(v)]
-	, float(from_val), float(new_gold), GOLD_COUNT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_gold_tween.tween_method(
+		_set_gold_label_value,
+		float(from_val), float(new_gold), GOLD_COUNT_DURATION
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _set_gold_label_value(value: float) -> void:
+	gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(value)]
 
 
 func _on_luck_changed(_new_luck: int) -> void:
@@ -475,7 +485,7 @@ func _on_run_mode_changed(_new_mode: int) -> void:
 
 func _refresh_stage_display() -> void:
 	var loop_text: String = " L%d" % GameManager.current_loop if GameManager.current_loop > 1 else ""
-	var row_count: int = StageMapData.ROWS_PER_LOOP if GameManager.stage_map else GameManager.get_stages_in_current_loop()
+	var row_count: int = StageMapDataScript.ROWS_PER_LOOP if GameManager.stage_map else GameManager.get_stages_in_current_loop()
 	var row_display: int = mini(GameManager.current_row + 1, row_count)
 	var mode_text: String = " [%s]" % GameManager.get_run_mode_name().to_upper() if GameManager.run_mode == GameManager.RunMode.GAUNTLET else ""
 	stage_label.text = "ROW %d/%d%s%s" % [row_display, row_count, loop_text, mode_text]
@@ -501,9 +511,11 @@ func _animate_progress_bar_to(target_value: float) -> void:
 	var duration: float = lerpf(PROGRESS_LERP_MIN_DURATION, PROGRESS_LERP_DURATION, delta / 100.0)
 	_progress_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_progress_tween.tween_method(_set_progress_bar_value, progress_bar.value, target_value, duration)
-	_progress_tween.finished.connect(func() -> void:
-		_progress_tween = null
-	)
+	_progress_tween.finished.connect(_clear_progress_tween)
+
+
+func _clear_progress_tween() -> void:
+	_progress_tween = null
 
 
 func _stop_progress_tween() -> void:

@@ -111,7 +111,7 @@ func _roll_step(elapsed: float) -> void:
 	var display_face: int = _final_roll if progress > 0.85 else DIE_FACES[randi() % DIE_FACES.size()]
 	_die_label.text = str(display_face)
 	SFXManager.play_roll()
-	get_tree().create_timer(interval).timeout.connect(func() -> void: _roll_step(elapsed + interval))
+	get_tree().create_timer(interval).timeout.connect(_roll_step.bind(elapsed + interval))
 
 
 func _finish_roll() -> void:
@@ -179,11 +179,14 @@ func _spawn_confetti() -> void:
 	_modal.add_child(particles)
 	_confetti_nodes.append(particles)
 	get_tree().create_timer(particles.lifetime + 0.5).timeout.connect(
-		func() -> void:
-			if is_instance_valid(particles):
-				particles.queue_free()
-				_confetti_nodes.erase(particles)
+		_cleanup_confetti_particle.bind(particles)
 	)
+
+
+func _cleanup_confetti_particle(particles: CPUParticles2D) -> void:
+	if is_instance_valid(particles):
+		particles.queue_free()
+		_confetti_nodes.erase(particles)
 
 
 func _clear_confetti() -> void:

@@ -6,6 +6,7 @@ extends PanelContainer
 signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 
 # Layout tuning — all spacing is computed dynamically from container size.
 const NODE_SIZE: float = 60.0
@@ -23,6 +24,9 @@ const CURRENT_ROW_GLOW: Color = Color("#00E5FF")
 const REROUTE_GLOW: Color = Color("#FFB347")
 const ICON_FONT_SIZE: int = 24
 const LABEL_FONT_SIZE: int = 11
+const PANEL_INTRO_DURATION: float = 0.22
+const NODE_REVEAL_STAGGER: float = 0.04
+const NODE_REVEAL_DURATION: float = 0.16
 
 @onready var _backdrop: ColorRect = $Backdrop
 @onready var _content: VBoxContainer = $MarginContainer/VBoxContainer
@@ -30,7 +34,7 @@ const LABEL_FONT_SIZE: int = 11
 @onready var _map_area: Control = $MarginContainer/VBoxContainer/MapArea
 @onready var _hint_label: Label = $MarginContainer/VBoxContainer/HintLabel
 
-var _stage_map: StageMapData = null
+var _stage_map: Resource = null
 var _current_row: int = 0
 var _current_col: int = -1
 var _node_buttons: Array = []  # Array of Array[Button]
@@ -48,13 +52,15 @@ func _ready() -> void:
 	_map_area.resized.connect(_on_map_area_resized)
 
 
-func open(stage_map: StageMapData, current_row: int, previous_col: int, reroute_uses: int = 0) -> void:
+func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses: int = 0) -> void:
 	_stage_map = stage_map
 	_current_row = current_row
 	_current_col = previous_col
 	_reroute_uses = reroute_uses if current_row > 0 else 0
 	_reroute_enabled = false
 	_title_label.text = "LOOP %d — Choose Your Path" % GameManager.current_loop
+	_backdrop.color.a = 0.0
+	modulate.a = 0.0
 	_refresh_hint_label()
 	_refresh_reroute_button()
 	visible = true
@@ -63,6 +69,7 @@ func open(stage_map: StageMapData, current_row: int, previous_col: int, reroute_
 	await get_tree().process_frame
 	_pending_open = false
 	_rebuild_map()
+	_play_intro()
 
 
 func _on_map_area_resized() -> void:
@@ -128,6 +135,7 @@ func _rebuild_map() -> void:
 
 	# Connection lines (drawn behind buttons).
 	_draw_connections()
+	_prepare_nodes_for_intro()
 
 
 func _clear_map() -> void:
@@ -331,11 +339,48 @@ func _apply_theme_styling() -> void:
 
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 20)
-	_title_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 
 	_hint_label.add_theme_font_override("font", _UITheme.font_mono())
 	_hint_label.add_theme_font_size_override("font_size", 16)
 	_hint_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+
+func _prepare_nodes_for_intro() -> void:
+	for row_btns: Variant in _node_buttons:
+		for btn: Button in row_btns as Array[Button]:
+			btn.modulate.a = 0.0
+			btn.position.y += 10.0
+
+
+func _play_intro() -> void:
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "modulate:a", 1.0, PANEL_INTRO_DURATION)
+	tween.parallel().tween_property(_backdrop, "color:a", 0.95, PANEL_INTRO_DURATION)
+	var reveal_index: int = 0
+	for row_index: int in _node_buttons.size():
+		var row_btns: Array = _node_buttons[row_index]
+		for col_index: int in row_btns.size():
+			tween.tween_callback(Callable(self, "_reveal_node_button_by_index").bind(row_index, col_index)).set_delay(NODE_REVEAL_STAGGER * reveal_index)
+			reveal_index += 1
+
+
+func _reveal_node_button(btn: Button) -> void:
+	var tween: Tween = create_tween()
+	var end_y: float = btn.position.y - 10.0
+	tween.tween_property(btn, "modulate:a", 1.0, NODE_REVEAL_DURATION)
+	tween.parallel().tween_property(btn, "position:y", end_y, NODE_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _reveal_node_button_by_index(row_index: int, col_index: int) -> void:
+	if row_index < 0 or row_index >= _node_buttons.size():
+		return
+	var row_btns: Array = _node_buttons[row_index]
+	if col_index < 0 or col_index >= row_btns.size():
+		return
+	var btn: Button = row_btns[col_index] as Button
+	if btn == null or not is_instance_valid(btn):
+		return
+	_reveal_node_button(btn)
 
 
 func _ensure_reroute_button() -> void:

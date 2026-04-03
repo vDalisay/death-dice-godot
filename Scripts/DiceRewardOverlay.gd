@@ -10,6 +10,9 @@ const BACKDROP_ALPHA: float = 0.72
 const CARD_WIDTH: int = 220
 const CARD_HEIGHT: int = 320
 const FACE_GRID_COLUMNS: int = 3
+const CARD_REVEAL_STAGGER: float = 0.08
+const CARD_REVEAL_DURATION: float = 0.22
+const PICK_FLASH_DURATION: float = 0.2
 
 # Rarity weights (base, per-luck-point adjustment).
 const BASE_GREY: float = 0.50
@@ -94,6 +97,15 @@ func _rebuild_reward_cards(luck: int) -> void:
 		_card_row.add_child(card)
 		_cards.append(card)
 
+	for index: int in _cards.size():
+		var card: PanelContainer = _cards[index]
+		card.modulate.a = 0.0
+		card.position.y += 18.0
+		card.scale = Vector2(0.94, 0.94)
+
+	var tween: Tween = create_tween()
+	for index: int in _cards.size():
+		tween.tween_callback(Callable(self, "_reveal_option_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
 
 func _build_reroll_button() -> void:
 	_reroll_button = Button.new()
@@ -241,14 +253,14 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 
 
 func _on_card_picked(index: int) -> void:
-	var chosen: DiceData = _dice_options[index]
-
 	# Animate: selected card scales up, others fade out.
 	for i: int in _cards.size():
 		var card: PanelContainer = _cards[i]
 		if i == index:
 			var tween: Tween = create_tween()
 			tween.tween_property(card, "scale", Vector2(1.08, 1.08), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tween.parallel().tween_property(card, "modulate", Color(1.08, 1.08, 1.08, 1.0), PICK_FLASH_DURATION * 0.5)
+			tween.tween_property(card, "modulate", Color.WHITE, PICK_FLASH_DURATION * 0.5)
 		else:
 			var tween: Tween = create_tween()
 			tween.tween_property(card, "modulate:a", 0.2, 0.2)
@@ -262,10 +274,30 @@ func _on_card_picked(index: int) -> void:
 	# Emit after short delay, then self-destruct.
 	var exit_tween: Tween = create_tween()
 	exit_tween.tween_interval(0.5)
-	exit_tween.tween_callback(func() -> void:
-		reward_chosen.emit(chosen)
-		queue_free()
-	)
+	exit_tween.tween_callback(Callable(self, "_emit_reward_and_free").bind(index))
+
+
+func _reveal_option_card(card: PanelContainer) -> void:
+	var tween: Tween = create_tween()
+	var end_y: float = card.position.y - 18.0
+	tween.tween_property(card, "modulate:a", 1.0, CARD_REVEAL_DURATION)
+	tween.parallel().tween_property(card, "position:y", end_y, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(card, "scale", Vector2.ONE, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _reveal_option_card_by_index(index: int) -> void:
+	if index < 0 or index >= _cards.size():
+		return
+	var card: PanelContainer = _cards[index]
+	if not is_instance_valid(card):
+		return
+	_reveal_option_card(card)
+
+
+func _emit_reward_and_free(index: int) -> void:
+	if index >= 0 and index < _dice_options.size():
+		reward_chosen.emit(_dice_options[index])
+	queue_free()
 
 
 func _find_button(node: Node) -> Button:

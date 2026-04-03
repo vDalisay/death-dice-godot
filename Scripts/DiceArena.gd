@@ -172,7 +172,7 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 		var captured_indices: Array[int] = indices.duplicate()
 		var captured_pool: Array[DiceData] = pool.duplicate()
 		get_tree().create_timer(BAG_MOVE_DURATION).timeout.connect(
-			func() -> void: _execute_reroll(captured_indices, captured_pool)
+			_execute_reroll.bind(captured_indices, captured_pool)
 		)
 
 
@@ -216,7 +216,7 @@ func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:
 			else:
 				var cumulative: float = volley_cumulative_delay(slot, total) + randf_range(0.0, VOLLEY_DELAY_JITTER)
 				get_tree().create_timer(cumulative).timeout.connect(
-					func() -> void: _reroll_volley_launch(captured_die, captured_face, captured_slot, captured_total)
+					_reroll_volley_launch.bind(captured_die, captured_face, captured_slot, captured_total)
 				)
 
 	if instant_mode:
@@ -312,7 +312,7 @@ func _start_volley() -> void:
 			cumulative_delay += base_delay + randf_range(0.0, VOLLEY_DELAY_JITTER)
 			var captured_index: int = i
 			get_tree().create_timer(cumulative_delay).timeout.connect(
-				func() -> void: _volley_launch(captured_index)
+				_volley_launch.bind(captured_index)
 			)
 
 

@@ -2,6 +2,8 @@ class_name StageMapGenerator
 extends RefCounted
 ## Generates StageMapData while keeping generation algorithms out of the data Resource.
 
+const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+
 const NORMAL_STAGE_RATIO: float = 0.5
 const SHOP_RATIO: float = 0.15
 const EVENT_RATIO: float = 0.15
@@ -12,16 +14,16 @@ const MIN_CONNECTIONS_PER_NODE: int = 1
 const MAX_CONNECTIONS_PER_NODE: int = 2
 
 
-static func generate(_loop: int) -> StageMapData:
-	var map: StageMapData = StageMapData.new()
+static func generate(_loop: int) -> Resource:
+	var map: Resource = StageMapDataScript.new()
 	map.rows.clear()
 
 	var row_sizes: Array[int] = []
-	for row_index: int in StageMapData.ROWS_PER_LOOP:
-		if row_index == StageMapData.ROWS_PER_LOOP - FINAL_ROW_INDEX_FROM_END:
+	for row_index: int in StageMapDataScript.ROWS_PER_LOOP:
+		if row_index == StageMapDataScript.ROWS_PER_LOOP - FINAL_ROW_INDEX_FROM_END:
 			row_sizes.append(1)
 		else:
-			row_sizes.append(randi_range(StageMapData.MIN_NODES_PER_ROW, StageMapData.MAX_NODES_PER_ROW))
+			row_sizes.append(randi_range(StageMapDataScript.MIN_NODES_PER_ROW, StageMapDataScript.MAX_NODES_PER_ROW))
 
 	var total_nodes: int = 0
 	for size_value: int in row_sizes:
@@ -30,7 +32,7 @@ static func generate(_loop: int) -> StageMapData:
 	var node_types: Array[MapNodeData.NodeType] = allocate_node_types(total_nodes)
 
 	var type_index: int = 0
-	for row_index: int in StageMapData.ROWS_PER_LOOP:
+	for row_index: int in StageMapDataScript.ROWS_PER_LOOP:
 		var row: Array[MapNodeData] = []
 		for col_index: int in row_sizes[row_index]:
 			var node: MapNodeData = MapNodeData.new()
@@ -40,7 +42,7 @@ static func generate(_loop: int) -> StageMapData:
 			row.append(node)
 		map.rows.append(row)
 
-	for row_index: int in StageMapData.ROWS_PER_LOOP - 1:
+	for row_index: int in StageMapDataScript.ROWS_PER_LOOP - 1:
 		var current_row: Array = map.rows[row_index]
 		var next_row: Array = map.rows[row_index + 1]
 		var current_count: int = current_row.size()
@@ -104,11 +106,11 @@ static func nearest_parent(target_col: int, current_count: int, next_count: int)
 static func allocate_node_types(total_nodes: int) -> Array[MapNodeData.NodeType]:
 	var types: Array[MapNodeData.NodeType] = []
 
-	var normal_count: int = maxi(StageMapData.MIN_NORMAL_STAGES, int(total_nodes * NORMAL_STAGE_RATIO))
-	var shop_count: int = mini(StageMapData.MAX_NON_COMBAT_PER_TYPE, maxi(1, int(total_nodes * SHOP_RATIO)))
-	var event_count: int = mini(StageMapData.MAX_NON_COMBAT_PER_TYPE, maxi(1, int(total_nodes * EVENT_RATIO)))
-	var forge_count: int = mini(StageMapData.MAX_NON_COMBAT_PER_TYPE, maxi(0, int(total_nodes * FORGE_RATIO)))
-	var rest_count: int = mini(StageMapData.MAX_NON_COMBAT_PER_TYPE, maxi(0, int(total_nodes * REST_RATIO)))
+	var normal_count: int = maxi(StageMapDataScript.MIN_NORMAL_STAGES, int(total_nodes * NORMAL_STAGE_RATIO))
+	var shop_count: int = mini(StageMapDataScript.MAX_NON_COMBAT_PER_TYPE, maxi(1, int(total_nodes * SHOP_RATIO)))
+	var event_count: int = mini(StageMapDataScript.MAX_NON_COMBAT_PER_TYPE, maxi(1, int(total_nodes * EVENT_RATIO)))
+	var forge_count: int = mini(StageMapDataScript.MAX_NON_COMBAT_PER_TYPE, maxi(0, int(total_nodes * FORGE_RATIO)))
+	var rest_count: int = mini(StageMapDataScript.MAX_NON_COMBAT_PER_TYPE, maxi(0, int(total_nodes * REST_RATIO)))
 
 	var allocated: int = normal_count + shop_count + event_count + forge_count + rest_count
 	while allocated > total_nodes:

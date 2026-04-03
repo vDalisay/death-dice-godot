@@ -1,6 +1,8 @@
 extends Node
 ## Global score and run state. Registered as autoload "GameManager".
 
+const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+
 const MAX_LIVES: int = 3
 const STARTING_DICE_COUNT: int = 5
 const STAGES_LOOP_1: int = 5
@@ -59,7 +61,7 @@ var current_stage: int = 1
 var current_loop: int = 1
 var current_row: int = 0
 var previous_col: int = -1
-var stage_map: StageMapData = null
+var stage_map: Resource = null
 var gold: int = 0
 var stage_target_score: int = BASE_STAGE_TARGET
 var dice_pool: Array[DiceData] = []
@@ -166,7 +168,7 @@ func _ready() -> void:
 
 
 func generate_stage_map() -> void:
-	stage_map = StageMapData.generate(current_loop)
+	stage_map = StageMapDataScript.generate(current_loop)
 	current_row = 0
 	previous_col = -1
 

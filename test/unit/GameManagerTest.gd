@@ -2,11 +2,20 @@ extends GdUnitTestSuite
 ## Unit tests for GameManager autoload.
 
 var _gm: Node
+var _saved_prestige_unlocks: Array[String] = []
 
 
 func before_test() -> void:
 	# Create a fresh GameManager instance for each test to avoid shared state.
+	_saved_prestige_unlocks = SaveManager.prestige_unlocks.duplicate()
+	var empty_unlocks: Array[String] = []
+	SaveManager.prestige_unlocks = empty_unlocks
 	_gm = auto_free(preload("res://Scripts/GameManager.gd").new())
+
+
+func after_test() -> void:
+	var restored_unlocks: Array[String] = _saved_prestige_unlocks.duplicate()
+	SaveManager.prestige_unlocks = restored_unlocks
 
 
 func test_initial_state() -> void:

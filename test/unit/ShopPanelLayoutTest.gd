@@ -61,3 +61,16 @@ func test_refresh_button_disables_at_zero_gold() -> void:
 	GameManager.gold_changed.emit(0)
 	var refresh_button: Button = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/RefreshButton") as Button
 	assert_bool(refresh_button.disabled).is_true()
+
+
+func test_expensive_cards_dim_when_gold_is_zero() -> void:
+	GameManager.reset_run()
+	GameManager.gold = 0
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+	panel.open(1, false)
+	await await_idle_frame()
+	assert_int(panel._card_panels.size()).is_greater_equal(1)
+	var first_card: PanelContainer = panel._card_panels[0] as PanelContainer
+	assert_float(first_card.self_modulate.a).is_less(1.0)

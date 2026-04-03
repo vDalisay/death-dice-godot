@@ -1,8 +1,8 @@
 shader_type canvas_item;
 // Full-screen CRT scanline overlay inspired by Balatro-style presentation.
 
-uniform float line_density : hint_range(200.0, 1600.0) = 900.0;
-uniform float intensity : hint_range(0.0, 0.4) = 0.12;
+uniform float line_density : hint_range(200.0, 1600.0) = 600.0;
+uniform float intensity : hint_range(0.0, 0.4) = 0.24;
 uniform float thickness : hint_range(0.05, 1.0) = 0.45;
 uniform vec4 tint : source_color = vec4(0.03, 0.05, 0.06, 1.0);
 

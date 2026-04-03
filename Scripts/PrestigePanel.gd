@@ -5,6 +5,7 @@ extends PanelContainer
 signal closed()
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
@@ -47,11 +48,11 @@ func _rebuild_cards() -> void:
 	_currency_label.text = "Skulls: %d" % SaveManager.prestige_currency
 	for child: Node in _cards_container.get_children():
 		child.queue_free()
-	for unlock: PrestigeUnlockData in PrestigeUnlockData.get_all():
+	for unlock: Resource in PrestigeUnlockDataScript.get_all():
 		_cards_container.add_child(_build_unlock_card(unlock))
 
 
-func _build_unlock_card(unlock: PrestigeUnlockData) -> PanelContainer:
+func _build_unlock_card(unlock: Resource) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(320, 160)
 	card.add_theme_stylebox_override(

@@ -3,6 +3,7 @@ extends Node
 
 const SAVE_PATH: String = "user://save_data.json"
 const RunSaveDataScript: GDScript = preload("res://Scripts/RunSaveData.gd")
+const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 
 # Mastery milestone definitions: runs_used -> unlock cosmetics
 const MASTERY_MILESTONES: Dictionary = {
@@ -295,8 +296,8 @@ func has_prestige_unlock(unlock_id: String) -> bool:
 func purchase_prestige_unlock(unlock_id: String) -> bool:
 	if has_prestige_unlock(unlock_id):
 		return false
-	var all_unlocks: Array[PrestigeUnlockData] = PrestigeUnlockData.get_all()
-	for unlock: PrestigeUnlockData in all_unlocks:
+	var all_unlocks: Array = PrestigeUnlockDataScript.get_all()
+	for unlock: Resource in all_unlocks:
 		if unlock.unlock_id != unlock_id:
 			continue
 		if not spend_prestige_currency(unlock.skull_cost):

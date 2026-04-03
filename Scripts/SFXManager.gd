@@ -157,6 +157,4 @@ func _play_tone(frequency: float, duration: float, volume: float) -> void:
 
 
 func _play_tone_delayed(frequency: float, duration: float, volume: float, delay: float) -> void:
-	get_tree().create_timer(delay).timeout.connect(
-		func() -> void: _play_tone(frequency, duration, volume)
-	)
+	get_tree().create_timer(delay).timeout.connect(_play_tone.bind(frequency, duration, volume))

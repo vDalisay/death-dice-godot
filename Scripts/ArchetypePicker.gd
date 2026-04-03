@@ -12,6 +12,10 @@ const CARD_MIN_SIZE: Vector2 = Vector2(220, 180)
 const CARD_ROW_SPACING: int = 24
 const MODE_ROW_SPACING: int = 12
 const CONTENT_SPACING: int = 16
+const INTRO_DURATION: float = 0.24
+const CARD_REVEAL_STAGGER: float = 0.08
+const CARD_REVEAL_DURATION: float = 0.18
+const MODE_PULSE_SCALE: float = 1.06
 
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
@@ -22,6 +26,7 @@ const CONTENT_SPACING: int = 16
 @onready var _content: VBoxContainer = $CenterContainer/Card/MarginContainer/Content
 
 var _selected_mode: int = int(GameManager.RunMode.CLASSIC)
+var _mode_buttons: Array[Button] = []
 var _prestige_button: Button = null
 
 
@@ -30,19 +35,22 @@ func _ready() -> void:
 	_add_prestige_button()
 	_classic_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.CLASSIC)))
 	_gauntlet_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.GAUNTLET)))
+	_mode_buttons = [_classic_button, _gauntlet_button]
 	_set_mode(_selected_mode)
 	_rebuild_archetype_cards()
+	_play_intro()
 
 
 func open(initial_mode: int) -> void:
 	_selected_mode = initial_mode
 	_set_mode(_selected_mode)
 	_rebuild_archetype_cards()
+	_play_intro()
 
 
 func _apply_theme() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	color = Color(0.1, 0.1, 0.15, 0.92)
+	color = Color(0.1, 0.1, 0.15, 0.0)
 	_card_panel.custom_minimum_size = PANEL_MIN_SIZE
 	_card_panel.add_theme_stylebox_override(
 		"panel",
@@ -55,7 +63,7 @@ func _apply_theme() -> void:
 	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	_mode_description.text = "Gauntlet: steeper stage scaling, separate records"
 	_mode_description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_mode_description.add_theme_font_override("font", _UITheme.font_body())
+	_mode_description.add_theme_font_override("font", _UITheme.font_mono())
 	_mode_description.add_theme_font_size_override("font_size", 14)
 	_mode_description.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 	_archetype_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -74,6 +82,8 @@ func _set_mode(mode: int) -> void:
 	var classic_selected: bool = _selected_mode == int(GameManager.RunMode.CLASSIC)
 	_classic_button.modulate = Color(1.0, 0.9, 0.35) if classic_selected else Color(0.8, 0.8, 0.8)
 	_gauntlet_button.modulate = Color(1.0, 0.35, 0.35) if not classic_selected else Color(0.8, 0.8, 0.8)
+	var selected_button: Button = _classic_button if classic_selected else _gauntlet_button
+	_play_mode_pulse(selected_button)
 
 
 func _rebuild_archetype_cards() -> void:
@@ -89,6 +99,7 @@ func _rebuild_archetype_cards() -> void:
 		archetypes.append(GameManager.Archetype.FORTUNE_FOOL)
 	for arch: GameManager.Archetype in archetypes:
 		_archetype_row.add_child(_build_archetype_card(arch))
+	_prepare_cards_for_intro()
 
 
 func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
@@ -150,6 +161,54 @@ func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
 	card_box.add_child(select_button)
 	return card
 
+func _prepare_cards_for_intro() -> void:
+	for child: Node in _archetype_row.get_children():
+		var card: PanelContainer = child as PanelContainer
+		if card == null:
+			continue
+		card.modulate.a = 0.0
+		card.position.y += 12.0
+		card.scale = Vector2(0.96, 0.96)
+
+
+func _play_intro() -> void:
+	color.a = 0.0
+	_card_panel.modulate.a = 0.0
+	_card_panel.scale = Vector2(1.04, 1.04)
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "color:a", 0.92, INTRO_DURATION)
+	tween.parallel().tween_property(_card_panel, "modulate:a", 1.0, INTRO_DURATION)
+	tween.parallel().tween_property(_card_panel, "scale", Vector2.ONE, INTRO_DURATION).set_ease(Tween.EASE_OUT)
+	var reveal_index: int = 0
+	for child: Node in _archetype_row.get_children():
+		var card: PanelContainer = child as PanelContainer
+		if card == null:
+			continue
+		tween.tween_callback(_reveal_archetype_card_by_index.bind(reveal_index)).set_delay(CARD_REVEAL_STAGGER * reveal_index)
+		reveal_index += 1
+
+
+
+func _reveal_archetype_card_by_index(index: int) -> void:
+	if index < 0 or index >= _archetype_row.get_child_count():
+		return
+	var card: PanelContainer = _archetype_row.get_child(index) as PanelContainer
+	if card == null or not is_instance_valid(card):
+		return
+	var tween: Tween = create_tween()
+	var end_y: float = card.position.y - 12.0
+	tween.tween_property(card, "modulate:a", 1.0, CARD_REVEAL_DURATION)
+	tween.parallel().tween_property(card, "position:y", end_y, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(card, "scale", Vector2.ONE, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _play_mode_pulse(button: Button) -> void:
+	if button == null:
+		return
+	var tween: Tween = create_tween()
+	tween.tween_property(button, "scale", Vector2(MODE_PULSE_SCALE, MODE_PULSE_SCALE), 0.09).set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "scale", Vector2.ONE, 0.14).set_ease(Tween.EASE_IN)
+
 
 func _add_prestige_button() -> void:
 	_prestige_button = Button.new()
@@ -164,8 +223,6 @@ func _add_prestige_button() -> void:
 
 
 func _open_prestige_panel() -> void:
-	var panel: PrestigePanel = PrestigePanelScene.instantiate() as PrestigePanel
+	var panel: Node = PrestigePanelScene.instantiate()
 	add_child(panel)
-	panel.closed.connect(func() -> void:
-		_rebuild_archetype_cards()
-	)
+	panel.connect("closed", Callable(self, "_rebuild_archetype_cards"))

@@ -20,20 +20,12 @@ func _ready() -> void:
 		_pool.append(_create_emitter())
 
 
-func _ensure_pool_root() -> void:
-	if _pool_root != null and is_instance_valid(_pool_root):
-		return
-	_pool_root = Node2D.new()
-	_pool_root.name = "PoolRoot"
-	_pool_root.visible = false
-	add_child(_pool_root)
-
-
 ## Acquire a pooled emitter and reparent it under the given parent.
 ## Returns null if budget exceeded.
 func acquire(parent: Node) -> CPUParticles2D:
 	if _active_count >= MAX_ACTIVE_EMITTERS:
 		return null
+	_ensure_pool_root()
 	var emitter: CPUParticles2D
 	if _pool.size() > 0:
 		emitter = _pool.pop_back()
@@ -84,22 +76,27 @@ func release_after(emitter: CPUParticles2D, delay: float) -> void:
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return
-	tree.create_timer(delay).timeout.connect(func() -> void:
-		_return_emitter(emitter)
-	)
+	tree.create_timer(delay).timeout.connect(_return_emitter_after_timeout.bind(emitter))
+
+
+func _return_emitter_after_timeout(emitter: Variant) -> void:
+	if emitter == null or not is_instance_valid(emitter):
+		_active_count = max(_active_count - 1, 0)
+		return
+	_return_emitter(emitter as CPUParticles2D)
 
 
 func _return_emitter(emitter: CPUParticles2D) -> void:
 	_active_count = max(_active_count - 1, 0)
 	if not is_instance_valid(emitter):
 		return
+	_ensure_pool_root()
 	emitter.emitting = false
 	emitter.visible = false
 	emitter.top_level = false
 	if emitter.get_parent():
 		emitter.get_parent().remove_child(emitter)
 	if _pool.size() < MAX_POOL_SIZE:
-		_ensure_pool_root()
 		if _pool_root != null and is_instance_valid(_pool_root):
 			_pool_root.add_child(emitter)
 		_pool.append(emitter)
@@ -116,3 +113,12 @@ func _create_emitter() -> CPUParticles2D:
 	if _pool_root != null and is_instance_valid(_pool_root):
 		_pool_root.add_child(emitter)
 	return emitter
+
+
+func _ensure_pool_root() -> void:
+	if _pool_root != null and is_instance_valid(_pool_root):
+		return
+	_pool_root = Node2D.new()
+	_pool_root.name = "PoolRoot"
+	_pool_root.visible = false
+	add_child(_pool_root)

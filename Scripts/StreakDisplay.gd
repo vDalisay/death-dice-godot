@@ -8,6 +8,10 @@ const MAX_SIZE: Vector2 = Vector2(160, 160)
 const FIRE_CHARS: Array[String] = ["▲", "▲", "▲", "▲", "▲"]
 const FLICKER_INTERVAL: float = 0.12
 const PULSE_DURATION: float = 0.8
+const BOX_PADDING: Vector2 = Vector2(10, 6)
+const BOX_BORDER_WIDTH: int = 2
+const MACHINE_BG: Color = Color("#090B12E6")
+const MACHINE_BORDER: Color = Color("#FF6D00CC")
 
 var _streak: int = 0
 var _multiplier: float = 1.0
@@ -15,6 +19,7 @@ var _fire_labels: Array[Label] = []
 var _fire_base_positions: Array[Vector2] = []
 var _mult_label: Label = null
 var _container: Control = null
+var _backplate: Panel = null
 var _flicker_timer: float = 0.0
 var _pulse_tween: Tween = null
 var _embedded_layout: bool = false
@@ -27,6 +32,11 @@ func _ready() -> void:
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_container.position = Vector2(12, 12)
 	add_child(_container)
+
+	_backplate = Panel.new()
+	_backplate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_backplate.visible = false
+	_container.add_child(_backplate)
 
 	# Create layered fire glyph labels for depth effect.
 	for i: int in FIRE_CHARS.size():
@@ -98,6 +108,8 @@ func _layout_fire() -> void:
 	# How many fire glyphs to show (1 at streak 1, up to all 5 at streak 5+).
 	var fire_count: int = clampi(_streak, 1, FIRE_CHARS.size())
 	var font_size: int = int(lerpf(36.0, 72.0, t))
+	var flame_color: Color = Color(1.0, lerpf(0.34, 0.78, 1.0 - t * 0.25), lerpf(0.1, 0.28, t), 1.0)
+	var display_center: Vector2 = display_size * 0.5
 
 	for i: int in _fire_labels.size():
 		var lbl: Label = _fire_labels[i]
@@ -106,6 +118,9 @@ func _layout_fire() -> void:
 			continue
 		lbl.visible = true
 		lbl.add_theme_font_size_override("font_size", font_size)
+		lbl.add_theme_color_override("font_color", flame_color)
+		lbl.add_theme_color_override("font_outline_color", Color("#1A0200"))
+		lbl.add_theme_constant_override("outline_size", int(lerpf(3.0, 7.0, t)))
 		lbl.size = display_size
 		# Offset each fire label slightly for a clustered layered look.
 		var spread: float = lerpf(4.0, 12.0, t)
@@ -115,18 +130,32 @@ func _layout_fire() -> void:
 		lbl.position = base_pos
 		_fire_base_positions[i] = base_pos
 
+	var box_size: Vector2 = Vector2(display_size.x * 0.74, display_size.y * 0.34) + BOX_PADDING * 2.0
+	_backplate.size = box_size
+	_backplate.position = Vector2(display_center.x - box_size.x * 0.5, display_center.y - box_size.y * 0.42)
+	_backplate.visible = true
+	var box_style := StyleBoxFlat.new()
+	box_style.bg_color = MACHINE_BG
+	box_style.border_color = MACHINE_BORDER
+	box_style.set_border_width_all(BOX_BORDER_WIDTH)
+	box_style.shadow_color = Color("#020202CC")
+	box_style.shadow_size = 4
+	box_style.shadow_offset = Vector2i(0, 0)
+	_backplate.add_theme_stylebox_override("panel", box_style)
+
 	# Multiplier label — bright white with black outline for contrast.
 	var mult_font_size: int = int(lerpf(20.0, 36.0, t))
 	_mult_label.add_theme_font_size_override("font_size", mult_font_size)
-	_mult_label.add_theme_color_override("font_color", Color.WHITE)
+	_mult_label.add_theme_font_override("font", preload("res://Scripts/UITheme.gd").font_display())
+	_mult_label.add_theme_color_override("font_color", Color("#FFE8A3"))
 	_mult_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_mult_label.add_theme_constant_override("outline_size", int(lerpf(4.0, 8.0, t)))
 	if _multiplier > 1.0:
 		_mult_label.text = "x%.1f" % _multiplier
 	else:
 		_mult_label.text = "%d" % _streak
-	_mult_label.size = display_size
-	_mult_label.position = Vector2.ZERO
+	_mult_label.size = box_size
+	_mult_label.position = _backplate.position
 
 
 func _apply_flicker() -> void:
@@ -139,7 +168,9 @@ func _apply_flicker() -> void:
 		lbl.position.x = origin.x + randf_range(-2.5, 2.5)
 		lbl.position.y = origin.y + randf_range(-2.5, 2.5)
 		# Subtle opacity flicker.
-		lbl.modulate.a = randf_range(0.7, 1.0)
+		lbl.modulate.a = randf_range(0.78, 1.0)
+	if _backplate:
+		_backplate.modulate.a = randf_range(0.9, 1.0)
 
 
 func _play_pulse() -> void:
