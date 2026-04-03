@@ -28,6 +28,7 @@ const BUTTON_PRESS_SCALE: float = 0.96
 const BUTTON_TWEEN_DURATION: float = 0.08
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
+enum RollBustOutcome { SAFE, IMMUNE_SAVE, INSURANCE_SAVE, EVENT_SAVE, BUST }
 
 @onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
@@ -71,6 +72,8 @@ var _screen_overlay: Node = null
 var _picker_selected_mode: int = GameManager.RunMode.CLASSIC
 var _turn_score_service: RefCounted = null
 var _bust_resolver: RefCounted = null
+var _risk_estimator: RefCounted = null
+var _roll_resolution_service: RefCounted = null
 var _stage_flow: RefCounted = null
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
@@ -83,12 +86,16 @@ const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
 const TurnScoreServiceScript: GDScript = preload("res://Scripts/TurnScoreService.gd")
 const BustFlowResolverScript: GDScript = preload("res://Scripts/BustFlowResolver.gd")
+const BustRiskEstimatorScript: GDScript = preload("res://Scripts/BustRiskEstimator.gd")
+const RollResolutionServiceScript: GDScript = preload("res://Scripts/RollResolutionService.gd")
 const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoordinator.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 func _ready() -> void:
 	_turn_score_service = TurnScoreServiceScript.new()
 	_bust_resolver = BustFlowResolverScript.new()
+	_risk_estimator = BustRiskEstimatorScript.new()
+	_roll_resolution_service = RollResolutionServiceScript.new()
 	_stage_flow = StageFlowCoordinatorScript.new()
 	theme = _UITheme.build_theme()
 	roll_button.pressed.connect(_on_roll_pressed)
@@ -415,9 +422,18 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
 	var threshold: int = _get_bust_threshold()
 	var is_immune: bool = _bust_resolver.is_immune_turn(turn_number, GameManager.current_stage, int(GameManager.chosen_archetype))
-	if effective_stops >= threshold and not is_immune:
-		var insurance_index: int = _find_insurance_face_index()
-		if insurance_index >= 0:
+	var insurance_index: int = _find_insurance_face_index()
+	var bust_outcome: int = _get_roll_resolution_service().resolve_bust_outcome(
+		effective_stops,
+		threshold,
+		is_immune,
+		insurance_index,
+		GameManager.event_free_bust
+	)
+	match bust_outcome:
+		RollBustOutcome.SAFE, RollBustOutcome.IMMUNE_SAVE:
+			turn_state = TurnState.ACTIVE
+		RollBustOutcome.INSURANCE_SAVE:
 			_consume_insurance_face(insurance_index)
 			_sync_arena_die_state(insurance_index)
 			turn_state = TurnState.BANKED
@@ -427,7 +443,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			SFXManager.play_close_call()
 			_sync_buttons()
 			_schedule_auto_advance()
-		else:
+		RollBustOutcome.EVENT_SAVE:
 			if GameManager.consume_event_free_bust():
 				turn_state = TurnState.BANKED
 				bank_streak = 0
@@ -437,17 +453,9 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				_sync_buttons()
 				_schedule_auto_advance()
 			else:
-				turn_state = TurnState.BUST
-				bank_streak = 0
-				_update_streak_display()
-				GameManager.lose_life()
-				AchievementManager.on_bust()
-				SFXManager.play_bust()
-				_show_bust_overlay(effective_stops)
-				_sync_buttons()
-				_schedule_auto_advance()
-	else:
-		turn_state = TurnState.ACTIVE
+				_apply_bust_outcome(effective_stops)
+		RollBustOutcome.BUST:
+			_apply_bust_outcome(effective_stops)
 
 	# Sync non-rolled dice visuals.
 	for i: int in GameManager.dice_pool.size():
@@ -469,15 +477,10 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 
 	var roll_stop_count: int = _count_stops_in(rolled_indices)
 	if roll_stop_count > 0:
-		var has_cursed: bool = false
-		for i: int in rolled_indices:
-			var f: DiceFaceData = current_results[i]
-			if f != null and f.type == DiceFaceData.FaceType.CURSED_STOP:
-				has_cursed = true
-				break
+		var has_cursed: bool = _get_roll_resolution_service().has_cursed_stop_in(rolled_indices, current_results)
 		_shake_screen(SHAKE_CURSED_STOP if has_cursed else SHAKE_STOP, 0.12 if has_cursed else 0.1)
-	if shield_count > 0 and roll_stop_count > 0 and roll_stop_count > maxi(0, roll_stop_count - shield_count):
-		var shielded: int = roll_stop_count - maxi(0, roll_stop_count - shield_count)
+	var shielded: int = _get_roll_resolution_service().absorbed_stop_count(roll_stop_count, shield_count)
+	if shielded > 0:
 		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
 		for i: int in GameManager.dice_pool.size():
 			var shield_face: DiceFaceData = current_results[i]
@@ -518,6 +521,12 @@ func _calculate_turn_score() -> int:
 		GameManager.has_modifier(RunModifier.ModifierType.CHAIN_LIGHTNING)
 	)
 
+
+func _get_roll_resolution_service() -> RefCounted:
+	if _roll_resolution_service == null:
+		_roll_resolution_service = RollResolutionServiceScript.new()
+	return _roll_resolution_service
+
 func _count_stops() -> int:
 	var count: int = 0
 	for stopped: bool in dice_stopped:
@@ -528,24 +537,13 @@ func _count_stops() -> int:
 ## Count stops only among the specified dice indices (per-roll bust check).
 ## CURSED_STOP counts as 2 stops.
 func _count_stops_in(indices: Array[int]) -> int:
-	var count: int = 0
-	for i: int in indices:
-		if dice_stopped[i]:
-			var face: DiceFaceData = current_results[i]
-			if face != null and face.type == DiceFaceData.FaceType.CURSED_STOP:
-				count += 2
-			else:
-				count += 1
-	return count
+	return _get_roll_resolution_service().count_stops_in(indices, dice_stopped, current_results)
 
 func _count_shields() -> int:
-	var count: int = 0
-	var multiplier: int = 2 if GameManager.has_modifier(RunModifier.ModifierType.SHIELD_WALL) else 1
-	for i: int in GameManager.dice_pool.size():
-		var face: DiceFaceData = current_results[i]
-		if face != null and face.type == DiceFaceData.FaceType.SHIELD:
-			count += face.value * multiplier
-	return count
+	return _get_roll_resolution_service().count_shields(
+		current_results,
+		GameManager.has_modifier(RunModifier.ModifierType.SHIELD_WALL)
+	)
 
 
 func _accumulate_luck() -> void:
@@ -580,6 +578,18 @@ func _consume_insurance_face(die_index: int) -> void:
 	face.value = 0
 	dice_keep[die_index] = true
 	dice_keep_locked[die_index] = true
+
+
+func _apply_bust_outcome(effective_stops: int) -> void:
+	turn_state = TurnState.BUST
+	bank_streak = 0
+	_update_streak_display()
+	GameManager.lose_life()
+	AchievementManager.on_bust()
+	SFXManager.play_bust()
+	_show_bust_overlay(effective_stops)
+	_sync_buttons()
+	_schedule_auto_advance()
 
 func _get_turn_multiplier() -> int:
 	var multiplier: int = 1
@@ -620,7 +630,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			elif face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-				accumulated_stop_count += 2 if face.type == DiceFaceData.FaceType.CURSED_STOP else 1
+				accumulated_stop_count += _get_roll_resolution_service().stop_weight(face)
 				if die:
 					die.play_stop_impact(face.type == DiceFaceData.FaceType.CURSED_STOP)
 					die.tumble(face)
@@ -652,7 +662,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			var extra_die: PhysicsDie = dice_arena.get_die(extra_i)
 			if extra_face.type == DiceFaceData.FaceType.STOP or extra_face.type == DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[extra_i] = true
-				accumulated_stop_count += 2 if extra_face.type == DiceFaceData.FaceType.CURSED_STOP else 1
+				accumulated_stop_count += _get_roll_resolution_service().stop_weight(extra_face)
 				if extra_die:
 					extra_die.play_stop_impact(extra_face.type == DiceFaceData.FaceType.CURSED_STOP)
 			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE]:
@@ -747,66 +757,44 @@ func _get_bust_risk_text(effective_stops: int, threshold: int) -> String:
 
 
 func _estimate_next_reroll_bust_chance(effective_stops: int, threshold: int) -> float:
-	var stops_needed: int = threshold - effective_stops
-	if stops_needed <= 0:
-		return 1.0
-	var distribution: Array[float] = [1.0]
-	for i: int in GameManager.dice_pool.size():
-		if dice_keep[i] or dice_keep_locked[i]:
-			continue
-		var die_data: DiceData = GameManager.dice_pool[i]
-		if die_data == null or die_data.faces.is_empty():
-			continue
-		var face_count: float = float(die_data.faces.size())
-		var p0: float = 0.0
-		var p1: float = 0.0
-		var p2: float = 0.0
-		for face: DiceFaceData in die_data.faces:
-			if face == null:
-				continue
-			match face.type:
-				DiceFaceData.FaceType.CURSED_STOP:
-					p2 += 1.0 / face_count
-				DiceFaceData.FaceType.STOP:
-					p1 += 1.0 / face_count
-				_:
-					p0 += 1.0 / face_count
-		var next_dist: Array[float] = []
-		next_dist.resize(distribution.size() + 2)
-		next_dist.fill(0.0)
-		for s: int in distribution.size():
-			var base_prob: float = distribution[s]
-			next_dist[s] += base_prob * p0
-			next_dist[s + 1] += base_prob * p1
-			next_dist[s + 2] += base_prob * p2
-		distribution = next_dist
-	var chance: float = 0.0
-	for s: int in distribution.size():
-		if s >= stops_needed:
-			chance += distribution[s]
-	return clampf(chance, 0.0, 1.0)
+	if _risk_estimator == null:
+		_risk_estimator = BustRiskEstimatorScript.new()
+	return _risk_estimator.estimate_next_reroll_bust_chance(
+		effective_stops,
+		threshold,
+		GameManager.dice_pool,
+		dice_keep,
+		dice_keep_locked
+	)
 
 
 func _estimate_bust_odds(effective_stops: int, threshold: int) -> float:
-	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
-	var horizon_rolls: int = maxi(1, _reroll_count + 1)
-	var survive_all: float = pow(1.0 - next_roll_chance, float(horizon_rolls))
-	return clampf(1.0 - survive_all, 0.0, 1.0)
+	if _risk_estimator == null:
+		_risk_estimator = BustRiskEstimatorScript.new()
+	return _risk_estimator.estimate_bust_odds(
+		effective_stops,
+		threshold,
+		_reroll_count,
+		GameManager.dice_pool,
+		dice_keep,
+		dice_keep_locked
+	)
 
 
 func _build_risk_details(effective_stops: int, shield_count: int, threshold: int, bust_odds: float) -> String:
+	if _risk_estimator == null:
+		_risk_estimator = BustRiskEstimatorScript.new()
 	var rerollable_count: int = _get_rerollable_count()
-	var next_roll_odds: int = int(round(_estimate_next_reroll_bust_chance(effective_stops, threshold) * 100.0))
-	var projected_odds: int = int(round(bust_odds * 100.0))
-	return "Bust odds (next reroll): %d%%\nProjected odds (current reroll streak): %d%%\nStops: %d/%d (shields: %d)\nRerollable dice: %d | Rerolls taken: %d" % [
-		next_roll_odds,
-		projected_odds,
+	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
+	return _risk_estimator.build_risk_details(
 		effective_stops,
-		threshold,
 		shield_count,
+		threshold,
+		next_roll_chance,
+		bust_odds,
 		rerollable_count,
-		_reroll_count,
-	]
+		_reroll_count
+	)
 
 ## Sync the i-th PhysicsDie's visual flags to match RollPhase tracking state.
 func _sync_arena_die_state(index: int) -> void:
