@@ -3,7 +3,7 @@ extends PanelContainer
 ## Full-screen branching stage map. Player picks a node in the current row.
 ## Call open() and listen for node_selected.
 
-signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType)
+signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
@@ -20,10 +20,12 @@ const VISITED_ALPHA: float = 0.30
 const FUTURE_ALPHA: float = 0.22
 const UNREACHABLE_ALPHA: float = 0.35
 const CURRENT_ROW_GLOW: Color = Color("#00E5FF")
+const REROUTE_GLOW: Color = Color("#FFB347")
 const ICON_FONT_SIZE: int = 24
 const LABEL_FONT_SIZE: int = 11
 
 @onready var _backdrop: ColorRect = $Backdrop
+@onready var _content: VBoxContainer = $MarginContainer/VBoxContainer
 @onready var _title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var _map_area: Control = $MarginContainer/VBoxContainer/MapArea
 @onready var _hint_label: Label = $MarginContainer/VBoxContainer/HintLabel
@@ -34,20 +36,27 @@ var _current_col: int = -1
 var _node_buttons: Array = []  # Array of Array[Button]
 var _connection_lines: Array[Line2D] = []
 var _pending_open: bool = false
+var _reroute_button: Button = null
+var _reroute_uses: int = 0
+var _reroute_enabled: bool = false
 
 
 func _ready() -> void:
 	visible = false
 	_apply_theme_styling()
+	_ensure_reroute_button()
 	_map_area.resized.connect(_on_map_area_resized)
 
 
-func open(stage_map: StageMapData, current_row: int, previous_col: int) -> void:
+func open(stage_map: StageMapData, current_row: int, previous_col: int, reroute_uses: int = 0) -> void:
 	_stage_map = stage_map
 	_current_row = current_row
 	_current_col = previous_col
+	_reroute_uses = reroute_uses if current_row > 0 else 0
+	_reroute_enabled = false
 	_title_label.text = "LOOP %d — Choose Your Path" % GameManager.current_loop
-	_hint_label.text = "Stage %d / %d" % [current_row + 1, StageMapData.ROWS_PER_LOOP]
+	_refresh_hint_label()
+	_refresh_reroute_button()
 	visible = true
 	# Defer rebuild so the layout pass resolves _map_area.size first.
 	_pending_open = true
@@ -59,6 +68,23 @@ func open(stage_map: StageMapData, current_row: int, previous_col: int) -> void:
 func _on_map_area_resized() -> void:
 	if visible and _stage_map != null and not _pending_open:
 		_rebuild_map()
+
+
+func try_consume_reroute_for(row: int, col: int) -> bool:
+	if not _reroute_enabled:
+		return false
+	if _is_reachable_without_reroute(row, col):
+		_reroute_enabled = false
+		_refresh_hint_label()
+		_refresh_reroute_button()
+		return false
+	if _reroute_uses <= 0:
+		return false
+	_reroute_uses -= 1
+	_reroute_enabled = false
+	_refresh_hint_label()
+	_refresh_reroute_button()
+	return true
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +201,8 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
 
 	if node.visited:
 		_style_visited(style, btn, node_color)
+	elif row == _current_row and _reroute_enabled and not _is_reachable_without_reroute(row, col):
+		_style_reroute(style, btn, row, col, node.type)
 	elif row == _current_row and _can_reach(row, col):
 		_style_active(style, btn, node_color, row, col, node.type)
 	elif row == _current_row:
@@ -229,6 +257,22 @@ func _style_active(style: StyleBoxFlat, btn: Button, _color: Color, row: int, co
 	btn.add_theme_stylebox_override("hover", hover_style)
 
 
+func _style_reroute(style: StyleBoxFlat, btn: Button, row: int, col: int, ntype: MapNodeData.NodeType) -> void:
+	style.bg_color = Color(_UITheme.ELEVATED, 0.9)
+	style.border_color = REROUTE_GLOW
+	style.set_border_width_all(3)
+	btn.disabled = false
+	var r: int = row
+	var c: int = col
+	var t: MapNodeData.NodeType = ntype
+	btn.pressed.connect(func() -> void: _on_node_pressed(r, c, t))
+	btn.add_theme_color_override("font_color", REROUTE_GLOW)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	var hover_style: StyleBoxFlat = style.duplicate()
+	hover_style.bg_color = Color(_UITheme.ELEVATED.lightened(0.16), 0.95)
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+
 func _style_unreachable(style: StyleBoxFlat, btn: Button, _color: Color) -> void:
 	style.bg_color = Color(_UITheme.PANEL_SURFACE, 0.6)
 	style.border_color = Color("#444455")
@@ -254,6 +298,12 @@ func _style_past(style: StyleBoxFlat, btn: Button, _color: Color) -> void:
 
 
 func _can_reach(row: int, col: int) -> bool:
+	if row == _current_row and _reroute_enabled:
+		return true
+	return _is_reachable_without_reroute(row, col)
+
+
+func _is_reachable_without_reroute(row: int, col: int) -> bool:
 	if row == 0:
 		return true
 	if _current_col < 0:
@@ -263,10 +313,11 @@ func _can_reach(row: int, col: int) -> bool:
 
 func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> void:
 	var node: MapNodeData = _stage_map.get_node_at(row, col)
+	var used_reroute: bool = try_consume_reroute_for(row, col)
 	if node:
 		node.visited = true
 	visible = false
-	node_selected.emit(row, col, node_type)
+	node_selected.emit(row, col, node_type, used_reroute)
 
 
 # ---------------------------------------------------------------------------
@@ -285,3 +336,42 @@ func _apply_theme_styling() -> void:
 	_hint_label.add_theme_font_override("font", _UITheme.font_mono())
 	_hint_label.add_theme_font_size_override("font_size", 16)
 	_hint_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+
+
+func _ensure_reroute_button() -> void:
+	if _reroute_button != null:
+		return
+	_reroute_button = Button.new()
+	_reroute_button.text = "Preview Reroute"
+	_reroute_button.custom_minimum_size = Vector2(0, 40)
+	_reroute_button.focus_mode = Control.FOCUS_NONE
+	_reroute_button.add_theme_font_override("font", _UITheme.font_display())
+	_reroute_button.add_theme_font_size_override("font_size", 12)
+	_reroute_button.pressed.connect(_on_reroute_button_pressed)
+	_content.add_child(_reroute_button)
+
+
+func _refresh_hint_label() -> void:
+	var base_text: String = "Stage %d / %d" % [_current_row + 1, StageMapData.ROWS_PER_LOOP]
+	if _reroute_enabled:
+		_hint_label.text = "%s  |  Reroute preview active: token spends only if you break path" % base_text
+	elif _reroute_uses > 0:
+		_hint_label.text = "%s  |  %d reroute token%s ready" % [base_text, _reroute_uses, "" if _reroute_uses == 1 else "s"]
+	else:
+		_hint_label.text = base_text
+
+
+func _refresh_reroute_button() -> void:
+	if _reroute_button == null:
+		return
+	_reroute_button.visible = _reroute_uses > 0
+	_reroute_button.text = "Cancel Reroute Preview" if _reroute_enabled else "Preview Reroute (%d)" % _reroute_uses
+
+
+func _on_reroute_button_pressed() -> void:
+	if _reroute_uses <= 0:
+		return
+	_reroute_enabled = not _reroute_enabled
+	_refresh_hint_label()
+	_refresh_reroute_button()
+	_rebuild_map()

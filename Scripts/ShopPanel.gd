@@ -16,6 +16,13 @@ const DOUBLE_DOWN_MIN_GOLD: int = 10
 
 var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
 var _ShopItemCardScene: PackedScene = preload("res://Scenes/ShopItemCard.tscn")
+const INSURANCE_BET_MIN_GOLD: int = 10
+const HEAT_BET_MIN_GOLD: int = 15
+const EVEN_ODD_BET_MIN_GOLD: int = 5
+
+var _InsuranceBetScene: PackedScene = preload("res://Scenes/InsuranceBetOverlay.tscn")
+var _HeatBetScene: PackedScene = preload("res://Scenes/HeatBetOverlay.tscn")
+var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn")
 
 @onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
@@ -38,6 +45,12 @@ var _price_labels: Array[Label] = []
 var _double_down_desc_label: Label = null
 var _double_down_overlay: DoubleDownOverlay = null
 var _dd_used_this_shop: bool = false
+var _insurance_overlay: InsuranceBetOverlay = null
+var _heat_overlay: HeatBetOverlay = null
+var _even_odd_overlay: EvenOddBetOverlay = null
+var _ib_used_this_shop: bool = false
+var _hb_used_this_shop: bool = false
+var _eo_used_this_shop: bool = false
 
 
 func _ready() -> void:
@@ -55,6 +68,9 @@ func _ready() -> void:
 func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	GameManager.on_shop_entered()
 	_dd_used_this_shop = false
+	_ib_used_this_shop = false
+	_hb_used_this_shop = false
+	_eo_used_this_shop = false
 	if is_loop_complete:
 		_title_label.text = "LOOP %d COMPLETE" % (GameManager.current_loop - 1)
 		_continue_button.text = "Start Loop %d" % GameManager.current_loop
@@ -127,7 +143,7 @@ func _generate_items() -> void:
 		ShopItemData.make_buy_pink_die(),
 		ShopItemData.make_buy_fortune_die(),
 	]
-	if GameManager.current_loop >= 2:
+	if GameManager.current_loop >= 2 or GameManager.prestige_shop_tier_active:
 		dice_pool.append(ShopItemData.make_buy_runner_die())
 		dice_pool.append(ShopItemData.make_buy_golden_die())
 		dice_pool.append(ShopItemData.make_buy_insurance_die())
@@ -145,6 +161,12 @@ func _generate_items() -> void:
 		_dice_items.append(ShopItemData.make_cleanse_curse())
 	if GameManager.gold >= DOUBLE_DOWN_MIN_GOLD and not _dd_used_this_shop:
 		_dice_items.append(ShopItemData.make_double_down())
+	if GameManager.gold >= INSURANCE_BET_MIN_GOLD and not _ib_used_this_shop:
+		_dice_items.append(ShopItemData.make_insurance_bet())
+	if GameManager.gold >= HEAT_BET_MIN_GOLD and not _hb_used_this_shop:
+		_dice_items.append(ShopItemData.make_heat_bet())
+	if GameManager.gold >= EVEN_ODD_BET_MIN_GOLD and not _eo_used_this_shop:
+		_dice_items.append(ShopItemData.make_even_odd_bet())
 
 	if GameManager.can_add_modifier():
 		var mod_factories: Array[Callable] = RunModifier.all_factories()
@@ -215,6 +237,10 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
 		buy_button.text = "Play"
 		_double_down_desc_label = desc_label
+	elif item.item_type == ShopItemData.ItemType.INSURANCE_BET or \
+		item.item_type == ShopItemData.ItemType.HEAT_BET or \
+		item.item_type == ShopItemData.ItemType.EVEN_ODD_BET:
+		buy_button.text = "Play"
 	else:
 		buy_button.text = "Buy"
 	buy_button.custom_minimum_size = Vector2(120, 44)
@@ -249,6 +275,12 @@ func _item_accent_color(item: ShopItemData) -> Color:
 			return _UITheme.NEON_PURPLE
 		ShopItemData.ItemType.DOUBLE_DOWN:
 			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.INSURANCE_BET:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.HEAT_BET:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.EVEN_ODD_BET:
+			return _UITheme.EXPLOSION_ORANGE
 		ShopItemData.ItemType.UPGRADE_DIE:
 			return _UITheme.ACTION_CYAN
 		ShopItemData.ItemType.CLEANSE_CURSE:
@@ -261,10 +293,15 @@ func _item_accent_color(item: ShopItemData) -> Color:
 # ---------------------------------------------------------------------------
 
 func _on_buy_pressed(item: ShopItemData) -> void:
-	if item.item_type != ShopItemData.ItemType.DOUBLE_DOWN:
+	var is_overlay_bet: bool = item.item_type == ShopItemData.ItemType.DOUBLE_DOWN \
+		or item.item_type == ShopItemData.ItemType.INSURANCE_BET \
+		or item.item_type == ShopItemData.ItemType.HEAT_BET \
+		or item.item_type == ShopItemData.ItemType.EVEN_ODD_BET
+	if not is_overlay_bet:
 		if not GameManager.spend_gold(item.cost):
 			return
-	GameManager.track_shop_spend(item.cost)
+	if item.cost > 0 and not is_overlay_bet:
+		GameManager.track_shop_spend(item.cost)
 	SFXManager.play_shop_purchase()
 
 	match item.item_type:
@@ -299,6 +336,15 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			_cleanse_random_cursed_die()
 		ShopItemData.ItemType.DOUBLE_DOWN:
 			_open_double_down()
+			return
+		ShopItemData.ItemType.INSURANCE_BET:
+			_open_insurance_bet()
+			return
+		ShopItemData.ItemType.HEAT_BET:
+			_open_heat_bet()
+			return
+		ShopItemData.ItemType.EVEN_ODD_BET:
+			_open_even_odd_bet()
 			return
 
 	_refresh_display()
@@ -436,5 +482,74 @@ func _on_double_down_resolved() -> void:
 	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
 		_double_down_overlay.queue_free()
 		_double_down_overlay = null
+	_generate_items()
+	_refresh_display()
+
+
+func _open_insurance_bet() -> void:
+	if _insurance_overlay != null and is_instance_valid(_insurance_overlay):
+		_insurance_overlay.queue_free()
+	var gold_before: int = GameManager.gold
+	_insurance_overlay = _InsuranceBetScene.instantiate() as InsuranceBetOverlay
+	add_child(_insurance_overlay)
+	_insurance_overlay.resolved.connect(func() -> void:
+		_on_insurance_bet_resolved(gold_before)
+	)
+	_insurance_overlay.open()
+
+
+func _on_insurance_bet_resolved(gold_before: int) -> void:
+	if _insurance_overlay != null and is_instance_valid(_insurance_overlay):
+		_insurance_overlay.queue_free()
+		_insurance_overlay = null
+	if GameManager.gold < gold_before:
+		GameManager.track_shop_spend(gold_before - GameManager.gold)
+		_ib_used_this_shop = true
+	_generate_items()
+	_refresh_display()
+
+
+func _open_heat_bet() -> void:
+	if _heat_overlay != null and is_instance_valid(_heat_overlay):
+		_heat_overlay.queue_free()
+	var gold_before: int = GameManager.gold
+	_heat_overlay = _HeatBetScene.instantiate() as HeatBetOverlay
+	add_child(_heat_overlay)
+	_heat_overlay.resolved.connect(func() -> void:
+		_on_heat_bet_resolved(gold_before)
+	)
+	_heat_overlay.open()
+
+
+func _on_heat_bet_resolved(gold_before: int) -> void:
+	if _heat_overlay != null and is_instance_valid(_heat_overlay):
+		_heat_overlay.queue_free()
+		_heat_overlay = null
+	if GameManager.gold < gold_before:
+		GameManager.track_shop_spend(gold_before - GameManager.gold)
+		_hb_used_this_shop = true
+	_generate_items()
+	_refresh_display()
+
+
+func _open_even_odd_bet() -> void:
+	if _even_odd_overlay != null and is_instance_valid(_even_odd_overlay):
+		_even_odd_overlay.queue_free()
+	var gold_before: int = GameManager.gold
+	_even_odd_overlay = _EvenOddBetScene.instantiate() as EvenOddBetOverlay
+	add_child(_even_odd_overlay)
+	_even_odd_overlay.resolved.connect(func() -> void:
+		_on_even_odd_bet_resolved(gold_before)
+	)
+	_even_odd_overlay.open()
+
+
+func _on_even_odd_bet_resolved(gold_before: int) -> void:
+	if _even_odd_overlay != null and is_instance_valid(_even_odd_overlay):
+		_even_odd_overlay.queue_free()
+		_even_odd_overlay = null
+	if GameManager.gold < gold_before:
+		GameManager.track_shop_spend(gold_before - GameManager.gold)
+		_eo_used_this_shop = true
 	_generate_items()
 	_refresh_display()
