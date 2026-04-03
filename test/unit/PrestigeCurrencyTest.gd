@@ -2,12 +2,23 @@ extends GdUnitTestSuite
 ## Unit tests for prestige currency and unlock purchasing in SaveManager.
 
 var _sm
+var _original_prestige_currency: int = 0
+var _original_prestige_unlocks: Array[String] = []
 
 
 func before_test() -> void:
-	_sm = auto_free(preload("res://Scripts/SaveManager.gd").new())
+	_sm = SaveManager
+	_original_prestige_currency = _sm.prestige_currency
+	_original_prestige_unlocks = _sm.prestige_unlocks.duplicate()
+	var empty_unlocks: Array[String] = []
 	_sm.prestige_currency = 0
-	_sm.prestige_unlocks = []
+	_sm.prestige_unlocks = empty_unlocks
+
+
+func after_test() -> void:
+	var restored_unlocks: Array[String] = _original_prestige_unlocks.duplicate()
+	_sm.prestige_currency = _original_prestige_currency
+	_sm.prestige_unlocks = restored_unlocks
 
 
 func test_calculate_prestige_earnings() -> void:

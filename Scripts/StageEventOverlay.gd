@@ -222,7 +222,11 @@ func _on_choice_made(chose_blessing: bool) -> void:
 	close_tween.parallel().tween_property(_card_panel, "modulate:a", 0.0, 0.2)
 	var summary: String = _build_effect_summary(chosen_event)
 	var status_color: Color = _UITheme.SUCCESS_GREEN if chose_blessing else _UITheme.DANGER_RED
-	close_tween.tween_callback(func() -> void: event_resolved.emit(summary, status_color))
+	close_tween.tween_callback(_emit_event_resolved.bind(summary, status_color))
+
+
+func _emit_event_resolved(summary: String, status_color: Color) -> void:
+	event_resolved.emit(summary, status_color)
 
 
 # ---------------------------------------------------------------------------

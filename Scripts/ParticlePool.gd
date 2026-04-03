@@ -76,9 +76,14 @@ func release_after(emitter: CPUParticles2D, delay: float) -> void:
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return
-	tree.create_timer(delay).timeout.connect(func() -> void:
-		_return_emitter(emitter)
-	)
+	tree.create_timer(delay).timeout.connect(_return_emitter_after_timeout.bind(emitter))
+
+
+func _return_emitter_after_timeout(emitter: Variant) -> void:
+	if emitter == null or not is_instance_valid(emitter):
+		_active_count = max(_active_count - 1, 0)
+		return
+	_return_emitter(emitter as CPUParticles2D)
 
 
 func _return_emitter(emitter: CPUParticles2D) -> void:

@@ -54,9 +54,9 @@ const SPACE_XXL: int = 48
 # ---------------------------------------------------------------------------
 # Component Tokens
 # ---------------------------------------------------------------------------
-const CORNER_RADIUS_CARD: int  = 0
-const CORNER_RADIUS_BADGE: int = 0
-const CORNER_RADIUS_MODAL: int = 0
+const CORNER_RADIUS_CARD: int  = 12
+const CORNER_RADIUS_BADGE: int = 8
+const CORNER_RADIUS_MODAL: int = 12
 const TOUCH_TARGET_MIN: int    = 44
 const BUTTON_HEIGHT: int       = 56
 const SHADOW_DEPTH: int        = 4
@@ -145,7 +145,7 @@ static func get_rarity_color(rarity_value: int) -> Color:
 # ---------------------------------------------------------------------------
 
 ## Dark flat panel with optional border.
-static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_RADIUS_CARD, border_color: Color = MACHINE_BORDER_CYAN, border_width: int = MACHINE_BORDER_WIDTH) -> StyleBoxFlat:
+static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_RADIUS_CARD, border_color: Color = MACHINE_BORDER_CYAN, border_width: int = 0) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.corner_radius_top_left = corner

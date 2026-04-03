@@ -665,11 +665,14 @@ func _on_mouse_exited() -> void:
 			_popup_tween.kill()
 		_popup_tween = _name_popup.create_tween()
 		_popup_tween.tween_property(_name_popup, "modulate:a", 0.0, NAME_POPUP_FADE_DURATION)
-		_popup_tween.tween_callback(func() -> void:
-			_name_popup.visible = false
-		)
+		_popup_tween.tween_callback(_hide_name_popup)
 	_animate_hover(Vector2.ONE)
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+
+
+func _hide_name_popup() -> void:
+	if _name_popup != null:
+		_name_popup.visible = false
 
 
 func _animate_hover(target_scale: Vector2) -> void:
@@ -1076,37 +1079,39 @@ func _play_explode_wobble() -> void:
 	var base_face: Vector2 = _face_label.position if _face_label else Vector2.ZERO
 	var base_glyph: Vector2 = _glyph_label.position if _glyph_label else Vector2.ZERO
 	var wobble: Tween = create_tween()
-	wobble.tween_callback(func() -> void:
-		_bg_panel.position = base_bg + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
-		if _face_label:
-			_face_label.position = base_face + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
-		if _glyph_label:
-			_glyph_label.position = base_glyph + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
+	wobble.tween_callback(
+		_apply_explode_wobble_positions.bind(
+			base_bg + Vector2(-EXPLODE_WOBBLE_OFFSET, 0),
+			base_face + Vector2(-EXPLODE_WOBBLE_OFFSET, 0),
+			base_glyph + Vector2(-EXPLODE_WOBBLE_OFFSET, 0)
+		)
 	)
 	wobble.tween_interval(EXPLODE_WOBBLE_STEP)
-	wobble.tween_callback(func() -> void:
-		_bg_panel.position = base_bg + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
-		if _face_label:
-			_face_label.position = base_face + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
-		if _glyph_label:
-			_glyph_label.position = base_glyph + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
+	wobble.tween_callback(
+		_apply_explode_wobble_positions.bind(
+			base_bg + Vector2(EXPLODE_WOBBLE_OFFSET, 0),
+			base_face + Vector2(EXPLODE_WOBBLE_OFFSET, 0),
+			base_glyph + Vector2(EXPLODE_WOBBLE_OFFSET, 0)
+		)
 	)
 	wobble.tween_interval(EXPLODE_WOBBLE_STEP)
-	wobble.tween_callback(func() -> void:
-		_bg_panel.position = base_bg + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
-		if _face_label:
-			_face_label.position = base_face + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
-		if _glyph_label:
-			_glyph_label.position = base_glyph + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
+	wobble.tween_callback(
+		_apply_explode_wobble_positions.bind(
+			base_bg + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0),
+			base_face + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0),
+			base_glyph + Vector2(-EXPLODE_WOBBLE_OFFSET * 0.6, 0)
+		)
 	)
 	wobble.tween_interval(EXPLODE_WOBBLE_STEP)
-	wobble.tween_callback(func() -> void:
-		_bg_panel.position = base_bg
-		if _face_label:
-			_face_label.position = base_face
-		if _glyph_label:
-			_glyph_label.position = base_glyph
-	)
+	wobble.tween_callback(_apply_explode_wobble_positions.bind(base_bg, base_face, base_glyph))
+
+
+func _apply_explode_wobble_positions(bg_position: Vector2, face_position: Vector2, glyph_position: Vector2) -> void:
+	_bg_panel.position = bg_position
+	if _face_label:
+		_face_label.position = face_position
+	if _glyph_label:
+		_glyph_label.position = glyph_position
 
 
 func _play_visual_offset_pulse(offset_y: float, duration: float) -> void:

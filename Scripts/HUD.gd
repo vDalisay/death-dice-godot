@@ -302,9 +302,13 @@ func animate_score_count(old_value: int, new_value: int) -> void:
 		_score_tween.kill()
 	_score_tween = create_tween()
 	_score_tween.tween_method(
-		func(val: float) -> void: score_label.text = "Total: %d" % int(val),
+		_set_total_score_label,
 		float(old_value), float(new_value), SCORE_COUNT_DURATION
 	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+
+func _set_total_score_label(value: float) -> void:
+	score_label.text = "Total: %d" % int(value)
 
 
 func show_floating_gold(amount: int) -> void:
@@ -418,9 +422,14 @@ func _on_gold_changed(new_gold: int) -> void:
 		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, new_gold]
 		return
 	_gold_tween = create_tween()
-	_gold_tween.tween_method(func(v: float) -> void:
-		gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(v)]
-	, float(from_val), float(new_gold), GOLD_COUNT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_gold_tween.tween_method(
+		_set_gold_label_value,
+		float(from_val), float(new_gold), GOLD_COUNT_DURATION
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _set_gold_label_value(value: float) -> void:
+	gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(value)]
 
 
 func _on_luck_changed(_new_luck: int) -> void:
@@ -502,9 +511,11 @@ func _animate_progress_bar_to(target_value: float) -> void:
 	var duration: float = lerpf(PROGRESS_LERP_MIN_DURATION, PROGRESS_LERP_DURATION, delta / 100.0)
 	_progress_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_progress_tween.tween_method(_set_progress_bar_value, progress_bar.value, target_value, duration)
-	_progress_tween.finished.connect(func() -> void:
-		_progress_tween = null
-	)
+	_progress_tween.finished.connect(_clear_progress_tween)
+
+
+func _clear_progress_tween() -> void:
+	_progress_tween = null
 
 
 func _stop_progress_tween() -> void:

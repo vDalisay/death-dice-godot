@@ -5,7 +5,7 @@ extends PanelContainer
 signal closed()
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
-const PrestigePanelScene: PackedScene = preload("res://Scenes/PrestigePanel.tscn")
+const PRESTIGE_PANEL_SCENE_PATH: String = "res://Scenes/PrestigePanel.tscn"
 
 const CARD_WIDTH: int = 140
 const CARD_HEIGHT: int = 120
@@ -246,10 +246,12 @@ func _count_up_card(refs: _StatCardRefs) -> void:
 		_show_best_badge(refs)
 		return
 	var count_tween: Tween = create_tween()
-	count_tween.tween_method(func(val: float) -> void:
-		value_label.text = str(int(val))
-	, 0.0, float(target), COUNT_DURATION)
+	count_tween.tween_method(_set_stat_card_value.bind(value_label), 0.0, float(target), COUNT_DURATION)
 	count_tween.tween_callback(_show_best_badge.bind(refs))
+
+
+func _set_stat_card_value(value_label: Label, value: float) -> void:
+	value_label.text = str(int(value))
 
 
 func _show_best_badge(refs: _StatCardRefs) -> void:
@@ -272,5 +274,8 @@ func _add_prestige_button() -> void:
 
 
 func _on_prestige_pressed() -> void:
-	var panel: PrestigePanel = PrestigePanelScene.instantiate() as PrestigePanel
+	var panel_scene: PackedScene = load(PRESTIGE_PANEL_SCENE_PATH) as PackedScene
+	if panel_scene == null:
+		return
+	var panel: Node = panel_scene.instantiate()
 	add_child(panel)

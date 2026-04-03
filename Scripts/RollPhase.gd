@@ -982,12 +982,14 @@ func _release_roll_animation_lock(delay: float = 0.0) -> void:
 		_is_roll_animating = false
 		_sync_buttons()
 		return
-	get_tree().create_timer(delay).timeout.connect(func() -> void:
-		if nonce != _roll_anim_nonce:
-			return
-		_is_roll_animating = false
-		_sync_buttons()
-	)
+	get_tree().create_timer(delay).timeout.connect(_complete_roll_animation_lock.bind(nonce))
+
+
+func _complete_roll_animation_lock(nonce: int) -> void:
+	if nonce != _roll_anim_nonce:
+		return
+	_is_roll_animating = false
+	_sync_buttons()
 
 
 func _get_rerollable_count() -> int:
@@ -1005,11 +1007,12 @@ func _schedule_auto_advance(after_delay: float = 0.0) -> void:
 	if not _run_active:
 		return
 	var total_delay: float = after_delay + AUTO_ADVANCE_DELAY
-	get_tree().create_timer(total_delay).timeout.connect(
-		func() -> void:
-			if turn_state == TurnState.BANKED or turn_state == TurnState.BUST:
-				_start_new_turn()
-	)
+	get_tree().create_timer(total_delay).timeout.connect(_auto_advance_turn)
+
+
+func _auto_advance_turn() -> void:
+	if turn_state == TurnState.BANKED or turn_state == TurnState.BUST:
+		_start_new_turn()
 
 
 ## Play left-to-right per-die score popups, then the total score tween.
@@ -1059,22 +1062,28 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 			interval = maxf(interval, 0.01)  # Floor to prevent zero-delay.
 		elapsed += interval
 		last_interval = interval
-		tween.tween_callback(func() -> void:
-			var score_die: PhysicsDie = dice_arena.get_die(die_i)
-			var score_face: DiceFaceData = current_results[die_i]
-			if score_die:
-				var popup_color: Color = PhysicsDie.face_type_color(score_face.type) if score_face else _UITheme.SCORE_GOLD
-				score_die.show_score_popup(die_score, popup_color)
-				score_die.pop()
-			SFXManager.play_score_tick(tick_step)
-			hud.animate_score_count(_old, _new)
+		tween.tween_callback(
+			_play_score_tick_animation.bind(die_i, die_score, tick_step, _old, _new)
 		).set_delay(interval)
 		running = new_running
 	# After all per-die popups, show floating gold.
-	tween.tween_callback(func() -> void:
-		hud.show_floating_gold(new_total - old_total)
-	).set_delay(last_interval)
+	tween.tween_callback(_show_floating_gold_delta.bind(new_total - old_total)).set_delay(last_interval)
 	return elapsed + last_interval
+
+
+func _play_score_tick_animation(die_index: int, die_score: int, tick_step: int, old_total: int, new_total: int) -> void:
+	var score_die: PhysicsDie = dice_arena.get_die(die_index)
+	var score_face: DiceFaceData = current_results[die_index]
+	if score_die:
+		var popup_color: Color = PhysicsDie.face_type_color(score_face.type) if score_face else _UITheme.SCORE_GOLD
+		score_die.show_score_popup(die_score, popup_color)
+		score_die.pop()
+	SFXManager.play_score_tick(tick_step)
+	hud.animate_score_count(old_total, new_total)
+
+
+func _show_floating_gold_delta(amount: int) -> void:
+	hud.show_floating_gold(amount)
 
 
 ## Structured bank cascade checkpoints layered on top of per-die tally.
@@ -1082,22 +1091,38 @@ func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: in
 	var anim_duration: float = _play_score_count_animation(old_total, new_total)
 	var checkpoint_tween: Tween = create_tween()
 	if _triggered_combo_ids.size() > 0:
-		checkpoint_tween.tween_callback(func() -> void:
-			hud.show_status("COMBO BONUS!", _UITheme.ROSE_ACCENT)
+		checkpoint_tween.tween_callback(
+			_show_hud_status.bind("COMBO BONUS!", _UITheme.ROSE_ACCENT)
 		).set_delay(BANK_CASCADE_STEP_DELAY)
 	if multiplier > 1:
-		checkpoint_tween.tween_callback(func() -> void:
-			hud.show_status("MULTIPLIER x%d!" % multiplier, _UITheme.SCORE_GOLD)
-			SFXManager.play_score_tick()
+		checkpoint_tween.tween_callback(
+			_show_multiplier_status.bind(multiplier)
 		).set_delay(BANK_CASCADE_STEP_DELAY)
 	if streak_multiplier > 1.0:
-		checkpoint_tween.tween_callback(func() -> void:
-			hud.show_status("HOT STREAK x%.1f!" % streak_multiplier, _UITheme.EXPLOSION_ORANGE)
+		checkpoint_tween.tween_callback(
+			_show_hot_streak_status.bind(streak_multiplier)
 		).set_delay(BANK_CASCADE_STEP_DELAY)
-	checkpoint_tween.tween_callback(func() -> void:
-		hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
+	checkpoint_tween.tween_callback(
+		_show_total_locked_status.bind(new_total)
 	).set_delay(BANK_CASCADE_STEP_DELAY)
 	return anim_duration
+
+
+func _show_hud_status(message: String, color: Color) -> void:
+	hud.show_status(message, color)
+
+
+func _show_multiplier_status(multiplier: int) -> void:
+	hud.show_status("MULTIPLIER x%d!" % multiplier, _UITheme.SCORE_GOLD)
+	SFXManager.play_score_tick()
+
+
+func _show_hot_streak_status(streak_multiplier: float) -> void:
+	hud.show_status("HOT STREAK x%.1f!" % streak_multiplier, _UITheme.EXPLOSION_ORANGE)
+
+
+func _show_total_locked_status(new_total: int) -> void:
+	hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
 
 
 func _play_multiply_face_vfx() -> void:
@@ -1156,10 +1181,12 @@ func _spawn_jackpot_confetti() -> void:
 	confetti.position = Vector2(size.x / 2.0, size.y * 0.3)
 	add_child(confetti)
 	confetti.emitting = true
-	get_tree().create_timer(JACKPOT_CONFETTI_LIFETIME + 0.5).timeout.connect(func() -> void:
-		if is_instance_valid(confetti):
-			confetti.queue_free()
-	)
+	get_tree().create_timer(JACKPOT_CONFETTI_LIFETIME + 0.5).timeout.connect(_queue_free_if_valid.bind(confetti))
+
+
+func _queue_free_if_valid(node: Node) -> void:
+	if is_instance_valid(node):
+		node.queue_free()
 
 
 func _show_bust_overlay(effective_stops: int) -> void:
@@ -1204,20 +1231,24 @@ func _show_stage_clear_overlay(bonus_gold: int, surplus: int, is_loop: bool) -> 
 	var overlay: ColorRect = StageClearedScene.instantiate() as ColorRect
 	add_child(overlay)
 	overlay.call("setup", bonus_gold, surplus, is_loop)
-	overlay.connect("proceed_requested", func() -> void:
-		overlay.queue_free()
-		_show_dice_reward()
-	)
+	overlay.connect("proceed_requested", _on_stage_clear_overlay_proceed.bind(overlay))
+
+
+func _on_stage_clear_overlay_proceed(overlay: ColorRect) -> void:
+	_queue_free_if_valid(overlay)
+	_show_dice_reward()
 
 
 func _show_dice_reward() -> void:
 	var reward_overlay: ColorRect = DiceRewardScene.instantiate() as ColorRect
 	add_child(reward_overlay)
 	reward_overlay.call("open", GameManager.luck)
-	reward_overlay.connect("reward_chosen", func(die: DiceData) -> void:
-		GameManager.add_dice(die)
-		_open_stage_map()
-	)
+	reward_overlay.connect("reward_chosen", _on_reward_chosen)
+
+
+func _on_reward_chosen(die: DiceData) -> void:
+	GameManager.add_dice(die)
+	_open_stage_map()
 
 
 func _maybe_open_forge(is_loop: bool) -> void:
@@ -1241,12 +1272,14 @@ func _show_stage_event() -> void:
 	var event_overlay: ColorRect = StageEventScene.instantiate() as ColorRect
 	add_child(event_overlay)
 	event_overlay.call("open")
-	event_overlay.connect("event_resolved", func(summary: String, status_color: Color) -> void:
-		event_overlay.queue_free()
-		if summary != "":
-			hud.show_status(summary, status_color)
-		_open_stage_map()
-	)
+	event_overlay.connect("event_resolved", _on_stage_event_resolved.bind(event_overlay))
+
+
+func _on_stage_event_resolved(summary: String, status_color: Color, event_overlay: ColorRect) -> void:
+	_queue_free_if_valid(event_overlay)
+	if summary != "":
+		hud.show_status(summary, status_color)
+	_open_stage_map()
 
 
 # ---------------------------------------------------------------------------
