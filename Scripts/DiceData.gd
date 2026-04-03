@@ -13,6 +13,9 @@ const MAX_MULTIPLY_LEFT_VALUE: int = 4
 const MAX_LUCK_VALUE: int = 3
 const MAX_CHAIN_ROLLS: int = 10
 
+const DiceUpgradeServiceScript: GDScript = preload("res://Scripts/DiceUpgradeService.gd")
+var _upgrade_service: RefCounted = DiceUpgradeServiceScript.new()
+
 enum Rarity { GREY, GREEN, BLUE, PURPLE }
 
 const RARITY_GREY_COLOR: Color = Color("#888888")
@@ -58,96 +61,15 @@ func has_stop_face() -> bool:
 ## Upgrades the weakest face on this die. Returns true if an upgrade occurred.
 ## Will not remove the last STOP face (balance invariant).
 func upgrade_weakest_face() -> bool:
-	var worst_index: int = -1
-	var worst_power: int = 999
-	for i: int in faces.size():
-		var power: int = _face_power(faces[i])
-		if power < worst_power:
-			# Don't select STOP face if it's the only one remaining
-			if faces[i].type == DiceFaceData.FaceType.STOP and _count_stop_faces() <= 1:
-				continue
-			worst_power = power
-			worst_index = i
-	if worst_index < 0:
-		return false
-	var face: DiceFaceData = faces[worst_index]
-	match face.type:
-		DiceFaceData.FaceType.CURSED_STOP:
-			face.type = DiceFaceData.FaceType.STOP
-		DiceFaceData.FaceType.STOP:
-			face.type = DiceFaceData.FaceType.BLANK
-			face.value = 0
-		DiceFaceData.FaceType.BLANK:
-			face.type = DiceFaceData.FaceType.NUMBER
-			face.value = 1
-		DiceFaceData.FaceType.NUMBER:
-			if face.value >= MAX_FACE_VALUE:
-				face.type = DiceFaceData.FaceType.AUTO_KEEP
-			else:
-				face.value += 1
-		DiceFaceData.FaceType.AUTO_KEEP:
-			if face.value >= MAX_FACE_VALUE:
-				return false
-			face.value += 1
-		DiceFaceData.FaceType.SHIELD:
-			if face.value >= MAX_SHIELD_VALUE:
-				return false
-			face.value += 1
-		DiceFaceData.FaceType.MULTIPLY:
-			if face.value >= MAX_MULTIPLY_VALUE:
-				return false
-			face.value += 1
-		DiceFaceData.FaceType.EXPLODE:
-			if face.value >= MAX_EXPLODE_VALUE:
-				return false
-			face.value += 1
-		DiceFaceData.FaceType.INSURANCE:
-			face.type = DiceFaceData.FaceType.SHIELD
-			face.value = 1
-		DiceFaceData.FaceType.LUCK:
-			if face.value >= MAX_LUCK_VALUE:
-				return false
-			face.value += 1
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			if face.value >= MAX_MULTIPLY_LEFT_VALUE:
-				return false
-			face.value += 1
-	return true
+	return _upgrade_service.upgrade_weakest_face(self)
 
 
 func _face_power(face: DiceFaceData) -> int:
-	match face.type:
-		DiceFaceData.FaceType.CURSED_STOP:
-			return -1
-		DiceFaceData.FaceType.STOP:
-			return 0
-		DiceFaceData.FaceType.BLANK:
-			return 1
-		DiceFaceData.FaceType.NUMBER:
-			return 2 + face.value
-		DiceFaceData.FaceType.SHIELD:
-			return 8 + face.value
-		DiceFaceData.FaceType.INSURANCE:
-			return 10
-		DiceFaceData.FaceType.LUCK:
-			return 6 + face.value
-		DiceFaceData.FaceType.AUTO_KEEP:
-			return 12 + face.value
-		DiceFaceData.FaceType.MULTIPLY:
-			return 18 + face.value
-		DiceFaceData.FaceType.EXPLODE:
-			return 22 + face.value
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return 18 + face.value
-	return 0
+	return _upgrade_service.face_power(face)
 
 
 func _count_stop_faces() -> int:
-	var count: int = 0
-	for face: DiceFaceData in faces:
-		if face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
-			count += 1
-	return count
+	return _upgrade_service.count_stop_faces(faces)
 
 
 # ---------------------------------------------------------------------------
