@@ -182,6 +182,9 @@ func _on_bank_pressed() -> void:
 	var banked: int = int(base_banked * streak_mult * momentum_mult)
 	var old_total: int = GameManager.total_score
 	GameManager.add_score(banked)
+	# Reset momentum after banking (cashes out the bonus).
+	GameManager.momentum = 0
+	GameManager.momentum_changed.emit(GameManager.momentum)
 	# Accumulate LUCK face values for dice reward rarity.
 	_accumulate_luck()
 	# Gambler's Rush: +1g per survived stop.
