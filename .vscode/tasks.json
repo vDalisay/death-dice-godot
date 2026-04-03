@@ -1,26 +1,34 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Install & Build godot-mcp-runtime",
-      "type": "shell",
-      "command": "cd Mcp\\godot-mcp-runtime ; npm install ; npm run build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Run godot-mcp-runtime",
-      "type": "shell",
-      "command": "$env:GODOT_PATH='${input:godotPath}'; $env:DEBUG='true'; node Mcp\\godot-mcp-runtime\\dist\\index.js",
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared" }
-    }
-  ],
-  "inputs": [
-    {
-      "id": "godotPath",
-      "type": "promptString",
-      "description": "Full path to Godot executable (e.g. C:\\Program Files\\Godot\\Godot.exe)",
-      "default": ""
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install & Build godot-mcp-runtime",
+			"type": "shell",
+			"command": "cd Mcp\\godot-mcp-runtime ; npm install ; npm run build",
+			"problemMatcher": []
+		},
+		{
+			"label": "Run godot-mcp-runtime",
+			"type": "shell",
+			"command": "$env:GODOT_PATH='${input:godotPath}'; $env:DEBUG='true'; node Mcp\\godot-mcp-runtime\\dist\\index.js",
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Run GdUnit4 Tests",
+			"type": "shell",
+			"command": "cd . && godot --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://test/ 2>&1 | Tee-Object -FilePath test_output.log"
+		}
+	],
+	"inputs": [
+		{
+			"id": "godotPath",
+			"type": "promptString",
+			"description": "Full path to Godot executable (e.g. C:\\Program Files\\Godot\\Godot.exe)",
+			"default": ""
+		}
+	]
 }

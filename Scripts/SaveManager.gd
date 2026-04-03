@@ -4,6 +4,15 @@ extends Node
 const SAVE_PATH: String = "user://save_data.json"
 const RunSaveDataScript: GDScript = preload("res://Scripts/RunSaveData.gd")
 
+# Mastery milestone definitions: runs_used -> unlock cosmetics
+const MASTERY_MILESTONES: Dictionary = {
+	1: {"level": 1, "cosmetics": []},
+	5: {"level": 2, "cosmetics": ["glow"]},
+	15: {"level": 3, "cosmetics": ["color_shift"]},
+	40: {"level": 4, "cosmetics": ["particle_trail"]},
+	100: {"level": 5, "cosmetics": ["legendary_shine"]},
+}
+
 signal highscore_changed(new_highscore: int)
 
 var highscore: int = 0
@@ -19,6 +28,7 @@ var career_best_loop: int = 0
 var dice_type_counts: Dictionary = {}
 var discovered_dice: Dictionary = {}
 var unlocked_achievements: Dictionary = {}
+var dice_mastery: Dictionary = {}
 
 func _ready() -> void:
 	_load()
@@ -37,6 +47,7 @@ func record_run(run: RunSaveData) -> void:
 	for die_name: String in run.final_dice_names:
 		dice_type_counts[die_name] = int(dice_type_counts.get(die_name, 0)) + 1
 		discover_die(die_name)
+		update_die_mastery_on_run_completion(die_name)
 	if run.score > highscore:
 		highscore = run.score
 		highscore_changed.emit(highscore)
@@ -123,8 +134,62 @@ func get_discovered_count() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Persistence
+# Mastery Progression
 # ---------------------------------------------------------------------------
+
+func update_die_mastery_on_run_completion(die_name: String) -> void:
+	"""Update mastery level and unlock cosmetics for a die after run completion."""
+	if not dice_mastery.has(die_name):
+		dice_mastery[die_name] = {"level": 0, "total_runs_used": 0, "unlocked_cosmetics": []}
+	
+	var mastery: Dictionary = dice_mastery[die_name] as Dictionary
+	mastery["total_runs_used"] = int(mastery.get("total_runs_used", 0)) + 1
+	
+	# Determine new level based on total runs used
+	var new_level: int = 0
+	var newly_unlocked_cosmetics: Array[String] = []
+	
+	for threshold: Variant in MASTERY_MILESTONES.keys():
+		if mastery["total_runs_used"] >= threshold:
+			var milestone: Dictionary = MASTERY_MILESTONES[threshold] as Dictionary
+			new_level = milestone.get("level", 0) as int
+			for cosmetic: Variant in (milestone.get("cosmetics", []) as Array):
+				var cosmetic_name: String = cosmetic as String
+				if not (cosmetic_name in (mastery.get("unlocked_cosmetics", []) as Array)):
+					newly_unlocked_cosmetics.append(cosmetic_name)
+	
+	mastery["level"] = new_level
+	var current_cosmetics: Array = mastery.get("unlocked_cosmetics", []) as Array
+	for cosmetic: String in newly_unlocked_cosmetics:
+		current_cosmetics.append(cosmetic)
+	mastery["unlocked_cosmetics"] = current_cosmetics
+	
+	_save()
+
+
+func get_die_mastery_level(die_name: String) -> int:
+	"""Returns mastery level (0-5) for a die. 0 if not yet mastered."""
+	if not dice_mastery.has(die_name):
+		return 0
+	return int((dice_mastery[die_name] as Dictionary).get("level", 0))
+
+
+func get_die_total_runs_used(die_name: String) -> int:
+	"""Returns total number of runs this die was in the player's final pool."""
+	if not dice_mastery.has(die_name):
+		return 0
+	return int((dice_mastery[die_name] as Dictionary).get("total_runs_used", 0))
+
+
+func is_cosmetic_unlocked(die_name: String, cosmetic: String) -> bool:
+	"""Check if a specific cosmetic is unlocked for a die."""
+	if not dice_mastery.has(die_name):
+		return false
+	var unlocked: Array = (dice_mastery[die_name] as Dictionary).get("unlocked_cosmetics", []) as Array
+	return cosmetic in unlocked
+
+
+
 
 func _save() -> void:
 	var runs_array: Array[Dictionary] = []
@@ -143,6 +208,7 @@ func _save() -> void:
 		"dice_type_counts": dice_type_counts,
 		"discovered_dice": discovered_dice,
 		"unlocked_achievements": unlocked_achievements,
+		"dice_mastery": dice_mastery,
 		"runs": runs_array,
 	}
 	var file: FileAccess = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -174,6 +240,7 @@ func _load() -> void:
 	dice_type_counts = data.get("dice_type_counts", {}) as Dictionary
 	discovered_dice = data.get("discovered_dice", {}) as Dictionary
 	unlocked_achievements = data.get("unlocked_achievements", {}) as Dictionary
+	dice_mastery = data.get("dice_mastery", {}) as Dictionary
 	var runs: Array = data.get("runs", []) as Array
 	run_history.clear()
 	for entry: Variant in runs:
