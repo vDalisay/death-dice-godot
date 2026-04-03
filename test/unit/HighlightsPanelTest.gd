@@ -47,6 +47,21 @@ func test_new_best_badge_exists_when_beating_record() -> void:
 	assert_str(badge.text).contains("NEW BEST")
 
 
+func test_score_card_shows_delta_vs_best() -> void:
+	var panel: HighlightsPanel = auto_free(HighlightsPanelScene.instantiate()) as HighlightsPanel
+	add_child(panel)
+	await await_idle_frame()
+	var run: RunSaveData = _make_run(250, 4, 1, 80, 2, 7)
+	var bests: Dictionary = {"highscore": 200, "best_stages": 3, "best_loop": 1, "best_turn": 70}
+	panel.show_highlights(run, bests)
+	await await_idle_frame()
+	var stat_container: HFlowContainer = panel.find_child("StatCards", true, false) as HFlowContainer
+	var first_card: PanelContainer = stat_container.get_child(0) as PanelContainer
+	var delta: Label = first_card.find_child("DeltaLabel", true, false) as Label
+	assert_object(delta).is_not_null()
+	assert_str(delta.text).contains("+50")
+
+
 func test_close_button_hides_and_emits() -> void:
 	var panel: HighlightsPanel = auto_free(HighlightsPanelScene.instantiate()) as HighlightsPanel
 	add_child(panel)

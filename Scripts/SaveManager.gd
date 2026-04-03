@@ -88,6 +88,12 @@ func get_mode_highscore(mode: int) -> int:
 	return highscore
 
 
+func get_mode_best_loop(mode: int) -> int:
+	if mode == GameManager.RunMode.GAUNTLET:
+		return gauntlet_best_loop
+	return career_best_loop
+
+
 func get_favorite_die_type() -> String:
 	if dice_type_counts.is_empty():
 		return "None"

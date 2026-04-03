@@ -43,6 +43,17 @@ func _format_stat(stat_name: String, value: int, prior_best: int) -> String:
 	return "%s: %d" % [stat_name, value]
 
 
+func _format_delta(value: int, prior_best: int) -> String:
+	if prior_best <= 0:
+		return "First record"
+	var delta: int = value - prior_best
+	if delta > 0:
+		return "+%d vs best" % delta
+	if delta < 0:
+		return "%d vs best" % delta
+	return "Tied best"
+
+
 func _on_close_pressed() -> void:
 	visible = false
 	closed.emit()
@@ -68,13 +79,25 @@ class _StatDef:
 	var value: int
 	var is_best: bool
 	var accent: Color
+	var prior_best: int
+	var show_delta: bool
 
-	func _init(p_name: String, p_icon: String, p_value: int, p_is_best: bool, p_accent: Color) -> void:
+	func _init(
+		p_name: String,
+		p_icon: String,
+		p_value: int,
+		p_is_best: bool,
+		p_accent: Color,
+		p_prior_best: int = 0,
+		p_show_delta: bool = false
+	) -> void:
 		label_name = p_name
 		icon = p_icon
 		value = p_value
 		is_best = p_is_best
 		accent = p_accent
+		prior_best = p_prior_best
+		show_delta = p_show_delta
 
 
 func _build_stat_cards(run: RunSaveData, prior_bests: Dictionary) -> void:
@@ -83,15 +106,24 @@ func _build_stat_cards(run: RunSaveData, prior_bests: Dictionary) -> void:
 		child.queue_free()
 	_stat_card_nodes.clear()
 
+	var score_best: int = prior_bests.get("highscore", 0) as int
+	var stages_best: int = prior_bests.get("best_stages", 0) as int
+	var loop_best: int = prior_bests.get("best_loop", 0) as int
+	var turn_best: int = prior_bests.get("best_turn", 0) as int
+
 	var stats: Array[_StatDef] = []
 	stats.append(_StatDef.new("Score", _UITheme.GLYPH_STAR, run.score,
-		run.score >= (prior_bests.get("highscore", 0) as int) and run.score > 0, _UITheme.SCORE_GOLD))
+		run.score >= score_best and run.score > 0,
+		_UITheme.SCORE_GOLD, score_best, true))
 	stats.append(_StatDef.new("Stages", _UITheme.GLYPH_CHECK, run.stages_cleared,
-		run.stages_cleared >= (prior_bests.get("best_stages", 0) as int) and run.stages_cleared > 0, _UITheme.SUCCESS_GREEN))
+		run.stages_cleared >= stages_best and run.stages_cleared > 0,
+		_UITheme.SUCCESS_GREEN, stages_best, true))
 	stats.append(_StatDef.new("Loops", _UITheme.GLYPH_FIRE, run.loops_completed,
-		run.loops_completed >= (prior_bests.get("best_loop", 0) as int) and run.loops_completed > 0, _UITheme.EXPLOSION_ORANGE))
+		run.loops_completed >= loop_best and run.loops_completed > 0,
+		_UITheme.EXPLOSION_ORANGE, loop_best, true))
 	stats.append(_StatDef.new("Best Turn", _UITheme.GLYPH_EXPLODE, run.best_turn_score,
-		run.best_turn_score >= (prior_bests.get("best_turn", 0) as int) and run.best_turn_score > 0, _UITheme.ROSE_ACCENT))
+		run.best_turn_score >= turn_best and run.best_turn_score > 0,
+		_UITheme.ROSE_ACCENT, turn_best, true))
 	stats.append(_StatDef.new("Busts", _UITheme.GLYPH_STOP, run.busts, false, _UITheme.DANGER_RED))
 	stats.append(_StatDef.new("Final Dice", _UITheme.GLYPH_DIE, run.final_dice_names.size(), false, _UITheme.ACTION_CYAN))
 
@@ -153,6 +185,16 @@ func _create_stat_card(stat: _StatDef) -> PanelContainer:
 	vbox.add_child(value_label)
 	# Store target value as metadata.
 	value_label.set_meta("target_value", stat.value)
+
+	if stat.show_delta:
+		var delta_label := Label.new()
+		delta_label.name = "DeltaLabel"
+		delta_label.text = _format_delta(stat.value, stat.prior_best)
+		delta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		delta_label.add_theme_font_override("font", _UITheme.font_display())
+		delta_label.add_theme_font_size_override("font_size", 8)
+		delta_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+		vbox.add_child(delta_label)
 
 	# "NEW BEST!" badge (initially hidden).
 	if stat.is_best:

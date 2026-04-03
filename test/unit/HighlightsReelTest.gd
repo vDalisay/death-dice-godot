@@ -37,3 +37,19 @@ func test_format_stat_zero_not_best() -> void:
 	var result: String = panel._format_stat("Score", 0, 0)
 	assert_str(result).not_contains("NEW BEST!")
 	panel.free()
+
+
+func test_format_delta_positive() -> void:
+	var panel_script: GDScript = preload("res://Scripts/HighlightsPanel.gd")
+	var panel: HighlightsPanel = panel_script.new()
+	var result: String = panel._format_delta(120, 100)
+	assert_str(result).contains("+20")
+	panel.free()
+
+
+func test_format_delta_tie() -> void:
+	var panel_script: GDScript = preload("res://Scripts/HighlightsPanel.gd")
+	var panel: HighlightsPanel = panel_script.new()
+	var result: String = panel._format_delta(100, 100)
+	assert_str(result).contains("Tied best")
+	panel.free()

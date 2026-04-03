@@ -894,11 +894,11 @@ func _sync_ui() -> void:
 			pass  # Already set in _on_bank_pressed
 
 func _on_run_ended() -> void:
-	# Capture prior career bests BEFORE recording (so highlights compare against pre-run values).
+	# Capture prior bests BEFORE recording (so highlights compare against pre-run values).
 	var prior_bests: Dictionary = {
-		"highscore": SaveManager.highscore,
+		"highscore": SaveManager.get_mode_highscore(int(GameManager.run_mode)),
 		"best_stages": SaveManager.total_stages_cleared,
-		"best_loop": SaveManager.career_best_loop,
+		"best_loop": SaveManager.get_mode_best_loop(int(GameManager.run_mode)),
 		"best_turn": SaveManager.career_best_turn_score,
 	}
 	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
