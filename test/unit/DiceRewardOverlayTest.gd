@@ -2,6 +2,7 @@ extends GdUnitTestSuite
 ## Unit tests for DiceRewardOverlay rarity and dice pool logic.
 
 const OverlayScript: GDScript = preload("res://Scripts/DiceRewardOverlay.gd")
+const OverlayScene: PackedScene = preload("res://Scenes/DiceRewardOverlay.tscn")
 
 
 # ---------------------------------------------------------------------------
@@ -108,3 +109,11 @@ func test_rarity_name_grey() -> void:
 
 func test_rarity_name_purple() -> void:
 	assert_str(OverlayScript._rarity_name(DiceData.Rarity.PURPLE)).is_equal("EPIC")
+
+
+func test_open_builds_three_reward_cards() -> void:
+	var overlay: ColorRect = auto_free(OverlayScene.instantiate()) as ColorRect
+	add_child(overlay)
+	await await_idle_frame()
+	overlay.call("open", 0)
+	assert_int(overlay.get("_cards").size()).is_equal(3)

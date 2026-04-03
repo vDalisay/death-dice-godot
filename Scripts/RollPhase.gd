@@ -90,6 +90,7 @@ const BustRiskEstimatorScript: GDScript = preload("res://Scripts/BustRiskEstimat
 const RollResolutionServiceScript: GDScript = preload("res://Scripts/RollResolutionService.gd")
 const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoordinator.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 
 func _ready() -> void:
 	_turn_score_service = TurnScoreServiceScript.new()
@@ -1030,8 +1031,10 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 		last_interval = interval
 		tween.tween_callback(func() -> void:
 			var score_die: PhysicsDie = dice_arena.get_die(die_i)
+			var score_face: DiceFaceData = current_results[die_i]
 			if score_die:
-				score_die.show_score_popup(die_score)
+				var popup_color: Color = PhysicsDie.face_type_color(score_face.type) if score_face else _UITheme.SCORE_GOLD
+				score_die.show_score_popup(die_score, popup_color)
 				score_die.pop()
 			SFXManager.play_score_tick(tick_step)
 			hud.animate_score_count(_old, _new)
@@ -1226,7 +1229,7 @@ func _open_stage_map() -> void:
 	if GameManager.stage_map == null:
 		GameManager.generate_stage_map()
 	# Check if we've completed all rows (loop complete).
-	if GameManager.current_row >= StageMapData.ROWS_PER_LOOP:
+	if GameManager.current_row >= StageMapDataScript.ROWS_PER_LOOP:
 		_complete_loop()
 		return
 	_roll_content.visible = false

@@ -37,6 +37,9 @@ const FONT_DISPLAY_PATH: String  = "res://Fonts/PressStart2P-Regular.ttf"
 const FONT_STATS_PATH: String    = "res://Fonts/ChakraPetch-Bold.ttf"
 const FONT_BODY_PATH: String     = "res://Fonts/ChakraPetch-Regular.ttf"
 const FONT_MONO_PATH: String     = "res://Fonts/VT323-Regular.ttf"
+const ART_ROOT_PATH: String      = "res://Art/"
+const ART_UI_PATH: String        = ART_ROOT_PATH + "UI/"
+const ART_DICE_PATH: String      = ART_ROOT_PATH + "Dice/"
 
 # ---------------------------------------------------------------------------
 # Spacing Tokens (8dp grid)
@@ -51,12 +54,16 @@ const SPACE_XXL: int = 48
 # ---------------------------------------------------------------------------
 # Component Tokens
 # ---------------------------------------------------------------------------
-const CORNER_RADIUS_CARD: int  = 8
-const CORNER_RADIUS_BADGE: int = 4
-const CORNER_RADIUS_MODAL: int = 16
+const CORNER_RADIUS_CARD: int  = 0
+const CORNER_RADIUS_BADGE: int = 0
+const CORNER_RADIUS_MODAL: int = 0
 const TOUCH_TARGET_MIN: int    = 44
 const BUTTON_HEIGHT: int       = 56
 const SHADOW_DEPTH: int        = 4
+
+const MACHINE_BORDER_WIDTH: int = 2
+const MACHINE_BORDER_CYAN: Color = Color("#00E5FF88")
+const MACHINE_BORDER_DANGER: Color = Color("#FF174488")
 
 # ---------------------------------------------------------------------------
 # Styled Glyphs (replace emoji)
@@ -106,6 +113,21 @@ static func font_mono() -> Font:
 	return _font_mono
 
 
+static func get_panel_frame(id: String) -> Texture2D:
+	var path: String = ART_UI_PATH + "Frames/" + id + ".png"
+	return load(path) as Texture2D if ResourceLoader.exists(path) else null
+
+
+static func get_icon(id: String) -> Texture2D:
+	var path: String = ART_UI_PATH + "Icons/" + id + ".png"
+	return load(path) as Texture2D if ResourceLoader.exists(path) else null
+
+
+static func get_die_sprite(face_id: String, variant: String = "default") -> Texture2D:
+	var path: String = ART_DICE_PATH + face_id.to_lower() + "_" + variant.to_lower() + ".png"
+	return load(path) as Texture2D if ResourceLoader.exists(path) else null
+
+
 # ---------------------------------------------------------------------------
 # Rarity helper  (mirrors DiceData.Rarity enum values)
 # ---------------------------------------------------------------------------
@@ -123,13 +145,16 @@ static func get_rarity_color(rarity_value: int) -> Color:
 # ---------------------------------------------------------------------------
 
 ## Dark flat panel with optional border.
-static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_RADIUS_CARD, border_color: Color = Color.TRANSPARENT, border_width: int = 0) -> StyleBoxFlat:
+static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_RADIUS_CARD, border_color: Color = MACHINE_BORDER_CYAN, border_width: int = MACHINE_BORDER_WIDTH) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.corner_radius_top_left = corner
 	sb.corner_radius_top_right = corner
 	sb.corner_radius_bottom_left = corner
 	sb.corner_radius_bottom_right = corner
+	sb.shadow_color = Color("#05050A")
+	sb.shadow_size = SHADOW_DEPTH
+	sb.shadow_offset = Vector2i(0, 0)
 	if border_width > 0:
 		sb.border_width_left = border_width
 		sb.border_width_right = border_width
@@ -139,11 +164,24 @@ static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_
 	return sb
 
 
-static func apply_modal_panel_style(panel: PanelContainer, border_color: Color, border_width: int = 2, bg: Color = PANEL_SURFACE) -> void:
+static func apply_modal_panel_style(panel: PanelContainer, border_color: Color = MACHINE_BORDER_DANGER, border_width: int = MACHINE_BORDER_WIDTH, bg: Color = PANEL_SURFACE) -> void:
 	panel.add_theme_stylebox_override(
 		"panel",
 		make_panel_stylebox(bg, CORNER_RADIUS_MODAL, border_color, border_width)
 	)
+
+
+static func make_textured_panel_stylebox(frame_id: String, fallback_bg: Color = PANEL_SURFACE) -> StyleBox:
+	var frame: Texture2D = get_panel_frame(frame_id)
+	if frame == null:
+		return make_panel_stylebox(fallback_bg)
+	var sb := StyleBoxTexture.new()
+	sb.texture = frame
+	sb.texture_margin_left = 12.0
+	sb.texture_margin_right = 12.0
+	sb.texture_margin_top = 12.0
+	sb.texture_margin_bottom = 12.0
+	return sb
 
 
 static func apply_label_style(control: Control, font: Font, font_size: int, font_color: Color) -> void:

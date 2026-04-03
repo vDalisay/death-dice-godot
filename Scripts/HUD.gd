@@ -4,6 +4,7 @@ extends VBoxContainer
 ## Redesigned as a compact 3-zone dashboard with themed panels and risk pips.
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
 
 const SCORE_COUNT_DURATION: float = 0.5
@@ -475,7 +476,7 @@ func _on_run_mode_changed(_new_mode: int) -> void:
 
 func _refresh_stage_display() -> void:
 	var loop_text: String = " L%d" % GameManager.current_loop if GameManager.current_loop > 1 else ""
-	var row_count: int = StageMapData.ROWS_PER_LOOP if GameManager.stage_map else GameManager.get_stages_in_current_loop()
+	var row_count: int = StageMapDataScript.ROWS_PER_LOOP if GameManager.stage_map else GameManager.get_stages_in_current_loop()
 	var row_display: int = mini(GameManager.current_row + 1, row_count)
 	var mode_text: String = " [%s]" % GameManager.get_run_mode_name().to_upper() if GameManager.run_mode == GameManager.RunMode.GAUNTLET else ""
 	stage_label.text = "ROW %d/%d%s%s" % [row_display, row_count, loop_text, mode_text]

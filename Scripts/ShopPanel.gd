@@ -9,6 +9,12 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const ITEM_FONT_SIZE: int = 18
 const REFRESH_COST: int = 5
+const MODAL_INTRO_DURATION: float = 0.22
+const CARD_REVEAL_STAGGER: float = 0.06
+const CARD_REVEAL_DURATION: float = 0.2
+const AFFORDABLE_CARD_ALPHA: float = 1.0
+const BLOCKED_CARD_ALPHA: float = 0.58
+const PURCHASE_FLASH_DURATION: float = 0.18
 
 const DICE_SLOTS: int = 4
 const MODIFIER_SLOTS: int = 2
@@ -35,6 +41,7 @@ var _modifier_items: Array[ShopItemData] = []
 var _all_items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
 var _price_labels: Array[Label] = []
+var _card_panels: Array[PanelContainer] = []
 var _double_down_desc_label: Label = null
 var _double_down_overlay: DoubleDownOverlay = null
 var _dd_used_this_shop: bool = false
@@ -64,6 +71,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	_generate_items()
 	_refresh_display()
 	visible = true
+	_play_open_intro()
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +176,7 @@ func _build_item_cards() -> void:
 	_all_items.clear()
 	_buy_buttons.clear()
 	_price_labels.clear()
+	_card_panels.clear()
 
 	_dice_header.visible = not _dice_items.is_empty()
 	for item: ShopItemData in _dice_items:
@@ -232,6 +241,7 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 
 	_buy_buttons.append(buy_button)
 	_price_labels.append(price_label)
+	_card_panels.append(card)
 	return card
 
 
@@ -266,6 +276,7 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			return
 	GameManager.track_shop_spend(item.cost)
 	SFXManager.play_shop_purchase()
+	_play_purchase_feedback(_item_accent_color(item))
 
 	match item.item_type:
 		ShopItemData.ItemType.BUY_STANDARD_DIE:
@@ -347,6 +358,7 @@ func _refresh_buy_buttons() -> void:
 		var blocked: bool = too_expensive or mod_full or already_owned
 		_buy_buttons[i].disabled = blocked
 		_price_labels[i].add_theme_color_override("font_color", _UITheme.DANGER_RED if too_expensive else _UITheme.SCORE_GOLD)
+		_apply_card_affordance(i, blocked, _item_accent_color(item))
 
 	if _double_down_desc_label != null and is_instance_valid(_double_down_desc_label):
 		_double_down_desc_label.text = _dd_desc_text()
@@ -438,3 +450,68 @@ func _on_double_down_resolved() -> void:
 		_double_down_overlay = null
 	_generate_items()
 	_refresh_display()
+
+
+func _play_open_intro() -> void:
+	_backdrop.color.a = 0.0
+	_modal.modulate.a = 0.0
+	_modal.scale = Vector2(1.03, 1.03)
+	var intro: Tween = create_tween()
+	intro.tween_property(_backdrop, "color:a", 0.72, MODAL_INTRO_DURATION)
+	intro.parallel().tween_property(_modal, "modulate:a", 1.0, MODAL_INTRO_DURATION)
+	intro.parallel().tween_property(_modal, "scale", Vector2.ONE, MODAL_INTRO_DURATION).set_ease(Tween.EASE_OUT)
+	for index: int in _card_panels.size():
+		var card: PanelContainer = _card_panels[index]
+		card.modulate.a = 0.0
+		card.position.y += 14.0
+		card.scale = Vector2(0.96, 0.96)
+		intro.tween_callback(Callable(self, "_reveal_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
+
+
+func _reveal_card(card: PanelContainer) -> void:
+	var tween: Tween = create_tween()
+	var end_y: float = card.position.y - 14.0
+	tween.tween_property(card, "modulate:a", 1.0, CARD_REVEAL_DURATION)
+	tween.parallel().tween_property(card, "position:y", end_y, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(card, "scale", Vector2.ONE, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _reveal_card_by_index(index: int) -> void:
+	if index < 0 or index >= _card_panels.size():
+		return
+	var card: PanelContainer = _card_panels[index]
+	if not is_instance_valid(card):
+		return
+	_reveal_card(card)
+
+
+func _apply_card_affordance(index: int, blocked: bool, accent_color: Color) -> void:
+	if index < 0 or index >= _card_panels.size():
+		return
+	var card: PanelContainer = _card_panels[index]
+	card.self_modulate = Color(1.0, 1.0, 1.0, AFFORDABLE_CARD_ALPHA) if not blocked else Color(0.82, 0.82, 0.82, BLOCKED_CARD_ALPHA)
+	card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(
+			_UITheme.ELEVATED,
+			_UITheme.CORNER_RADIUS_CARD,
+			accent_color if not blocked else _UITheme.MUTED_TEXT,
+			2
+		)
+	)
+
+
+func _play_purchase_feedback(accent_color: Color) -> void:
+	var modal_tween: Tween = create_tween()
+	modal_tween.tween_property(_modal, "modulate", Color(1.05, 1.05, 1.05, 1.0), PURCHASE_FLASH_DURATION * 0.5)
+	modal_tween.tween_property(_modal, "modulate", Color.WHITE, PURCHASE_FLASH_DURATION * 0.5)
+	var badge_tween: Tween = create_tween()
+	badge_tween.tween_property(_gold_badge, "scale", Vector2(1.08, 1.08), PURCHASE_FLASH_DURATION * 0.45).set_ease(Tween.EASE_OUT)
+	badge_tween.tween_property(_gold_badge, "scale", Vector2.ONE, PURCHASE_FLASH_DURATION * 0.55).set_ease(Tween.EASE_IN)
+	_gold_label.add_theme_color_override("font_color", accent_color)
+	get_tree().create_timer(PURCHASE_FLASH_DURATION).timeout.connect(_restore_gold_label_color, CONNECT_ONE_SHOT)
+
+
+func _restore_gold_label_color() -> void:
+	if _gold_label != null and is_instance_valid(_gold_label):
+		_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)

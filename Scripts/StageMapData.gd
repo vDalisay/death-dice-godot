@@ -8,8 +8,6 @@ const MIN_NODES_PER_ROW: int = 2
 const MAX_NODES_PER_ROW: int = 3
 const MIN_NORMAL_STAGES: int = 3
 const MAX_NON_COMBAT_PER_TYPE: int = 2
-const StageMapGeneratorScript: GDScript = preload("res://Scripts/StageMapGenerator.gd")
-
 ## The map grid: rows[row_index] is an Array[MapNodeData].
 @export var rows: Array[Array] = []  # Array of Array[MapNodeData]
 
@@ -19,7 +17,7 @@ const StageMapGeneratorScript: GDScript = preload("res://Scripts/StageMapGenerat
 # ---------------------------------------------------------------------------
 
 static func generate(_loop: int) -> StageMapData:
-	return StageMapGeneratorScript.generate(_loop) as StageMapData
+	return _get_stage_map_generator_script().generate(_loop) as StageMapData
 
 
 ## Returns valid connection targets in the next row for a node at (col) in a
@@ -27,17 +25,21 @@ static func generate(_loop: int) -> StageMapData:
 ## Uses proportional mapping: node at position p in current row maps to the
 ## same proportional position in the next row, ±1 column.
 static func _adjacent_candidates(col: int, cur_count: int, next_count: int) -> Array[int]:
-	return StageMapGeneratorScript.adjacent_candidates(col, cur_count, next_count)
+	return _get_stage_map_generator_script().adjacent_candidates(col, cur_count, next_count)
 
 
 ## Find the nearest parent node (by proportional column distance) that could
 ## plausibly connect to target_col in the next row.
 static func _nearest_parent(target_col: int, cur_count: int, next_count: int) -> int:
-	return StageMapGeneratorScript.nearest_parent(target_col, cur_count, next_count)
+	return _get_stage_map_generator_script().nearest_parent(target_col, cur_count, next_count)
 
 
 static func _allocate_node_types(total: int) -> Array[MapNodeData.NodeType]:
-	return StageMapGeneratorScript.allocate_node_types(total)
+	return _get_stage_map_generator_script().allocate_node_types(total)
+
+
+static func _get_stage_map_generator_script() -> GDScript:
+	return load("res://Scripts/StageMapGenerator.gd") as GDScript
 
 
 # ---------------------------------------------------------------------------

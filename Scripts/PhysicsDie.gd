@@ -59,6 +59,10 @@ const LANDING_SLAM_CURVE_EXPONENT: float = 1.3
 const LANDING_SLAM_LATERAL_MAX_OFFSET_X: float = 3.0
 const LANDING_SLAM_DURATION_MIN_FACTOR: float = 0.8
 const LANDING_SLAM_DURATION_MAX_FACTOR: float = 1.25
+const LANDING_DUST_DURATION: float = 0.34
+const LANDING_DUST_AMOUNT_MIN: int = 10
+const LANDING_DUST_AMOUNT_MAX: int = 22
+const FACE_FLASH_DURATION: float = 0.1
 
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
@@ -302,12 +306,15 @@ func pop() -> void:
 		.set_ease(Tween.EASE_IN)
 
 
-func show_score_popup(value: int) -> void:
+func show_score_popup(value: int, popup_color: Color = Color.TRANSPARENT) -> void:
 	var lbl := Label.new()
 	lbl.text = "+%d" % value
 	lbl.add_theme_font_override("font", _UITheme.font_stats())
 	lbl.add_theme_font_size_override("font_size", 20)
-	lbl.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	var resolved_color: Color = popup_color if popup_color != Color.TRANSPARENT else _get_current_face_feedback_color()
+	lbl.add_theme_color_override("font_color", resolved_color)
+	lbl.add_theme_color_override("font_outline_color", Color("#05050A"))
+	lbl.add_theme_constant_override("outline_size", 5)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.top_level = true
 	lbl.size = Vector2(64, 24)
@@ -877,6 +884,8 @@ func _play_settle_accent(peak_speed: float) -> void:
 	_scale_tween.tween_property(self, "scale", Vector2.ONE, slam_duration * 0.55) \
 		.set_ease(Tween.EASE_IN)
 	_play_visual_offset_pulse_xy(lateral_offset_x, slam_offset, slam_duration)
+	_flash_face_lock(_get_current_face_feedback_color())
+	_spawn_landing_dust(speed_t)
 	SFXManager.play_dice_settle()
 
 
@@ -1015,6 +1024,49 @@ func _spawn_stop_smoke(color: Color) -> void:
 	})
 	puff.emitting = true
 	ParticlePool.release_after(puff, 0.5)
+
+
+func _spawn_landing_dust(intensity_t: float) -> void:
+	var dust: CPUParticles2D = ParticlePool.acquire(self)
+	if dust == null:
+		return
+	var dust_color: Color = Color(0.82, 0.88, 0.96, 0.42)
+	ParticlePool.configure_burst(dust, {
+		"amount": int(lerpf(float(LANDING_DUST_AMOUNT_MIN), float(LANDING_DUST_AMOUNT_MAX), intensity_t)),
+		"lifetime": LANDING_DUST_DURATION,
+		"explosiveness": 0.78,
+		"direction": Vector2.DOWN,
+		"spread": 70.0,
+		"initial_velocity_min": lerpf(24.0, 70.0, intensity_t),
+		"initial_velocity_max": lerpf(60.0, 140.0, intensity_t),
+		"gravity": Vector2(0.0, 140.0),
+		"color": dust_color,
+		"scale_amount_min": 0.7,
+		"scale_amount_max": 1.35,
+	})
+	dust.position = Vector2(0.0, DIE_SIZE * 0.28)
+	dust.emitting = true
+	ParticlePool.release_after(dust, LANDING_DUST_DURATION + 0.2)
+
+
+func _flash_face_lock(color: Color) -> void:
+	if _bg_panel == null:
+		return
+	var tween: Tween = create_tween()
+	var flash_color: Color = Color(
+		minf(color.r * 1.2, 1.0),
+		minf(color.g * 1.2, 1.0),
+		minf(color.b * 1.2, 1.0),
+		1.0
+	)
+	tween.tween_property(_bg_panel, "modulate", flash_color, FACE_FLASH_DURATION * 0.45)
+	tween.tween_property(_bg_panel, "modulate", Color.WHITE, FACE_FLASH_DURATION * 0.55)
+
+
+func _get_current_face_feedback_color() -> Color:
+	if current_face == null:
+		return _UITheme.SCORE_GOLD
+	return face_type_color(current_face.type)
 
 
 func _play_explode_wobble() -> void:

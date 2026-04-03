@@ -17,6 +17,11 @@ func test_chromatic_shader_loads() -> void:
 	assert_object(shader).is_not_null()
 
 
+func test_static_noise_shader_loads() -> void:
+	var shader: Shader = load("res://Shaders/static_noise.gdshader") as Shader
+	assert_object(shader).is_not_null()
+
+
 func test_overlay_constants_are_sensible() -> void:
 	assert_float(ScreenOverlay.SCANLINE_INTENSITY).is_greater(0.0)
 	assert_float(ScreenOverlay.SCANLINE_INTENSITY).is_less(0.5)
@@ -35,9 +40,11 @@ func test_overlay_set_enabled_toggles_visibility() -> void:
 	await get_tree().process_frame
 	assert_bool(overlay._scanline_rect.visible).is_true()
 	assert_bool(overlay._vignette_rect.visible).is_true()
+	assert_bool(overlay._barrel_rect.visible).is_true()
 	overlay.set_enabled(false)
 	assert_bool(overlay._scanline_rect.visible).is_false()
 	assert_bool(overlay._vignette_rect.visible).is_false()
+	assert_bool(overlay._barrel_rect.visible).is_false()
 	overlay.set_enabled(true)
 	assert_bool(overlay._scanline_rect.visible).is_true()
 
@@ -73,6 +80,16 @@ func test_flash_bust_does_not_error() -> void:
 	await get_tree().process_frame
 	overlay.flash_bust()
 	assert_bool(overlay._chromatic_rect.visible).is_true()
+	assert_bool(overlay._static_rect.visible).is_true()
+
+
+func test_distress_burst_shows_red_flash_and_static() -> void:
+	var overlay: ScreenOverlay = auto_free(ScreenOverlay.new())
+	add_child(overlay)
+	await get_tree().process_frame
+	overlay.distress_burst()
+	assert_bool(overlay._distress_flash_rect.visible).is_true()
+	assert_bool(overlay._static_rect.visible).is_true()
 
 
 func test_flash_jackpot_does_not_error() -> void:

@@ -11,9 +11,11 @@ const MAX_ACTIVE_EMITTERS: int = 30
 
 var _pool: Array[CPUParticles2D] = []
 var _active_count: int = 0
+var _pool_root: Node = null
 
 
 func _ready() -> void:
+	_ensure_pool_root()
 	for i: int in INITIAL_POOL_SIZE:
 		_pool.append(_create_emitter())
 
@@ -23,6 +25,7 @@ func _ready() -> void:
 func acquire(parent: Node) -> CPUParticles2D:
 	if _active_count >= MAX_ACTIVE_EMITTERS:
 		return null
+	_ensure_pool_root()
 	var emitter: CPUParticles2D
 	if _pool.size() > 0:
 		emitter = _pool.pop_back()
@@ -82,12 +85,14 @@ func _return_emitter(emitter: CPUParticles2D) -> void:
 	_active_count = max(_active_count - 1, 0)
 	if not is_instance_valid(emitter):
 		return
+	_ensure_pool_root()
 	emitter.emitting = false
 	emitter.visible = false
 	emitter.top_level = false
 	if emitter.get_parent():
 		emitter.get_parent().remove_child(emitter)
 	if _pool.size() < MAX_POOL_SIZE:
+		_pool_root.add_child(emitter)
 		_pool.append(emitter)
 	else:
 		emitter.queue_free()
@@ -98,4 +103,14 @@ func _create_emitter() -> CPUParticles2D:
 	emitter.emitting = false
 	emitter.one_shot = true
 	emitter.visible = false
+	_ensure_pool_root()
+	_pool_root.add_child(emitter)
 	return emitter
+
+
+func _ensure_pool_root() -> void:
+	if _pool_root != null and is_instance_valid(_pool_root):
+		return
+	_pool_root = Node.new()
+	_pool_root.name = "PoolRoot"
+	add_child(_pool_root)
