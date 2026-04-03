@@ -157,6 +157,13 @@ func test_lose_life_decrements() -> void:
 	assert_int(GameManager.lives).is_equal(2)
 
 
+func test_lose_life_emits_lives_changed() -> void:
+	GameManager.lives = 3
+	monitor_signals(GameManager, false)
+	_overlay._apply_effect({"type": 8})
+	await assert_signal(GameManager).is_emitted("lives_changed", [2])
+
+
 func test_lose_life_emits_run_ended_at_zero() -> void:
 	GameManager.lives = 1
 	monitor_signals(GameManager, false)
@@ -169,6 +176,13 @@ func test_lose_gold_removes_20() -> void:
 	GameManager.gold = 50
 	_overlay._apply_effect({"type": 9})
 	assert_int(GameManager.gold).is_equal(30)
+
+
+func test_lose_gold_emits_gold_changed() -> void:
+	GameManager.gold = 50
+	monitor_signals(GameManager, false)
+	_overlay._apply_effect({"type": 9})
+	await assert_signal(GameManager).is_emitted("gold_changed", [30])
 
 
 func test_lose_gold_clamps_to_zero() -> void:

@@ -126,6 +126,14 @@ func test_advance_stage_emits_signals() -> void:
 	await assert_signal(_gm).is_emitted("score_changed", [0])
 
 
+func test_advance_row_updates_current_row_and_previous_col() -> void:
+	assert_int(_gm.current_row).is_equal(0)
+	assert_int(_gm.previous_col).is_equal(-1)
+	_gm.advance_row(2)
+	assert_int(_gm.current_row).is_equal(1)
+	assert_int(_gm.previous_col).is_equal(2)
+
+
 func test_is_final_stage() -> void:
 	assert_bool(_gm.is_final_stage()).is_false()
 	_gm.current_stage = 5
@@ -179,6 +187,40 @@ func test_spend_gold_fails_when_insufficient() -> void:
 	var result: bool = _gm.spend_gold(50)
 	assert_bool(result).is_false()
 	assert_int(_gm.gold).is_equal(10)
+
+
+# ---------------------------------------------------------------------------
+# Shop flow
+# ---------------------------------------------------------------------------
+
+func test_on_shop_entered_resets_shop_spend() -> void:
+	_gm._shop_gold_spent = 17
+	_gm.on_shop_entered()
+	assert_int(_gm._shop_gold_spent).is_equal(0)
+
+
+func test_on_shop_entered_awards_miser_bonus_when_pending() -> void:
+	_gm.gold = 0
+	_gm._miser_bonus_pending = true
+	_gm.on_shop_entered()
+	assert_int(_gm.gold).is_equal(_gm.MISER_BONUS_GOLD)
+	assert_bool(_gm._miser_bonus_pending).is_false()
+
+
+func test_on_shop_exited_sets_miser_pending_below_threshold() -> void:
+	_gm.active_modifiers.clear()
+	_gm.add_modifier(RunModifier.make_miser())
+	_gm._shop_gold_spent = _gm.MISER_SPEND_THRESHOLD - 1
+	_gm.on_shop_exited()
+	assert_bool(_gm._miser_bonus_pending).is_true()
+
+
+func test_on_shop_exited_clears_miser_pending_without_modifier() -> void:
+	_gm.active_modifiers.clear()
+	_gm._miser_bonus_pending = true
+	_gm._shop_gold_spent = 0
+	_gm.on_shop_exited()
+	assert_bool(_gm._miser_bonus_pending).is_false()
 
 
 # ---------------------------------------------------------------------------
