@@ -5,6 +5,7 @@ extends PanelContainer
 signal closed()
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const PrestigePanelScene: PackedScene = preload("res://Scenes/PrestigePanel.tscn")
 
 const CARD_WIDTH: int = 140
 const CARD_HEIGHT: int = 120
@@ -31,11 +32,13 @@ const BEST_BADGE_PULSE_DURATION: float = 0.4
 @onready var _close_button: Button = $CenterContainer/Card/MarginContainer/Content/CloseButton
 
 var _stat_card_nodes: Array[_StatCardRefs] = []
+var _prestige_button: Button = null
 
 
 func _ready() -> void:
 	visible = false
 	_close_button.pressed.connect(_on_close_pressed)
+	_add_prestige_button()
 	_apply_theme()
 
 
@@ -74,6 +77,8 @@ func _apply_theme() -> void:
 	_UITheme.apply_modal_panel_style(_card, _UITheme.SCORE_GOLD)
 	_UITheme.apply_label_style(_title_label, _UITheme.font_display(), TITLE_FONT_SIZE, _UITheme.SCORE_GOLD)
 	_UITheme.apply_label_style(_close_button, _UITheme.font_display(), 12, _UITheme.BRIGHT_TEXT)
+	if _prestige_button != null:
+		_UITheme.apply_label_style(_prestige_button, _UITheme.font_display(), 12, _UITheme.BRIGHT_TEXT)
 
 
 ## Data structure for a single stat card.
@@ -140,6 +145,7 @@ func _build_stat_cards(run: RunSaveData, prior_bests: Dictionary) -> void:
 		run.best_turn_score >= turn_best and run.best_turn_score > 0,
 		_UITheme.ROSE_ACCENT, turn_best, true))
 	stats.append(_StatDef.new("Busts", _UITheme.GLYPH_STOP, run.busts, false, _UITheme.DANGER_RED))
+	stats.append(_StatDef.new("Skulls", _UITheme.GLYPH_STAR, run.prestige_skulls_earned, false, _UITheme.ACTION_CYAN))
 	stats.append(_StatDef.new("Final Dice", _UITheme.GLYPH_DIE, run.final_dice_names.size(), false, _UITheme.ACTION_CYAN))
 
 	for stat: _StatDef in stats:
@@ -255,3 +261,16 @@ func _show_best_badge(refs: _StatCardRefs) -> void:
 	# Pulse glow.
 	badge_tween.tween_property(badge, "modulate:a", BEST_BADGE_PULSE_ALPHA, BEST_BADGE_PULSE_DURATION)
 	badge_tween.tween_property(badge, "modulate:a", 1.0, BEST_BADGE_PULSE_DURATION)
+
+
+func _add_prestige_button() -> void:
+	_prestige_button = Button.new()
+	_prestige_button.text = "Visit Prestige Shop"
+	_prestige_button.custom_minimum_size = Vector2(240, 40)
+	_prestige_button.pressed.connect(_on_prestige_pressed)
+	_close_button.get_parent().add_child(_prestige_button)
+
+
+func _on_prestige_pressed() -> void:
+	var panel: PrestigePanel = PrestigePanelScene.instantiate() as PrestigePanel
+	add_child(panel)

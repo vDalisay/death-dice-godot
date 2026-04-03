@@ -2,7 +2,7 @@ extends ColorRect
 ## Random Event overlay — player picks a Blessing or a Curse.
 ## Instantiated at runtime by RollPhase when visiting a RANDOM_EVENT node.
 
-signal event_resolved()
+signal event_resolved(summary: String, status_color: Color)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
@@ -25,6 +25,10 @@ enum EffectType {
 	BOOST_TARGETS,       # All targets +15% this loop
 	LOSE_LIFE,           # Lose 1 life
 	LOSE_GOLD,           # -20g (clamped to 0)
+	GAIN_LUCK,           # +3 LUCK immediately
+	GAIN_REROUTE,        # Gain 1 reroute token
+	LOSE_HEAVY_GOLD,     # -35g (clamped to 0)
+	DOUBLE_CURSED_STOP,  # Two random dice gain CURSED_STOP
 }
 
 const BLESSINGS: Array[Dictionary] = [
@@ -35,12 +39,22 @@ const BLESSINGS: Array[Dictionary] = [
 	{"type": EffectType.GAIN_GOLD, "name": "Treasure Trove", "icon": "💰", "desc": "+30g immediately", "color_key": "SCORE_GOLD"},
 ]
 
+const PRESTIGE_BLESSINGS: Array[Dictionary] = [
+	{"type": EffectType.GAIN_LUCK, "name": "Loaded Constellation", "icon": "☄", "desc": "+3 LUCK immediately", "color_key": "ACTION_CYAN"},
+	{"type": EffectType.GAIN_REROUTE, "name": "Thread the Needle", "icon": "🧭", "desc": "Gain 1 reroute token for this run", "color_key": "SUCCESS_GREEN"},
+]
+
 const CURSES: Array[Dictionary] = [
 	{"type": EffectType.LOSE_DIE, "name": "Sacrifice", "icon": "💀", "desc": "Lose 1 random die", "color_key": "DANGER_RED"},
 	{"type": EffectType.ADD_CURSED_STOP, "name": "Hex", "icon": "☠", "desc": "A random die gains a Cursed Stop", "color_key": "NEON_PURPLE"},
 	{"type": EffectType.BOOST_TARGETS, "name": "Harder Stages", "icon": "📈", "desc": "All targets +15% this loop", "color_key": "EXPLOSION_ORANGE"},
 	{"type": EffectType.LOSE_LIFE, "name": "Blood Price", "icon": "❤", "desc": "Lose 1 life", "color_key": "DANGER_RED"},
 	{"type": EffectType.LOSE_GOLD, "name": "Pickpocket", "icon": "💸", "desc": "-20g", "color_key": "SCORE_GOLD"},
+]
+
+const PRESTIGE_CURSES: Array[Dictionary] = [
+	{"type": EffectType.LOSE_HEAVY_GOLD, "name": "Skull Tax", "icon": "🪙", "desc": "-35g", "color_key": "SCORE_GOLD"},
+	{"type": EffectType.DOUBLE_CURSED_STOP, "name": "Grave Static", "icon": "☠", "desc": "Two random dice gain a Cursed Stop", "color_key": "NEON_PURPLE"},
 ]
 
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
@@ -73,8 +87,10 @@ func _apply_theme_styling() -> void:
 
 func open() -> void:
 	_resolved = false
-	_blessing = BLESSINGS[randi() % BLESSINGS.size()].duplicate()
-	_curse = CURSES[randi() % CURSES.size()].duplicate()
+	var blessing_pool: Array[Dictionary] = _build_blessing_pool()
+	var curse_pool: Array[Dictionary] = _build_curse_pool()
+	_blessing = blessing_pool[randi() % blessing_pool.size()].duplicate()
+	_curse = curse_pool[randi() % curse_pool.size()].duplicate()
 
 	# Clear old cards.
 	for card: PanelContainer in _choice_cards:
@@ -204,7 +220,9 @@ func _on_choice_made(chose_blessing: bool) -> void:
 	close_tween.tween_interval(0.6)
 	close_tween.tween_property(self, "color:a", 0.0, 0.2)
 	close_tween.parallel().tween_property(_card_panel, "modulate:a", 0.0, 0.2)
-	close_tween.tween_callback(func() -> void: event_resolved.emit())
+	var summary: String = _build_effect_summary(chosen_event)
+	var status_color: Color = _UITheme.SUCCESS_GREEN if chose_blessing else _UITheme.DANGER_RED
+	close_tween.tween_callback(func() -> void: event_resolved.emit(summary, status_color))
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +242,10 @@ func _apply_effect(event: Dictionary) -> void:
 			_boost_shield_faces(1)
 		EffectType.GAIN_GOLD:
 			GameManager.add_gold(30)
+		EffectType.GAIN_LUCK:
+			GameManager.add_luck(3)
+		EffectType.GAIN_REROUTE:
+			GameManager.prestige_reroute_uses += 1
 		EffectType.LOSE_DIE:
 			_lose_random_die()
 		EffectType.ADD_CURSED_STOP:
@@ -234,6 +256,61 @@ func _apply_effect(event: Dictionary) -> void:
 			GameManager.lose_life()
 		EffectType.LOSE_GOLD:
 			GameManager.remove_gold(20)
+		EffectType.LOSE_HEAVY_GOLD:
+			GameManager.remove_gold(35)
+		EffectType.DOUBLE_CURSED_STOP:
+			_add_cursed_stop_to_random_die()
+			_add_cursed_stop_to_random_die()
+
+
+func _build_blessing_pool() -> Array[Dictionary]:
+	var blessing_pool: Array[Dictionary] = BLESSINGS.duplicate(true)
+	if SaveManager.has_prestige_unlock("new_events"):
+		for event: Dictionary in PRESTIGE_BLESSINGS:
+			blessing_pool.append(event.duplicate())
+	return blessing_pool
+
+
+func _build_curse_pool() -> Array[Dictionary]:
+	var curse_pool: Array[Dictionary] = CURSES.duplicate(true)
+	if SaveManager.has_prestige_unlock("new_events"):
+		for event: Dictionary in PRESTIGE_CURSES:
+			curse_pool.append(event.duplicate())
+	return curse_pool
+
+
+func _build_effect_summary(event: Dictionary) -> String:
+	var effect_type: EffectType = event.get("type", EffectType.GAIN_GOLD) as EffectType
+	match effect_type:
+		EffectType.BOOST_NUMBERS:
+			return "EVENT: all NUMBER faces gain +1 this loop"
+		EffectType.GAIN_RANDOM_DICE:
+			return "EVENT: gained 2 random dice"
+		EffectType.FREE_BUST:
+			return "EVENT: next bust this loop is free"
+		EffectType.BOOST_SHIELDS:
+			return "EVENT: all SHIELD faces gain +1 this loop"
+		EffectType.GAIN_GOLD:
+			return "EVENT: gained 30g"
+		EffectType.LOSE_DIE:
+			return "EVENT: lost 1 random die"
+		EffectType.ADD_CURSED_STOP:
+			return "EVENT: a random die gained a Cursed Stop"
+		EffectType.BOOST_TARGETS:
+			return "EVENT: stage targets increased by 15% this loop"
+		EffectType.LOSE_LIFE:
+			return "EVENT: lost 1 life"
+		EffectType.LOSE_GOLD:
+			return "EVENT: lost 20g"
+		EffectType.GAIN_LUCK:
+			return "EVENT: gained 3 LUCK"
+		EffectType.GAIN_REROUTE:
+			return "EVENT: gained 1 reroute token"
+		EffectType.LOSE_HEAVY_GOLD:
+			return "EVENT: paid 35g in Skull Tax"
+		EffectType.DOUBLE_CURSED_STOP:
+			return "EVENT: two dice gained Cursed Stops"
+	return "EVENT: %s" % (event.get("name", "Unknown") as String)
 
 
 func _boost_number_faces(amount: int) -> void:

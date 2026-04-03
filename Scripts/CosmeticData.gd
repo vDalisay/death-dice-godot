@@ -9,7 +9,7 @@ extends Resource
 @export var cost: int = 0  # Gold cost to purchase
 @export var required_mastery_level: int = 0  # Minimum die mastery level to unlock purchase
 @export var steam_achievement_id: String = ""  # Optional Steam achievement ID to unlock on purchase
-@export var visual_effect: String = ""  # Type of effect: "glow", "color_shift", "particle_trail", "legendary_shine"
+@export var visual_effect: String = ""  # Type of effect: "glow", "color_shift", "particle_trail", "legendary_shine", "skull_shimmer"
 @export var color_override: Color = Color.WHITE  # Color to apply (for color_shift cosmetics)
 
 
@@ -62,6 +62,19 @@ static func make_legendary_shine_cosmetic() -> CosmeticData:
 	cosmetic.steam_achievement_id = "ACH_LEGENDARY_SHINE_COSMETIC"
 	cosmetic.visual_effect = "legendary_shine"
 	cosmetic.color_override = Color.CORNFLOWER_BLUE
+	return cosmetic
+
+
+static func make_skull_shimmer_cosmetic() -> CosmeticData:
+	var cosmetic := CosmeticData.new()
+	cosmetic.cosmetic_id = "skull_shimmer"
+	cosmetic.cosmetic_name = "Skull Shimmer"
+	cosmetic.description = "A prestige aura that leaves a pale skull-glint over the die"
+	cosmetic.cost = 125
+	cosmetic.required_mastery_level = 0
+	cosmetic.steam_achievement_id = "ACH_SKULL_SHIMMER_COSMETIC"
+	cosmetic.visual_effect = "skull_shimmer"
+	cosmetic.color_override = Color(0.85, 0.92, 1.0)
 	return cosmetic
 
 
