@@ -81,6 +81,62 @@ var _miser_bonus_pending: bool = false
 var skip_archetype_picker: bool = false
 
 
+func set_archetype(archetype: Archetype) -> void:
+	chosen_archetype = archetype
+
+
+func add_momentum(amount: int = 1) -> void:
+	momentum += amount
+	momentum_changed.emit(momentum)
+
+
+func reset_momentum() -> void:
+	momentum = 0
+	momentum_changed.emit(momentum)
+
+
+func set_event_free_bust(enabled: bool) -> void:
+	event_free_bust = enabled
+
+
+func consume_event_free_bust() -> bool:
+	if not event_free_bust:
+		return false
+	event_free_bust = false
+	return true
+
+
+func apply_event_target_multiplier(multiplier: float) -> void:
+	event_target_multiplier = multiplier
+	stage_target_score = roundi(float(stage_target_score) * multiplier)
+
+
+func remove_gold(amount: int) -> void:
+	gold = maxi(gold - maxi(0, amount), 0)
+	gold_changed.emit(gold)
+
+
+func heal_lives(amount: int) -> void:
+	lives = mini(lives + maxi(0, amount), MAX_LIVES)
+	lives_changed.emit(lives)
+
+
+func begin_stage_from_map() -> void:
+	total_stages_cleared += 1
+	current_stage += 1
+	total_score = 0
+	stage_target_score = _calculate_stage_target(current_stage)
+	score_changed.emit(total_score)
+	stage_advanced.emit(current_stage)
+
+
+func register_turn_score(turn_score: int) -> bool:
+	if turn_score <= best_turn_score:
+		return false
+	best_turn_score = turn_score
+	return true
+
+
 func _ready() -> void:
 	_build_starting_pool()
 	generate_stage_map()
@@ -189,8 +245,7 @@ func advance_stage() -> void:
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
-	momentum = 0
-	momentum_changed.emit(momentum)
+	reset_momentum()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
@@ -206,8 +261,7 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
-	momentum = 0
-	momentum_changed.emit(momentum)
+	reset_momentum()
 	_reset_event_flags()
 	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
@@ -237,8 +291,7 @@ func get_stage_clear_bonus() -> int:
 func lose_life() -> void:
 	lives -= 1
 	run_busts += 1
-	momentum = 0
-	momentum_changed.emit(momentum)
+	reset_momentum()
 	lives_changed.emit(lives)
 	if lives <= 0:
 		run_ended.emit()
@@ -262,7 +315,7 @@ func reset_run() -> void:
 	luck = 0
 	event_free_bust = false
 	event_target_multiplier = 1.0
-	momentum = 0
+	reset_momentum()
 	active_modifiers.clear()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
@@ -272,7 +325,6 @@ func reset_run() -> void:
 	score_changed.emit(total_score)
 	lives_changed.emit(lives)
 	gold_changed.emit(gold)
-	momentum_changed.emit(momentum)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
 

@@ -126,6 +126,14 @@ func test_advance_stage_emits_signals() -> void:
 	await assert_signal(_gm).is_emitted("score_changed", [0])
 
 
+func test_advance_row_updates_current_row_and_previous_col() -> void:
+	assert_int(_gm.current_row).is_equal(0)
+	assert_int(_gm.previous_col).is_equal(-1)
+	_gm.advance_row(2)
+	assert_int(_gm.current_row).is_equal(1)
+	assert_int(_gm.previous_col).is_equal(2)
+
+
 func test_is_final_stage() -> void:
 	assert_bool(_gm.is_final_stage()).is_false()
 	_gm.current_stage = 5
@@ -179,6 +187,40 @@ func test_spend_gold_fails_when_insufficient() -> void:
 	var result: bool = _gm.spend_gold(50)
 	assert_bool(result).is_false()
 	assert_int(_gm.gold).is_equal(10)
+
+
+# ---------------------------------------------------------------------------
+# Shop flow
+# ---------------------------------------------------------------------------
+
+func test_on_shop_entered_resets_shop_spend() -> void:
+	_gm._shop_gold_spent = 17
+	_gm.on_shop_entered()
+	assert_int(_gm._shop_gold_spent).is_equal(0)
+
+
+func test_on_shop_entered_awards_miser_bonus_when_pending() -> void:
+	_gm.gold = 0
+	_gm._miser_bonus_pending = true
+	_gm.on_shop_entered()
+	assert_int(_gm.gold).is_equal(_gm.MISER_BONUS_GOLD)
+	assert_bool(_gm._miser_bonus_pending).is_false()
+
+
+func test_on_shop_exited_sets_miser_pending_below_threshold() -> void:
+	_gm.active_modifiers.clear()
+	_gm.add_modifier(RunModifier.make_miser())
+	_gm._shop_gold_spent = _gm.MISER_SPEND_THRESHOLD - 1
+	_gm.on_shop_exited()
+	assert_bool(_gm._miser_bonus_pending).is_true()
+
+
+func test_on_shop_exited_clears_miser_pending_without_modifier() -> void:
+	_gm.active_modifiers.clear()
+	_gm._miser_bonus_pending = true
+	_gm._shop_gold_spent = 0
+	_gm.on_shop_exited()
+	assert_bool(_gm._miser_bonus_pending).is_false()
 
 
 # ---------------------------------------------------------------------------
@@ -260,3 +302,78 @@ func test_momentum_changed_emitted_on_reset_run() -> void:
 	monitor_signals(_gm, false)
 	_gm.reset_run()
 	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+
+
+func test_add_momentum_increments_and_emits() -> void:
+	monitor_signals(_gm, false)
+	_gm.add_momentum(2)
+	assert_int(_gm.momentum).is_equal(2)
+	await assert_signal(_gm).is_emitted("momentum_changed", [2])
+
+
+func test_reset_momentum_sets_zero_and_emits() -> void:
+	_gm.momentum = 3
+	monitor_signals(_gm, false)
+	_gm.reset_momentum()
+	assert_int(_gm.momentum).is_equal(0)
+	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+
+
+# ---------------------------------------------------------------------------
+# Encapsulated state mutation helpers
+# ---------------------------------------------------------------------------
+
+func test_set_archetype_updates_selected_value() -> void:
+	_gm.set_archetype(_gm.Archetype.BLANK_SLATE)
+	assert_int(_gm.chosen_archetype).is_equal(_gm.Archetype.BLANK_SLATE)
+
+
+func test_consume_event_free_bust_true_once() -> void:
+	_gm.set_event_free_bust(true)
+	assert_bool(_gm.consume_event_free_bust()).is_true()
+	assert_bool(_gm.event_free_bust).is_false()
+	assert_bool(_gm.consume_event_free_bust()).is_false()
+
+
+func test_apply_event_target_multiplier_scales_stage_target() -> void:
+	_gm.stage_target_score = 100
+	_gm.apply_event_target_multiplier(1.15)
+	assert_float(_gm.event_target_multiplier).is_equal(1.15)
+	assert_int(_gm.stage_target_score).is_equal(115)
+
+
+func test_remove_gold_clamps_and_emits() -> void:
+	_gm.gold = 10
+	monitor_signals(_gm, false)
+	_gm.remove_gold(25)
+	assert_int(_gm.gold).is_equal(0)
+	await assert_signal(_gm).is_emitted("gold_changed", [0])
+
+
+func test_heal_lives_clamps_and_emits() -> void:
+	_gm.lives = 2
+	monitor_signals(_gm, false)
+	_gm.heal_lives(5)
+	assert_int(_gm.lives).is_equal(_gm.MAX_LIVES)
+	await assert_signal(_gm).is_emitted("lives_changed", [_gm.MAX_LIVES])
+
+
+func test_begin_stage_from_map_updates_stage_and_score() -> void:
+	_gm.current_stage = 1
+	_gm.total_stages_cleared = 0
+	_gm.total_score = 77
+	monitor_signals(_gm, false)
+	_gm.begin_stage_from_map()
+	assert_int(_gm.current_stage).is_equal(2)
+	assert_int(_gm.total_stages_cleared).is_equal(1)
+	assert_int(_gm.total_score).is_equal(0)
+	await assert_signal(_gm).is_emitted("score_changed", [0])
+	await assert_signal(_gm).is_emitted("stage_advanced", [2])
+
+
+func test_register_turn_score_updates_only_when_higher() -> void:
+	_gm.best_turn_score = 12
+	assert_bool(_gm.register_turn_score(10)).is_false()
+	assert_int(_gm.best_turn_score).is_equal(12)
+	assert_bool(_gm.register_turn_score(18)).is_true()
+	assert_int(_gm.best_turn_score).is_equal(18)

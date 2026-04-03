@@ -139,6 +139,19 @@ static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_
 	return sb
 
 
+static func apply_modal_panel_style(panel: PanelContainer, border_color: Color, border_width: int = 2, bg: Color = PANEL_SURFACE) -> void:
+	panel.add_theme_stylebox_override(
+		"panel",
+		make_panel_stylebox(bg, CORNER_RADIUS_MODAL, border_color, border_width)
+	)
+
+
+static func apply_label_style(control: Control, font: Font, font_size: int, font_color: Color) -> void:
+	control.add_theme_font_override("font", font)
+	control.add_theme_font_size_override("font_size", font_size)
+	control.add_theme_color_override("font_color", font_color)
+
+
 ## Build and return a Theme resource with the full design-system applied.
 static func build_theme() -> Theme:
 	var t := Theme.new()
