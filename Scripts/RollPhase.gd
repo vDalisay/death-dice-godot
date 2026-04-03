@@ -69,7 +69,6 @@ var _roll_anim_nonce: int = 0
 var _triggered_combo_ids: Dictionary = {}
 var _screen_shake: Node = null
 var _screen_overlay: Node = null
-var _picker_selected_mode: int = GameManager.RunMode.CLASSIC
 var _turn_score_service: RefCounted = null
 var _bust_resolver: RefCounted = null
 var _risk_estimator: RefCounted = null
@@ -82,6 +81,7 @@ const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
 const DiceRewardScene: PackedScene = preload("res://Scenes/DiceRewardOverlay.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
 const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
+const ArchetypePickerScene: PackedScene = preload("res://Scenes/ArchetypePicker.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
 const TurnScoreServiceScript: GDScript = preload("res://Scripts/TurnScoreService.gd")
@@ -1332,106 +1332,17 @@ func _show_archetype_picker() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	_picker_selected_mode = int(GameManager.run_mode)
-	var overlay: ColorRect = ColorRect.new()
-	overlay.color = Color(0.1, 0.1, 0.15, 0.92)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	var center: CenterContainer = CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 16)
-	var title: Label = Label.new()
-	title.text = "Choose Your Archetype"
-	title.add_theme_font_size_override("font_size", 36)
-	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-	var mode_row: HBoxContainer = HBoxContainer.new()
-	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	mode_row.add_theme_constant_override("separation", 12)
-	var classic_btn: Button = Button.new()
-	classic_btn.text = "Classic"
-	classic_btn.custom_minimum_size = Vector2(140, 40)
-	var gauntlet_btn: Button = Button.new()
-	gauntlet_btn.text = "Gauntlet"
-	gauntlet_btn.custom_minimum_size = Vector2(140, 40)
-	classic_btn.pressed.connect(_on_mode_picker_selected.bind(int(GameManager.RunMode.CLASSIC), classic_btn, gauntlet_btn))
-	gauntlet_btn.pressed.connect(_on_mode_picker_selected.bind(int(GameManager.RunMode.GAUNTLET), classic_btn, gauntlet_btn))
-	mode_row.add_child(classic_btn)
-	mode_row.add_child(gauntlet_btn)
-	vbox.add_child(mode_row)
-	var mode_desc: Label = Label.new()
-	mode_desc.text = "Gauntlet: steeper stage scaling, separate records"
-	mode_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mode_desc.add_theme_font_size_override("font_size", 14)
-	mode_desc.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
-	vbox.add_child(mode_desc)
-	_refresh_mode_picker_buttons(classic_btn, gauntlet_btn)
-	var card_row: HBoxContainer = HBoxContainer.new()
-	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_row.add_theme_constant_override("separation", 24)
-	var archetypes: Array = [
-		GameManager.Archetype.CAUTION,
-		GameManager.Archetype.RISK_IT,
-		GameManager.Archetype.BLANK_SLATE,
-	]
-	for arch: GameManager.Archetype in archetypes:
-		var unlock_req: int = GameManager.ARCHETYPE_UNLOCK_LOOPS[arch]
-		var unlocked: bool = SaveManager.max_loops_completed >= unlock_req
-		var card: PanelContainer = PanelContainer.new()
-		card.custom_minimum_size = Vector2(200, 160)
-		var card_vbox: VBoxContainer = VBoxContainer.new()
-		card_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		card_vbox.add_theme_constant_override("separation", 8)
-		var name_lbl: Label = Label.new()
-		name_lbl.text = GameManager.ARCHETYPE_NAMES[arch]
-		name_lbl.add_theme_font_size_override("font_size", 22)
-		name_lbl.add_theme_color_override("font_color", Color.WHITE if unlocked else Color(0.4, 0.4, 0.4))
-		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		card_vbox.add_child(name_lbl)
-		var desc_lbl: Label = Label.new()
-		if unlocked:
-			desc_lbl.text = GameManager.ARCHETYPE_DESCRIPTIONS[arch]
-		else:
-			desc_lbl.text = "Locked — complete %d loop(s)" % unlock_req
-		desc_lbl.add_theme_font_size_override("font_size", 14)
-		desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7) if unlocked else Color(0.35, 0.35, 0.35))
-		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		card_vbox.add_child(desc_lbl)
-		var pick_btn: Button = Button.new()
-		pick_btn.text = "Select" if unlocked else "Locked"
-		pick_btn.disabled = not unlocked
-		pick_btn.add_theme_font_size_override("font_size", 18)
-		pick_btn.pressed.connect(_on_archetype_chosen.bind(arch, overlay))
-		card_vbox.add_child(pick_btn)
-		card.add_child(card_vbox)
-		card_row.add_child(card)
-	vbox.add_child(card_row)
-	center.add_child(vbox)
-	overlay.add_child(center)
-	add_child(overlay)
+	var picker: ColorRect = ArchetypePickerScene.instantiate() as ColorRect
+	add_child(picker)
+	picker.call("open", int(GameManager.run_mode))
+	picker.connect("selection_confirmed", _on_archetype_selected)
 
 
-func _on_mode_picker_selected(mode: int, classic_btn: Button, gauntlet_btn: Button) -> void:
-	_picker_selected_mode = mode
-	_refresh_mode_picker_buttons(classic_btn, gauntlet_btn)
-
-
-func _refresh_mode_picker_buttons(classic_btn: Button, gauntlet_btn: Button) -> void:
-	var classic_selected: bool = _picker_selected_mode == int(GameManager.RunMode.CLASSIC)
-	classic_btn.modulate = Color(1.0, 0.9, 0.35) if classic_selected else Color(0.8, 0.8, 0.8)
-	gauntlet_btn.modulate = Color(1.0, 0.35, 0.35) if not classic_selected else Color(0.8, 0.8, 0.8)
-
-
-func _on_archetype_chosen(arch: GameManager.Archetype, overlay: ColorRect) -> void:
-	GameManager.set_run_mode(_picker_selected_mode)
-	GameManager.set_archetype(arch)
+func _on_archetype_selected(run_mode: int, archetype: int) -> void:
+	GameManager.set_run_mode(run_mode)
+	GameManager.set_archetype(archetype as GameManager.Archetype)
 	GameManager.reset_run()
 	_run_snapshot_recorded = false
-	overlay.queue_free()
 	_run_active = true
 	turn_number = 0
 	bank_streak = 0
