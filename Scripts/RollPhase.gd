@@ -19,6 +19,9 @@ const SHAKE_STOP: float = 3.0
 const SHAKE_CURSED_STOP: float = 5.0
 const SHAKE_BUST: float = 8.0
 const SHAKE_BIG_BANK: float = 4.0
+const CHAIN_SHAKE_BASE: float = 2.0
+const CHAIN_SHAKE_STEP: float = 0.5
+const CHAIN_SHAKE_DURATION: float = 0.1
 
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
@@ -66,6 +69,9 @@ var _triggered_combo_ids: Dictionary = {}
 var _screen_shake: Node = null
 var _screen_overlay: Node = null
 var _picker_selected_mode: int = GameManager.RunMode.CLASSIC
+var _turn_score_service: RefCounted = null
+var _bust_resolver: RefCounted = null
+var _stage_flow: RefCounted = null
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -75,9 +81,15 @@ const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToas
 const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
+const TurnScoreServiceScript: GDScript = preload("res://Scripts/TurnScoreService.gd")
+const BustFlowResolverScript: GDScript = preload("res://Scripts/BustFlowResolver.gd")
+const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoordinator.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 func _ready() -> void:
+	_turn_score_service = TurnScoreServiceScript.new()
+	_bust_resolver = BustFlowResolverScript.new()
+	_stage_flow = StageFlowCoordinatorScript.new()
 	theme = _UITheme.build_theme()
 	roll_button.pressed.connect(_on_roll_pressed)
 	bank_button.pressed.connect(_on_bank_pressed)
@@ -400,10 +412,9 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	# Accumulated bust check: add new stops from this roll to running total
 	accumulated_stop_count += _count_stops_in(rolled_indices)
 	var shield_count: int = _count_shields()
-	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
+	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
 	var threshold: int = _get_bust_threshold()
-	var immune_turns: int = 3 if GameManager.chosen_archetype == GameManager.Archetype.CAUTION else 1
-	var is_immune: bool = turn_number <= immune_turns and GameManager.current_stage == 1
+	var is_immune: bool = _bust_resolver.is_immune_turn(turn_number, GameManager.current_stage, int(GameManager.chosen_archetype))
 	if effective_stops >= threshold and not is_immune:
 		var insurance_index: int = _find_insurance_face_index()
 		if insurance_index >= 0:
@@ -498,64 +509,14 @@ func _all_dice_resolved() -> bool:
 	return true
 
 func _calculate_turn_score() -> int:
-	var pool_size: int = GameManager.dice_pool.size()
-	var glass_cannon: bool = GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON)
-	var high_roller: bool = GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER)
-	var overcharge: bool = GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE)
-	# Pass 1: compute per-die base scores
-	var base_scores: Array[int] = []
-	base_scores.resize(pool_size)
-	base_scores.fill(0)
-	var multiplier: int = 1
-	for i: int in pool_size:
-		if dice_stopped[i]:
-			continue
-		var face: DiceFaceData = current_results[i]
-		if face == null:
-			continue
-		match face.type:
-			DiceFaceData.FaceType.NUMBER:
-				var bonus: int = 0
-				if glass_cannon:
-					bonus += 2
-				if high_roller and face.value >= 4:
-					bonus += 3
-				base_scores[i] = face.value + bonus
-			DiceFaceData.FaceType.AUTO_KEEP:
-				base_scores[i] = face.value
-			DiceFaceData.FaceType.EXPLODE:
-				base_scores[i] = face.value * (2 if overcharge else 1)
-			DiceFaceData.FaceType.MULTIPLY:
-				multiplier *= face.value
-	# Pass 2: apply MULTIPLY_LEFT — multiply the left neighbor's base score
-	for i: int in pool_size:
-		if dice_stopped[i]:
-			continue
-		var face: DiceFaceData = current_results[i]
-		if face == null:
-			continue
-		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT and i > 0 and not dice_stopped[i - 1]:
-			base_scores[i - 1] *= face.value
-	# Pass 3: Chain Lightning — 3+ kept dice with same face value get +3 each
-	if GameManager.has_modifier(RunModifier.ModifierType.CHAIN_LIGHTNING):
-		var value_groups: Dictionary = {}
-		for i: int in pool_size:
-			if dice_stopped[i] or base_scores[i] == 0:
-				continue
-			var val: int = base_scores[i]
-			if not value_groups.has(val):
-				value_groups[val] = []
-			value_groups[val].append(i)
-		for val: int in value_groups:
-			var indices: Array = value_groups[val]
-			if indices.size() >= 3:
-				for idx: int in indices:
-					base_scores[idx] += 3
-	# Sum all per-die scores, then apply global multiplier
-	var score: int = 0
-	for s: int in base_scores:
-		score += s
-	return score * multiplier
+	return _turn_score_service.calculate_turn_score(
+		current_results,
+		dice_stopped,
+		GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON),
+		GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER),
+		GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE),
+		GameManager.has_modifier(RunModifier.ModifierType.CHAIN_LIGHTNING)
+	)
 
 func _count_stops() -> int:
 	var count: int = 0
@@ -650,7 +611,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 				if die:
-					_shake_screen(2.0 + float(chain_depth) * 0.5, 0.1)
+					_shake_screen(CHAIN_SHAKE_BASE + float(chain_depth) * CHAIN_SHAKE_STEP, CHAIN_SHAKE_DURATION)
 					die.play_explode_charge()
 					die.tumble(face)
 					die.pop()
@@ -745,16 +706,13 @@ func _calculate_combo_bonus() -> int:
 
 
 func _get_bust_threshold() -> int:
-	var base: int = BASE_BUST_THRESHOLD
-	if turn_number <= 3:
-		base += 1   # Lenient: 4
-	# Glass Cannon: threshold -1
-	if GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON):
-		base = maxi(1, base - 1)
-	# Last Stand: threshold +2 at 1 life
-	if GameManager.has_modifier(RunModifier.ModifierType.LAST_STAND) and GameManager.lives == 1:
-		base += 2
-	return base
+	return _bust_resolver.get_bust_threshold(
+		BASE_BUST_THRESHOLD,
+		turn_number,
+		GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON),
+		GameManager.has_modifier(RunModifier.ModifierType.LAST_STAND),
+		GameManager.lives
+	)
 
 
 func _get_streak_multiplier() -> float:
@@ -1139,48 +1097,13 @@ func _play_multiply_face_vfx() -> void:
 
 ## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).
 func _get_per_die_scores() -> Array[int]:
-	var pool_size: int = GameManager.dice_pool.size()
-	var glass_cannon: bool = GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON)
-	var high_roller: bool = GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER)
-	var overcharge: bool = GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE)
-	var base_scores: Array[int] = []
-	base_scores.resize(pool_size)
-	base_scores.fill(0)
-	var multiplier: int = 1
-	for i: int in pool_size:
-		if dice_stopped[i]:
-			continue
-		var face: DiceFaceData = current_results[i]
-		if face == null:
-			continue
-		match face.type:
-			DiceFaceData.FaceType.NUMBER:
-				var bonus: int = 0
-				if glass_cannon:
-					bonus += 2
-				if high_roller and face.value >= 4:
-					bonus += 3
-				base_scores[i] = face.value + bonus
-			DiceFaceData.FaceType.AUTO_KEEP:
-				base_scores[i] = face.value
-			DiceFaceData.FaceType.EXPLODE:
-				base_scores[i] = face.value * (2 if overcharge else 1)
-			DiceFaceData.FaceType.MULTIPLY:
-				multiplier *= face.value
-	for i: int in pool_size:
-		if dice_stopped[i]:
-			continue
-		var face: DiceFaceData = current_results[i]
-		if face == null:
-			continue
-		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT and i > 0 and not dice_stopped[i - 1]:
-			base_scores[i - 1] *= face.value
-	# Apply global multiplier to each die's individual contribution.
-	var result: Array[int] = []
-	result.resize(pool_size)
-	for i: int in pool_size:
-		result[i] = base_scores[i] * multiplier
-	return result
+	return _turn_score_service.calculate_per_die_scores(
+		current_results,
+		dice_stopped,
+		GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON),
+		GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER),
+		GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE)
+	)
 
 # ---------------------------------------------------------------------------
 # Juice overlays
@@ -1325,7 +1248,7 @@ func _open_stage_map() -> void:
 
 
 func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType) -> void:
-	GameManager.advance_row(col)
+	_stage_flow.advance_row(col)
 	stage_map_panel.visible = false
 	match node_type:
 		MapNodeData.NodeType.NORMAL_STAGE:
@@ -1341,7 +1264,7 @@ func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType)
 
 
 func _start_stage_from_map() -> void:
-	GameManager.begin_stage_from_map()
+	_stage_flow.begin_stage_from_map()
 	_roll_content.visible = true
 	_update_streak_display()
 	_run_active = true
@@ -1372,15 +1295,14 @@ func _open_forge_from_map() -> void:
 
 
 func _execute_rest_node() -> void:
-	GameManager.heal_lives(REST_HEAL_LIVES)
-	GameManager.add_gold(REST_GOLD_BONUS)
+	_stage_flow.apply_rest_rewards(REST_HEAL_LIVES, REST_GOLD_BONUS)
 	hud.show_status("Rested! +%d life, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
 	SFXManager.play_stage_clear()
 	_open_stage_map()
 
 
 func _complete_loop() -> void:
-	GameManager.advance_loop()
+	_stage_flow.complete_loop()
 	AchievementManager.on_loop_advanced(GameManager.current_loop)
 	_maybe_apply_curse()
 	hud.show_status(
