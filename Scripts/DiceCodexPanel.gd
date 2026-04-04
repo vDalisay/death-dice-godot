@@ -8,7 +8,10 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const CARD_WIDTH: int = 294
 const CARD_HEIGHT: int = 176
+const FACE_TILE_WIDTH: int = 84
 const FACE_TILE_HEIGHT: int = 32
+const FACE_TILE_PADDING_X: int = 6
+const FACE_TILE_PADDING_Y: int = 4
 
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
@@ -126,20 +129,34 @@ func _build_entry(die: DiceData, discovered: bool) -> PanelContainer:
 func _build_face_tile(face: DiceFaceData, discovered: bool) -> PanelContainer:
 	var tile := PanelContainer.new()
 	tile.name = "FaceTile"
-	tile.custom_minimum_size = Vector2(84, FACE_TILE_HEIGHT)
+	tile.custom_minimum_size = Vector2(FACE_TILE_WIDTH, FACE_TILE_HEIGHT)
 	var color: Color = _face_accent(face.type) if discovered else _UITheme.MUTED_TEXT
 	tile.add_theme_stylebox_override(
 		"panel",
 		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_BADGE, color, 1)
 	)
 
+	var content_margin := MarginContainer.new()
+	content_margin.name = "FaceTileMargin"
+	content_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_margin.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	content_margin.grow_vertical = Control.GROW_DIRECTION_BOTH
+	content_margin.add_theme_constant_override("margin_left", FACE_TILE_PADDING_X)
+	content_margin.add_theme_constant_override("margin_top", FACE_TILE_PADDING_Y)
+	content_margin.add_theme_constant_override("margin_right", FACE_TILE_PADDING_X)
+	content_margin.add_theme_constant_override("margin_bottom", FACE_TILE_PADDING_Y)
+	tile.add_child(content_margin)
+
+	var center := CenterContainer.new()
+	center.name = "FaceTileCenter"
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content_margin.add_child(center)
+
 	var label := Label.new()
 	label.name = "FaceLabel"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.anchors_preset = Control.PRESET_FULL_RECT
-	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	label.add_theme_font_override("font", _UITheme.font_mono())
 	label.add_theme_font_size_override("font_size", 17)
 	if discovered:
@@ -148,7 +165,7 @@ func _build_face_tile(face: DiceFaceData, discovered: bool) -> PanelContainer:
 	else:
 		label.text = "?"
 		label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-	tile.add_child(label)
+	center.add_child(label)
 	return tile
 
 
