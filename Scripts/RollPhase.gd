@@ -26,6 +26,9 @@ const CHAIN_SHAKE_DURATION: float = 0.1
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
 const BUTTON_TWEEN_DURATION: float = 0.08
+const MULTIPLIER_BURST_DURATION: float = 0.42
+const MULTIPLIER_BURST_X_RATIO: float = 0.14
+const MULTIPLIER_BURST_Y_JITTER: float = 18.0
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 enum RollBustOutcome { SAFE, IMMUNE_SAVE, INSURANCE_SAVE, EVENT_SAVE, BUST }
@@ -33,6 +36,7 @@ enum RollBustOutcome { SAFE, IMMUNE_SAVE, INSURANCE_SAVE, EVENT_SAVE, BUST }
 @onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
 @onready var dice_arena: DiceArena = $MarginContainer/VBoxContainer/ArenaViewportContainer/ArenaViewport/DiceArena
+@onready var _arena_viewport_container: SubViewportContainer = $MarginContainer/VBoxContainer/ArenaViewportContainer
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
@@ -1066,6 +1070,7 @@ func _auto_advance_turn() -> void:
 func _play_score_count_animation(old_total: int, new_total: int) -> float:
 	var pool_size: int = GameManager.dice_pool.size()
 	var per_die: Array[int] = _get_per_die_scores()
+	hud.begin_score_feedback(old_total, new_total, _reroll_count > 0)
 
 	# Compute which dice have a non-zero contribution.
 	var scoring_indices: Array[int] = []
@@ -1082,6 +1087,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 
 	if scoring_indices.is_empty():
 		hud.animate_score_count(old_total, new_total)
+		hud.finish_score_feedback()
 		hud.show_floating_gold(new_total - old_total)
 		return 0.0
 
@@ -1115,6 +1121,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 		running = new_running
 	# After all per-die popups, show floating gold.
 	tween.tween_callback(_show_floating_gold_delta.bind(new_total - old_total)).set_delay(last_interval)
+	tween.tween_callback(hud.finish_score_feedback).set_delay(last_interval)
 	return elapsed + last_interval
 
 
@@ -1123,10 +1130,11 @@ func _play_score_tick_animation(die_index: int, die_score: int, tick_step: int, 
 	var score_face: DiceFaceData = current_results[die_index]
 	if score_die:
 		var popup_color: Color = PhysicsDie.face_type_color(score_face.type) if score_face else _UITheme.SCORE_GOLD
-		score_die.show_score_popup(die_score, popup_color)
 		score_die.pop()
+		hud.animate_score_transfer(score_die.global_position, die_score, old_total, new_total, popup_color)
+	else:
+		hud.animate_score_transfer(_get_multiplier_vfx_anchor_global_position(), die_score, old_total, new_total)
 	SFXManager.play_score_tick(tick_step)
-	hud.animate_score_count(old_total, new_total)
 
 
 func _show_floating_gold_delta(amount: int) -> void:
@@ -1173,19 +1181,83 @@ func _show_total_locked_status(new_total: int) -> void:
 
 
 func _play_multiply_face_vfx() -> void:
+	var effect_index: int = 0
+	var anchor: Vector2 = _get_multiplier_vfx_anchor_global_position()
 	for i: int in GameManager.dice_pool.size():
 		if dice_stopped[i]:
 			continue
 		var face: DiceFaceData = current_results[i]
 		if face == null:
 			continue
-		var die: PhysicsDie = dice_arena.get_die(i)
-		if die == null:
-			continue
 		if face.type == DiceFaceData.FaceType.MULTIPLY:
-			die.play_multiply_vfx(face.value)
+			_spawn_multiplier_burst(anchor + Vector2(0.0, _burst_vertical_offset(effect_index)), face.value, false)
+			effect_index += 1
 		elif face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
-			die.play_multiply_left_vfx(face.value)
+			_spawn_multiplier_burst(anchor + Vector2(0.0, _burst_vertical_offset(effect_index)), face.value, true)
+			effect_index += 1
+
+
+func _burst_vertical_offset(effect_index: int) -> float:
+	if effect_index == 0:
+		return 0.0
+	var direction: float = -1.0 if effect_index % 2 == 0 else 1.0
+	return direction * ceilf(float(effect_index) * 0.5) * MULTIPLIER_BURST_Y_JITTER
+
+
+func _get_multiplier_vfx_anchor_global_position() -> Vector2:
+	var arena_origin: Vector2 = _arena_viewport_container.global_position
+	var arena_size: Vector2 = _arena_viewport_container.size
+	return arena_origin + Vector2(arena_size.x * MULTIPLIER_BURST_X_RATIO, arena_size.y * 0.5)
+
+
+func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_multiplier: bool) -> void:
+	var fx_root := Node2D.new()
+	fx_root.name = "MultiplierBurstFx"
+	fx_root.top_level = true
+	fx_root.global_position = burst_position
+	add_child(fx_root)
+
+	var flame := CPUParticles2D.new()
+	flame.one_shot = true
+	flame.amount = 36
+	flame.lifetime = MULTIPLIER_BURST_DURATION
+	flame.explosiveness = 0.82
+	flame.direction = Vector2.RIGHT if not is_left_multiplier else Vector2(0.9, -0.1)
+	flame.spread = 34.0
+	flame.gravity = Vector2(0.0, -18.0)
+	flame.initial_velocity_min = 90.0
+	flame.initial_velocity_max = 180.0
+	flame.scale_amount_min = 1.4
+	flame.scale_amount_max = 2.6
+	var flame_gradient := Gradient.new()
+	var flame_color: Color = _UITheme.ROSE_ACCENT if is_left_multiplier else _UITheme.SCORE_GOLD
+	flame_gradient.set_color(0, Color(1.0, 0.98, 0.72, 0.95))
+	flame_gradient.add_point(0.45, flame_color)
+	flame_gradient.set_color(1, Color(flame_color.r, flame_color.g, flame_color.b, 0.0))
+	flame.color_ramp = flame_gradient
+	fx_root.add_child(flame)
+
+	var tag := Label.new()
+	tag.text = "<x%d" % multiplier if is_left_multiplier else "x%d" % multiplier
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tag.position = Vector2(-28.0, -18.0)
+	tag.size = Vector2(64.0, 24.0)
+	tag.add_theme_font_override("font", _UITheme.font_stats())
+	tag.add_theme_font_size_override("font_size", 22)
+	tag.add_theme_color_override("font_color", flame_color)
+	tag.add_theme_color_override("font_outline_color", Color("#05050A"))
+	tag.add_theme_constant_override("outline_size", 5)
+	fx_root.add_child(tag)
+
+	flame.emitting = true
+	fx_root.scale = Vector2(0.72, 0.72)
+	fx_root.modulate.a = 0.95
+	var tween: Tween = fx_root.create_tween()
+	tween.tween_property(fx_root, "scale", Vector2(1.12, 1.12), MULTIPLIER_BURST_DURATION * 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(fx_root, "global_position", burst_position + Vector2(34.0, -8.0), MULTIPLIER_BURST_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(fx_root, "modulate:a", 0.0, MULTIPLIER_BURST_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(fx_root.queue_free)
 
 
 ## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).

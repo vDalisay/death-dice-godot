@@ -164,6 +164,18 @@ func test_per_die_scores_sum_equals_turn_score() -> void:
 	assert_int(per_die_sum).is_equal(turn_score)
 
 
+func test_multiplier_vfx_anchor_is_left_center_of_arena() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _setup_scene(runner)
+	var anchor: Vector2 = root._get_multiplier_vfx_anchor_global_position()
+	var arena_rect := Rect2(root._arena_viewport_container.global_position, root._arena_viewport_container.size)
+	assert_float(anchor.x).is_greater_equal(arena_rect.position.x)
+	assert_float(anchor.x).is_less(arena_rect.position.x + arena_rect.size.x * 0.35)
+	assert_float(anchor.y).is_greater(arena_rect.position.y + arena_rect.size.y * 0.25)
+	assert_float(anchor.y).is_less(arena_rect.position.y + arena_rect.size.y * 0.75)
+
+
 # ---------------------------------------------------------------------------
 # CLOSE CALL / CLEAN ROLL status message conditions
 # ---------------------------------------------------------------------------

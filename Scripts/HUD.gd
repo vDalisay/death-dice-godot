@@ -8,10 +8,18 @@ const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
 
 const SCORE_COUNT_DURATION: float = 0.5
+const SCORE_STEP_DURATION: float = 0.18
+const SCORE_TRANSFER_DURATION: float = 0.34
+const SCORE_TRANSFER_ARC_HEIGHT: float = 44.0
 const GOLD_FLOAT_DURATION: float = 1.0
 const GOLD_COUNT_DURATION: float = 0.35
 const PROGRESS_LERP_DURATION: float = 0.4
 const PROGRESS_LERP_MIN_DURATION: float = 0.12
+const PROGRESS_THICKEN_STEP: float = 4.0
+const PROGRESS_THICKEN_CAP: float = 18.0
+const PROGRESS_THICKEN_GROW_DURATION: float = 0.1
+const PROGRESS_THICKEN_DEFLATE_DELAY: float = 0.14
+const PROGRESS_THICKEN_DEFLATE_DURATION: float = 0.45
 const ALMOST_THERE_THRESHOLD: float = 0.9
 const RISK_PIP_COUNT: int = 5
 const COMBO_BADGE_HEIGHT: int = 26
@@ -61,6 +69,8 @@ const COMBO_BADGE_HEIGHT: int = 26
 var _score_tween: Tween = null
 var _progress_tween: Tween = null
 var _progress_pulse_tween: Tween = null
+var _progress_hit_tween: Tween = null
+var _progress_thickness_tween: Tween = null
 var _combo_flash_tween: Tween = null
 var _gold_tween: Tween = null
 var _displayed_gold: int = -1
@@ -69,12 +79,19 @@ var _modifier_badges: Array[PanelContainer] = []
 var _last_modifier_types: Array[int] = []
 var _combo_badges_by_id: Dictionary = {}
 var _risk_tooltip_text: String = ""
+var _progress_bar_base_size: Vector2 = Vector2.ZERO
+var _progress_bar_thickness_bonus: float = 0.0
+var _score_feedback_active: bool = false
+var _score_feedback_is_reroll: bool = false
+var _score_feedback_display_total: int = 0
+var _score_feedback_pending_total: int = -1
 
 
 func _ready() -> void:
 	_create_risk_pips()
 	_cache_modifier_badges()
 	_apply_theme_styling()
+	_progress_bar_base_size = progress_bar.custom_minimum_size
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.lives_changed.connect(_on_lives_changed)
 	GameManager.gold_changed.connect(_on_gold_changed)
@@ -98,6 +115,7 @@ func _ready() -> void:
 	_risk_meter.mouse_entered.connect(_on_risk_meter_mouse_entered)
 	_risk_meter.mouse_exited.connect(_on_risk_meter_mouse_exited)
 	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
+	_score_feedback_display_total = GameManager.total_score
 
 
 # ---------------------------------------------------------------------------
@@ -298,12 +316,83 @@ func _pulse_combo_badge(combo_id: String) -> void:
 
 
 func animate_score_count(old_value: int, new_value: int) -> void:
+	_animate_score_label_between(old_value, new_value, SCORE_COUNT_DURATION)
+
+
+func begin_score_feedback(start_total: int, final_total: int, is_reroll_bank: bool) -> void:
+	_score_feedback_active = true
+	_score_feedback_is_reroll = is_reroll_bank
+	_score_feedback_display_total = start_total
+	_score_feedback_pending_total = final_total
+	_stop_progress_tween()
+	_stop_progress_thickness_tween()
+	_set_total_score_label(float(start_total))
+	_set_progress_bar_value(_score_to_progress_value(start_total))
+	_set_progress_bar_thickness(_progress_bar_base_size.y)
+
+
+func animate_score_transfer(source_global_position: Vector2, score_value: int, old_total: int, new_total: int, popup_color: Color = Color.TRANSPARENT) -> void:
+	if not _score_feedback_active:
+		begin_score_feedback(old_total, new_total, false)
+	if score_value <= 0:
+		_apply_score_feedback_step(old_total, new_total, 0)
+		return
+	var transfer_label := Label.new()
+	transfer_label.text = "+%d" % score_value
+	transfer_label.top_level = true
+	transfer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	transfer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	transfer_label.size = Vector2(96, 28)
+	transfer_label.pivot_offset = transfer_label.size * 0.5
+	transfer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	transfer_label.add_theme_font_override("font", _UITheme.font_stats())
+	transfer_label.add_theme_font_size_override("font_size", 20)
+	var resolved_color: Color = popup_color if popup_color != Color.TRANSPARENT else _UITheme.SCORE_GOLD
+	transfer_label.add_theme_color_override("font_color", resolved_color)
+	transfer_label.add_theme_color_override("font_outline_color", Color("#05050A"))
+	transfer_label.add_theme_constant_override("outline_size", 5)
+	add_child(transfer_label)
+	var start_position: Vector2 = source_global_position + Vector2(0.0, -42.0)
+	var end_position: Vector2 = _get_progress_hit_position(_score_to_progress_value(new_total)) + Vector2(0.0, -8.0)
+	var mid_position: Vector2 = start_position.lerp(end_position, 0.55) + Vector2(-18.0, -SCORE_TRANSFER_ARC_HEIGHT)
+	transfer_label.global_position = start_position - transfer_label.pivot_offset
+	transfer_label.scale = Vector2(0.8, 0.8)
+	var tween: Tween = transfer_label.create_tween()
+	tween.tween_property(transfer_label, "global_position", mid_position - transfer_label.pivot_offset, SCORE_TRANSFER_DURATION * 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(transfer_label, "scale", Vector2(1.0, 1.0), SCORE_TRANSFER_DURATION * 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(transfer_label, "global_position", end_position - transfer_label.pivot_offset, SCORE_TRANSFER_DURATION * 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(transfer_label, "scale", Vector2(0.78, 0.78), SCORE_TRANSFER_DURATION * 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(transfer_label, "modulate:a", 0.0, SCORE_TRANSFER_DURATION * 0.35).set_delay(SCORE_TRANSFER_DURATION * 0.65)
+	tween.tween_callback(_apply_score_feedback_step.bind(old_total, new_total, score_value))
+	tween.tween_callback(transfer_label.queue_free)
+
+
+func finish_score_feedback() -> void:
+	if not _score_feedback_active:
+		return
+	_score_feedback_active = false
+	if _score_feedback_pending_total > _score_feedback_display_total:
+		_animate_score_label_between(_score_feedback_display_total, _score_feedback_pending_total, SCORE_STEP_DURATION)
+		_animate_progress_bar_to(_score_to_progress_value(_score_feedback_pending_total), SCORE_STEP_DURATION)
+		_score_feedback_display_total = _score_feedback_pending_total
+	_schedule_progress_deflate()
+
+
+func get_progress_bar_current_height() -> float:
+	return progress_bar.custom_minimum_size.y
+
+
+func is_score_feedback_active() -> bool:
+	return _score_feedback_active
+
+
+func _animate_score_label_between(old_value: int, new_value: int, duration: float) -> void:
 	if _score_tween and _score_tween.is_valid():
 		_score_tween.kill()
 	_score_tween = create_tween()
 	_score_tween.tween_method(
 		_set_total_score_label,
-		float(old_value), float(new_value), SCORE_COUNT_DURATION
+		float(old_value), float(new_value), duration
 	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 
 
@@ -403,6 +492,10 @@ func _position_risk_tooltip() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_score_changed(new_total: int) -> void:
+	if _score_feedback_active:
+		_score_feedback_pending_total = new_total
+		return
+	_score_feedback_display_total = new_total
 	score_label.text = "Total: %d" % new_total
 	_refresh_progress_display()
 
@@ -493,8 +586,7 @@ func _refresh_stage_display() -> void:
 
 
 func _refresh_progress_display() -> void:
-	var target: int = maxi(1, GameManager.stage_target_score)
-	var target_value: float = clampf(float(GameManager.total_score) / float(target), 0.0, 1.0) * 100.0
+	var target_value: float = _score_to_progress_value(_get_progress_source_total())
 	if is_equal_approx(progress_bar.value, target_value):
 		_set_progress_bar_value(target_value)
 		return
@@ -505,10 +597,10 @@ func _refresh_progress_display() -> void:
 	_animate_progress_bar_to(target_value)
 
 
-func _animate_progress_bar_to(target_value: float) -> void:
+func _animate_progress_bar_to(target_value: float, duration_override: float = -1.0) -> void:
 	_stop_progress_tween()
 	var delta: float = absf(target_value - progress_bar.value)
-	var duration: float = lerpf(PROGRESS_LERP_MIN_DURATION, PROGRESS_LERP_DURATION, delta / 100.0)
+	var duration: float = duration_override if duration_override >= 0.0 else lerpf(PROGRESS_LERP_MIN_DURATION, PROGRESS_LERP_DURATION, delta / 100.0)
 	_progress_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_progress_tween.tween_method(_set_progress_bar_value, progress_bar.value, target_value, duration)
 	_progress_tween.finished.connect(_clear_progress_tween)
@@ -527,6 +619,92 @@ func _stop_progress_tween() -> void:
 func _set_progress_bar_value(value: float) -> void:
 	progress_bar.value = value
 	_update_progress_state(value / 100.0)
+
+
+func _get_progress_source_total() -> int:
+	return _score_feedback_display_total if _score_feedback_active else GameManager.total_score
+
+
+func _score_to_progress_value(score_total: int) -> float:
+	var target: int = maxi(1, GameManager.stage_target_score)
+	return clampf(float(score_total) / float(target), 0.0, 1.0) * 100.0
+
+
+func _get_progress_hit_position(progress_value: float) -> Vector2:
+	var ratio: float = clampf(progress_value / 100.0, 0.06, 1.0)
+	var fill_width: float = maxf(progress_bar.size.x, progress_bar.custom_minimum_size.x)
+	return progress_bar.global_position + Vector2(fill_width * ratio, progress_bar.size.y * 0.5)
+
+
+func _apply_score_feedback_step(old_total: int, new_total: int, score_value: int) -> void:
+	_score_feedback_display_total = new_total
+	_score_feedback_pending_total = maxi(_score_feedback_pending_total, new_total)
+	_animate_score_label_between(old_total, new_total, SCORE_STEP_DURATION)
+	_animate_progress_bar_to(_score_to_progress_value(new_total), SCORE_STEP_DURATION)
+	_play_progress_hit(score_value)
+
+
+func _play_progress_hit(score_value: int) -> void:
+	if _progress_hit_tween != null and _progress_hit_tween.is_valid():
+		_progress_hit_tween.kill()
+	var hit_boost: float = minf(1.0, float(maxi(score_value, 1)) / 18.0)
+	progress_bar.modulate = Color.WHITE
+	_progress_hit_tween = create_tween()
+	_progress_hit_tween.tween_property(progress_bar, "modulate", Color(1.0, 0.92 + hit_boost * 0.04, 0.7 + hit_boost * 0.1), 0.08)
+	_progress_hit_tween.tween_property(progress_bar, "modulate", Color.WHITE, 0.16)
+	var border_width: int = 1 + int(round(hit_boost * 2.0))
+	_progress_panel.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, border_width)
+	)
+	if _score_feedback_is_reroll:
+		var growth: float = minf(PROGRESS_THICKEN_STEP + float(score_value) * 0.08, PROGRESS_THICKEN_STEP * 2.0)
+		_progress_bar_thickness_bonus = minf(_progress_bar_thickness_bonus + growth, PROGRESS_THICKEN_CAP)
+		_animate_progress_bar_thickness(_progress_bar_base_size.y + _progress_bar_thickness_bonus, PROGRESS_THICKEN_GROW_DURATION)
+
+
+func _animate_progress_bar_thickness(target_height: float, duration: float) -> void:
+	_stop_progress_thickness_tween()
+	var start_height: float = progress_bar.custom_minimum_size.y
+	_progress_thickness_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_progress_thickness_tween.tween_method(_set_progress_bar_thickness, start_height, target_height, duration)
+
+
+func _set_progress_bar_thickness(height: float) -> void:
+	progress_bar.custom_minimum_size = Vector2(_progress_bar_base_size.x, height)
+
+
+func _schedule_progress_deflate() -> void:
+	if not _score_feedback_is_reroll:
+		_restore_progress_panel_style()
+		return
+	_stop_progress_thickness_tween()
+	var current_height: float = progress_bar.custom_minimum_size.y
+	_progress_thickness_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_progress_thickness_tween.tween_interval(PROGRESS_THICKEN_DEFLATE_DELAY)
+	_progress_thickness_tween.tween_method(_set_progress_bar_thickness, current_height, _progress_bar_base_size.y, PROGRESS_THICKEN_DEFLATE_DURATION)
+	_progress_thickness_tween.finished.connect(_on_progress_deflate_finished)
+
+
+func _on_progress_deflate_finished() -> void:
+	_progress_bar_thickness_bonus = 0.0
+	_restore_progress_panel_style()
+	_stop_progress_thickness_tween()
+
+
+func _restore_progress_panel_style() -> void:
+	if _progress_pulse_tween != null and _progress_pulse_tween.is_valid():
+		return
+	_progress_panel.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD)
+	)
+
+
+func _stop_progress_thickness_tween() -> void:
+	if _progress_thickness_tween != null and _progress_thickness_tween.is_valid():
+		_progress_thickness_tween.kill()
+	_progress_thickness_tween = null
 
 
 func _update_progress_state(ratio: float) -> void:
@@ -557,11 +735,7 @@ func _stop_progress_pulse() -> void:
 		_progress_pulse_tween.kill()
 	_progress_pulse_tween = null
 	progress_bar.modulate = Color.WHITE
-	# Restore default panel style
-	var default_style: StyleBoxFlat = _UITheme.make_panel_stylebox(
-		_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.PANEL_SURFACE, 0
-	)
-	_progress_panel.add_theme_stylebox_override("panel", default_style)
+	_restore_progress_panel_style()
 
 
 func _refresh_modifier_display() -> void:
