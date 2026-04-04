@@ -26,6 +26,7 @@ func _make_face(type: DiceFaceData.FaceType, value: int) -> DiceFaceData:
 func _force_clean_state(root: RollPhase) -> void:
 	var pool_size: int = GameManager.dice_pool.size()
 	root.accumulated_stop_count = 0
+	root.accumulated_shield_count = 0
 	root._reroll_count = 0
 	for i: int in pool_size:
 		root.dice_stopped[i] = false
