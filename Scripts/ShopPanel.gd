@@ -5,6 +5,7 @@ extends PanelContainer
 
 signal shop_closed()
 
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const ITEM_FONT_SIZE: int = 18
@@ -58,6 +59,8 @@ var _even_odd_overlay: Node = null
 var _ib_used_this_shop: bool = false
 var _hb_used_this_shop: bool = false
 var _eo_used_this_shop: bool = false
+var _transition_tween: Tween = null
+var _is_closing: bool = false
 
 
 func _ready() -> void:
@@ -87,6 +90,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	_generate_items()
 	_refresh_display()
 	visible = true
+	_is_closing = false
 	_play_open_intro()
 
 
@@ -373,7 +377,13 @@ func _upgrade_random_die() -> void:
 # ---------------------------------------------------------------------------
 
 func _on_continue_pressed() -> void:
+	if _is_closing:
+		return
+	_is_closing = true
+	_continue_button.disabled = true
+	_refresh_button.disabled = true
 	GameManager.on_shop_exited()
+	await _play_close_transition()
 	visible = false
 	shop_closed.emit()
 
@@ -499,19 +509,15 @@ func _on_double_down_resolved() -> void:
 
 
 func _play_open_intro() -> void:
-	_backdrop.color.a = 0.0
-	_modal.modulate.a = 0.0
-	_modal.scale = Vector2(1.03, 1.03)
-	var intro: Tween = create_tween()
-	intro.tween_property(_backdrop, "color:a", 0.72, MODAL_INTRO_DURATION)
-	intro.parallel().tween_property(_modal, "modulate:a", 1.0, MODAL_INTRO_DURATION)
-	intro.parallel().tween_property(_modal, "scale", Vector2.ONE, MODAL_INTRO_DURATION).set_ease(Tween.EASE_OUT)
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_enter(self, _modal, MODAL_INTRO_DURATION, _backdrop)
 	for index: int in _card_panels.size():
 		var card: PanelContainer = _card_panels[index]
 		card.modulate.a = 0.0
 		card.position.y += 14.0
 		card.scale = Vector2(0.96, 0.96)
-		intro.tween_callback(Callable(self, "_reveal_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
+		_transition_tween.tween_callback(Callable(self, "_reveal_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
 
 
 func _reveal_card(card: PanelContainer) -> void:
@@ -556,6 +562,13 @@ func _play_purchase_feedback(accent_color: Color) -> void:
 	badge_tween.tween_property(_gold_badge, "scale", Vector2.ONE, PURCHASE_FLASH_DURATION * 0.55).set_ease(Tween.EASE_IN)
 	_gold_label.add_theme_color_override("font_color", accent_color)
 	get_tree().create_timer(PURCHASE_FLASH_DURATION).timeout.connect(_restore_gold_label_color, CONNECT_ONE_SHOT)
+
+
+func _play_close_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_exit(self, _modal, 0.16, _backdrop)
+	await _transition_tween.finished
 
 
 func _restore_gold_label_color() -> void:
