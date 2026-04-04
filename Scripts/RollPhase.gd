@@ -165,6 +165,7 @@ func _start_new_turn() -> void:
 	turn_number += 1
 	accumulated_stop_count = 0
 	accumulated_shield_count = 0
+	GameManager.set_held_stop_count(0)
 	hud.reset_score_feedback_visuals(true)
 	_reroll_count = 0
 	_triggered_combo_ids.clear()
@@ -203,6 +204,11 @@ func _on_bank_pressed() -> void:
 	bank_streak += 1
 	_update_streak_display()
 	var heart_relief: int = _apply_banked_heart_relief()
+	var bank_threshold: int = _get_bust_threshold()
+	var bank_effective_stops: int = _get_effective_stop_count()
+	GameManager.set_held_stop_count(_count_intentionally_held_stops())
+	if bank_threshold > 1 and bank_effective_stops == bank_threshold - 1:
+		GameManager.register_near_death_bank(bank_effective_stops, bank_threshold)
 	var base_banked: int = _calculate_turn_score()
 	# Iron Bank: +50% score if no rerolls.
 	if GameManager.has_modifier(RunModifier.ModifierType.IRON_BANK) and _reroll_count == 0:
@@ -513,6 +519,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	for i: int in GameManager.dice_pool.size():
 		if i not in rolled_indices:
 			_sync_arena_die_state(i)
+	GameManager.set_held_stop_count(_count_intentionally_held_stops())
 	_sync_ui()
 
 	# Status messages based on roll outcome.
@@ -562,6 +569,20 @@ func _all_dice_resolved() -> bool:
 		if not dice_stopped[i] and not dice_keep[i]:
 			return false
 	return true
+
+
+func _get_effective_stop_count() -> int:
+	return _bust_resolver.effective_stops(accumulated_stop_count, _count_shields())
+
+
+func _count_intentionally_held_stops() -> int:
+	var total: int = 0
+	for i: int in GameManager.dice_pool.size():
+		if not dice_stopped[i]:
+			continue
+		if dice_keep[i] or dice_keep_locked[i]:
+			total += 1
+	return total
 
 func _calculate_turn_score() -> int:
 	return _turn_score_service.calculate_turn_score(
@@ -674,6 +695,7 @@ func _apply_bust_outcome(effective_stops: int) -> void:
 	bank_streak = 0
 	_update_streak_display()
 	hud.reset_score_feedback_visuals(true)
+	GameManager.set_held_stop_count(0)
 	GameManager.lose_life()
 	var insurance_payout: int = GameManager.resolve_insurance_bet()
 	AchievementManager.on_bust()

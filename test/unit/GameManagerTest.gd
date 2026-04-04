@@ -96,6 +96,10 @@ func test_reset_run_restores_defaults() -> void:
 	_gm.lose_life()
 	_gm.current_stage = 3
 	_gm.gold = 100
+	_gm.current_run_exp = 5
+	_gm.current_run_stop_shards = 2
+	_gm.set_held_stop_count(3)
+	_gm.activate_loop_contract("dead_close")
 	_gm.reset_run()
 	assert_int(_gm.total_score).is_equal(0)
 	assert_int(_gm.lives).is_equal(3)
@@ -103,6 +107,10 @@ func test_reset_run_restores_defaults() -> void:
 	assert_int(_gm.gold).is_equal(0)
 	assert_int(_gm.stage_target_score).is_equal(30)
 	assert_int(_gm.dice_pool.size()).is_equal(6)
+	assert_int(_gm.current_run_exp).is_equal(0)
+	assert_int(_gm.current_run_stop_shards).is_equal(0)
+	assert_int(_gm.held_stop_count).is_equal(0)
+	assert_str(_gm.active_loop_contract_id).is_equal("")
 
 
 func test_reset_run_emits_signals() -> void:
@@ -113,6 +121,8 @@ func test_reset_run_emits_signals() -> void:
 	await assert_signal(_gm).is_emitted("score_changed", [0])
 	await assert_signal(_gm).is_emitted("lives_changed", [3])
 	await assert_signal(_gm).is_emitted("gold_changed", [0])
+	await assert_signal(_gm).is_emitted("run_exp_changed", [0])
+	await assert_signal(_gm).is_emitted("run_stop_shards_changed", [0])
 	await assert_signal(_gm).is_emitted("stage_advanced", [1])
 
 
@@ -182,6 +192,21 @@ func test_add_gold_emits_signal() -> void:
 	monitor_signals(_gm, false)
 	_gm.add_gold(25)
 	await assert_signal(_gm).is_emitted("gold_changed", [25])
+
+
+func test_activate_loop_contract_updates_state() -> void:
+	monitor_signals(_gm, false)
+	_gm.activate_loop_contract("dead_close")
+	assert_str(_gm.active_loop_contract_id).is_equal("dead_close")
+	await assert_signal(_gm).is_emitted("loop_contract_changed", ["dead_close"])
+
+
+func test_register_near_death_bank_increments_counters() -> void:
+	monitor_signals(_gm, false)
+	_gm.register_near_death_bank(3, 4)
+	assert_int(_gm.near_death_banks_this_stage).is_equal(1)
+	assert_int(_gm.near_death_banks_this_run).is_equal(1)
+	await assert_signal(_gm).is_emitted("near_death_banked", [3, 4])
 
 
 func test_spend_gold_succeeds() -> void:

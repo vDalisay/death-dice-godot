@@ -54,6 +54,12 @@ signal loop_advanced(new_loop: int)
 signal luck_changed(new_luck: int)
 signal momentum_changed(new_momentum: int)
 signal run_mode_changed(new_mode: int)
+signal held_stops_changed(new_total: int)
+signal near_death_banked(effective_stops: int, threshold: int)
+signal loop_contract_changed(active_contract_id: String)
+signal loop_contract_progress_changed(progress: Dictionary)
+signal run_exp_changed(new_total: int)
+signal run_stop_shards_changed(new_total: int)
 
 var total_score: int = 0
 var lives: int = MAX_LIVES
@@ -72,6 +78,14 @@ var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
 var run_mode: RunMode = RunMode.CLASSIC
 var luck: int = 0
+var current_run_exp: int = 0
+var current_run_stop_shards: int = 0
+var held_stop_count: int = 0
+var active_loop_contract_id: String = ""
+var active_loop_contract_progress: Dictionary = {}
+var offered_loop_contract_ids: Array[String] = []
+var near_death_banks_this_stage: int = 0
+var near_death_banks_this_run: int = 0
 ## Event flags — temporary effects that reset each loop.
 var event_free_bust: bool = false
 var event_target_multiplier: float = 1.0
@@ -119,6 +133,55 @@ func add_momentum(amount: int = 1) -> void:
 func reset_momentum() -> void:
 	momentum = 0
 	momentum_changed.emit(momentum)
+
+
+func add_run_exp(amount: int) -> void:
+	if amount <= 0:
+		return
+	current_run_exp += amount
+	run_exp_changed.emit(current_run_exp)
+
+
+func add_run_stop_shards(amount: int) -> void:
+	if amount <= 0:
+		return
+	current_run_stop_shards += amount
+	run_stop_shards_changed.emit(current_run_stop_shards)
+
+
+func set_held_stop_count(count: int) -> void:
+	held_stop_count = maxi(0, count)
+	held_stops_changed.emit(held_stop_count)
+
+
+func set_offered_loop_contract_ids(contract_ids: Array[String]) -> void:
+	offered_loop_contract_ids = contract_ids.duplicate()
+
+
+func activate_loop_contract(contract_id: String) -> void:
+	active_loop_contract_id = contract_id
+	active_loop_contract_progress = {}
+	loop_contract_changed.emit(active_loop_contract_id)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func clear_active_loop_contract() -> void:
+	active_loop_contract_id = ""
+	active_loop_contract_progress = {}
+	offered_loop_contract_ids.clear()
+	loop_contract_changed.emit(active_loop_contract_id)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func update_loop_contract_progress(progress: Dictionary) -> void:
+	active_loop_contract_progress = progress.duplicate(true)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func register_near_death_bank(effective_stops: int, threshold: int) -> void:
+	near_death_banks_this_stage += 1
+	near_death_banks_this_run += 1
+	near_death_banked.emit(effective_stops, threshold)
 
 
 func set_event_free_bust(enabled: bool) -> void:
@@ -278,6 +341,7 @@ func advance_stage() -> void:
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
+	near_death_banks_this_stage = 0
 	reset_momentum()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
@@ -294,8 +358,10 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
+	near_death_banks_this_stage = 0
 	reset_momentum()
 	_reset_event_flags()
+	clear_active_loop_contract()
 	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
@@ -353,10 +419,16 @@ func reset_run() -> void:
 	gold = 0
 	best_turn_score = 0
 	luck = 0
+	current_run_exp = 0
+	current_run_stop_shards = 0
+	held_stop_count = 0
+	near_death_banks_this_stage = 0
+	near_death_banks_this_run = 0
 	event_free_bust = false
 	event_target_multiplier = 1.0
 	reset_momentum()
 	active_modifiers.clear()
+	clear_active_loop_contract()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
 	_clear_side_bets()
@@ -375,6 +447,9 @@ func reset_run() -> void:
 	score_changed.emit(total_score)
 	lives_changed.emit(lives)
 	gold_changed.emit(gold)
+	run_exp_changed.emit(current_run_exp)
+	run_stop_shards_changed.emit(current_run_stop_shards)
+	held_stops_changed.emit(held_stop_count)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
 
