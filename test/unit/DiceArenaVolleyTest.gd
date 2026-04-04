@@ -20,6 +20,14 @@ func test_volley_constants_are_sensible() -> void:
 	assert_float(DiceArena.VOLLEY_CONE_JITTER).is_greater_equal(0.0)
 	assert_float(DiceArena.VOLLEY_EMITTER_JITTER_X).is_greater(0.0)
 	assert_float(DiceArena.VOLLEY_EMITTER_JITTER_Y).is_greater(0.0)
+	assert_float(DiceArena.REROLL_VOLLEY_DELAY_START).is_greater(DiceArena.REROLL_VOLLEY_DELAY_END)
+	assert_float(DiceArena.REROLL_VOLLEY_DELAY_START).is_greater(DiceArena.VOLLEY_DELAY_START)
+	assert_float(DiceArena.REROLL_VOLLEY_DELAY_END).is_greater(DiceArena.VOLLEY_DELAY_END)
+	assert_float(DiceArena.REROLL_VOLLEY_DELAY_JITTER).is_greater_equal(0.0)
+	assert_float(DiceArena.REROLL_VOLLEY_CONE_HALF_ANGLE).is_less(DiceArena.VOLLEY_CONE_HALF_ANGLE)
+	assert_float(DiceArena.REROLL_VOLLEY_CONE_JITTER).is_less(DiceArena.VOLLEY_CONE_JITTER)
+	assert_float(DiceArena.REROLL_THROW_IMPULSE_MAX).is_less(DiceArena.THROW_IMPULSE_MAX)
+	assert_float(DiceArena.REROLL_THROW_IMPULSE_MIN).is_less(DiceArena.REROLL_THROW_IMPULSE_MAX)
 
 
 func test_volley_delay_acceleration() -> void:
@@ -29,6 +37,14 @@ func test_volley_delay_acceleration() -> void:
 		var cumulative: float = _arena.volley_cumulative_delay(idx, total)
 		var linear: float = float(idx) * DiceArena.VOLLEY_DELAY_START
 		assert_float(cumulative).is_less(linear)
+
+
+func test_reroll_delay_profile_is_slower_than_opening_volley() -> void:
+	var total: int = 8
+	for idx: int in [1, 3, 5, 7]:
+		var reroll_delay: float = _arena.reroll_cumulative_delay(idx, total)
+		var opening_delay: float = _arena.volley_cumulative_delay(idx, total)
+		assert_float(reroll_delay).is_greater(opening_delay)
 
 
 func test_volley_emitter_is_in_lower_arena() -> void:
@@ -110,3 +126,33 @@ func test_reroll_unaffected_by_volley() -> void:
 	assert_object(_arena.get_die(0).current_face).is_not_null()
 	# Die count unchanged.
 	assert_int(_arena.get_die_count()).is_equal(5)
+
+
+func test_begin_reroll_launch_sequence_adds_lift_phase_before_throw() -> void:
+	_arena.instant_mode = true
+	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
+	_arena.throw_dice(pool)
+	var die: PhysicsDie = _arena.get_die(0)
+	var face: DiceFaceData = pool[0].roll()
+
+	_arena._begin_reroll_launch_sequence(die, face, 0, 1)
+
+	assert_int(die.physics_state).is_equal(PhysicsDie.DiePhysicsState.RESOLVING)
+	assert_bool(die.freeze).is_true()
+	assert_float(die.linear_velocity.length()).is_equal(0.0)
+
+
+func test_reroll_volley_launch_uses_controlled_speed_range() -> void:
+	_arena.instant_mode = true
+	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
+	_arena.throw_dice(pool)
+	var die: PhysicsDie = _arena.get_die(0)
+	var face: DiceFaceData = pool[0].roll()
+
+	_arena._reroll_volley_launch(die, face, 0, 3)
+
+	var speed: float = die.linear_velocity.length()
+	assert_int(die.physics_state).is_equal(PhysicsDie.DiePhysicsState.FLYING)
+	assert_bool(die.freeze).is_false()
+	assert_float(speed).is_greater_equal(DiceArena.REROLL_THROW_IMPULSE_MIN)
+	assert_float(speed).is_less_equal(DiceArena.REROLL_THROW_IMPULSE_MAX)
