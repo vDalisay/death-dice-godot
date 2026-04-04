@@ -5,6 +5,7 @@ extends PanelContainer
 
 signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool)
 
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 
@@ -43,6 +44,9 @@ var _pending_open: bool = false
 var _reroute_button: Button = null
 var _reroute_uses: int = 0
 var _reroute_enabled: bool = false
+var _transition_tween: Tween = null
+var _last_open_used_loop_reveal: bool = false
+var _is_closing: bool = false
 
 
 func _ready() -> void:
@@ -64,6 +68,8 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
 	_refresh_hint_label()
 	_refresh_reroute_button()
 	visible = true
+	_is_closing = false
+	_last_open_used_loop_reveal = GameManager.consume_loop_reveal(GameManager.current_loop)
 	# Defer rebuild so the layout pass resolves _map_area.size first.
 	_pending_open = true
 	await get_tree().process_frame
@@ -135,7 +141,10 @@ func _rebuild_map() -> void:
 
 	# Connection lines (drawn behind buttons).
 	_draw_connections()
-	_prepare_nodes_for_intro()
+	if _last_open_used_loop_reveal:
+		_prepare_nodes_for_intro()
+	else:
+		_show_nodes_immediately()
 
 
 func _clear_map() -> void:
@@ -320,10 +329,14 @@ func _is_reachable_without_reroute(row: int, col: int) -> bool:
 
 
 func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> void:
+	if _is_closing:
+		return
+	_is_closing = true
 	var node: MapNodeData = _stage_map.get_node_at(row, col)
 	var used_reroute: bool = try_consume_reroute_for(row, col)
 	if node:
 		node.visited = true
+	await _play_close_transition()
 	visible = false
 	node_selected.emit(row, col, node_type, used_reroute)
 
@@ -352,15 +365,24 @@ func _prepare_nodes_for_intro() -> void:
 			btn.position.y += 10.0
 
 
+func _show_nodes_immediately() -> void:
+	for row_btns: Variant in _node_buttons:
+		for btn: Button in row_btns as Array[Button]:
+			btn.modulate.a = 1.0
+			btn.scale = Vector2.ONE
+
+
 func _play_intro() -> void:
-	var tween: Tween = create_tween()
-	tween.tween_property(self, "modulate:a", 1.0, PANEL_INTRO_DURATION)
-	tween.parallel().tween_property(_backdrop, "color:a", 0.95, PANEL_INTRO_DURATION)
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_enter(self, _content, PANEL_INTRO_DURATION, _backdrop)
+	if not _last_open_used_loop_reveal:
+		return
 	var reveal_index: int = 0
 	for row_index: int in _node_buttons.size():
 		var row_btns: Array = _node_buttons[row_index]
 		for col_index: int in row_btns.size():
-			tween.tween_callback(Callable(self, "_reveal_node_button_by_index").bind(row_index, col_index)).set_delay(NODE_REVEAL_STAGGER * reveal_index)
+			_transition_tween.tween_callback(Callable(self, "_reveal_node_button_by_index").bind(row_index, col_index)).set_delay(NODE_REVEAL_STAGGER * reveal_index)
 			reveal_index += 1
 
 
@@ -420,3 +442,10 @@ func _on_reroute_button_pressed() -> void:
 	_refresh_hint_label()
 	_refresh_reroute_button()
 	_rebuild_map()
+
+
+func _play_close_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_exit(self, _content, 0.16, _backdrop)
+	await _transition_tween.finished

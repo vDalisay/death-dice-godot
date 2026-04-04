@@ -4,6 +4,7 @@ extends ColorRect
 
 signal selection_confirmed(run_mode: int, archetype: int)
 
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const PrestigePanelScene: PackedScene = preload("res://Scenes/PrestigePanel.tscn")
 
@@ -28,6 +29,8 @@ const MODE_PULSE_SCALE: float = 1.06
 var _selected_mode: int = int(GameManager.RunMode.CLASSIC)
 var _mode_buttons: Array[Button] = []
 var _prestige_button: Button = null
+var _transition_tween: Tween = null
+var _interaction_locked: bool = false
 
 
 func _ready() -> void:
@@ -37,20 +40,21 @@ func _ready() -> void:
 	_gauntlet_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.GAUNTLET)))
 	_mode_buttons = [_classic_button, _gauntlet_button]
 	_set_mode(_selected_mode)
-	_rebuild_archetype_cards()
+	_rebuild_archetype_cards(true)
 	_play_intro()
 
 
 func open(initial_mode: int) -> void:
 	_selected_mode = initial_mode
+	_interaction_locked = false
 	_set_mode(_selected_mode)
-	_rebuild_archetype_cards()
+	_rebuild_archetype_cards(true)
 	_play_intro()
 
 
 func _apply_theme() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	color = Color(0.1, 0.1, 0.15, 0.0)
+	color = Color(0.1, 0.1, 0.15, 0.92)
 	_card_panel.custom_minimum_size = PANEL_MIN_SIZE
 	_card_panel.add_theme_stylebox_override(
 		"panel",
@@ -86,7 +90,7 @@ func _set_mode(mode: int) -> void:
 	_play_mode_pulse(selected_button)
 
 
-func _rebuild_archetype_cards() -> void:
+func _rebuild_archetype_cards(animate_cards: bool = false) -> void:
 	for child: Node in _archetype_row.get_children():
 		child.queue_free()
 
@@ -99,7 +103,10 @@ func _rebuild_archetype_cards() -> void:
 		archetypes.append(GameManager.Archetype.FORTUNE_FOOL)
 	for arch: GameManager.Archetype in archetypes:
 		_archetype_row.add_child(_build_archetype_card(arch))
-	_prepare_cards_for_intro()
+	if animate_cards:
+		_prepare_cards_for_intro()
+	else:
+		_show_cards_immediately()
 
 
 func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
@@ -154,12 +161,19 @@ func _build_archetype_card(archetype: GameManager.Archetype) -> PanelContainer:
 	select_button.disabled = not unlocked
 	select_button.add_theme_font_override("font", _UITheme.font_display())
 	select_button.add_theme_font_size_override("font_size", 18)
-	select_button.pressed.connect(func() -> void:
-		selection_confirmed.emit(_selected_mode, int(archetype))
-		queue_free()
-	)
+	select_button.pressed.connect(_confirm_selection.bind(int(archetype)))
 	card_box.add_child(select_button)
 	return card
+
+
+func _confirm_selection(archetype: int) -> void:
+	if _interaction_locked:
+		return
+	_interaction_locked = true
+	_set_interaction_enabled(false)
+	await _play_close_transition()
+	selection_confirmed.emit(_selected_mode, archetype)
+	queue_free()
 
 func _prepare_cards_for_intro() -> void:
 	for child: Node in _archetype_row.get_children():
@@ -171,20 +185,25 @@ func _prepare_cards_for_intro() -> void:
 		card.scale = Vector2(0.96, 0.96)
 
 
+func _show_cards_immediately() -> void:
+	for child: Node in _archetype_row.get_children():
+		var card: PanelContainer = child as PanelContainer
+		if card == null:
+			continue
+		card.modulate.a = 1.0
+		card.scale = Vector2.ONE
+
+
 func _play_intro() -> void:
-	color.a = 0.0
-	_card_panel.modulate.a = 0.0
-	_card_panel.scale = Vector2(1.04, 1.04)
-	var tween: Tween = create_tween()
-	tween.tween_property(self, "color:a", 0.92, INTRO_DURATION)
-	tween.parallel().tween_property(_card_panel, "modulate:a", 1.0, INTRO_DURATION)
-	tween.parallel().tween_property(_card_panel, "scale", Vector2.ONE, INTRO_DURATION).set_ease(Tween.EASE_OUT)
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_enter(self, _card_panel, INTRO_DURATION, self, Vector2(1.04, 1.04))
 	var reveal_index: int = 0
 	for child: Node in _archetype_row.get_children():
 		var card: PanelContainer = child as PanelContainer
 		if card == null:
 			continue
-		tween.tween_callback(_reveal_archetype_card_by_index.bind(reveal_index)).set_delay(CARD_REVEAL_STAGGER * reveal_index)
+		_transition_tween.tween_callback(_reveal_archetype_card_by_index.bind(reveal_index)).set_delay(CARD_REVEAL_STAGGER * reveal_index)
 		reveal_index += 1
 
 
@@ -200,6 +219,13 @@ func _reveal_archetype_card_by_index(index: int) -> void:
 	tween.tween_property(card, "modulate:a", 1.0, CARD_REVEAL_DURATION)
 	tween.parallel().tween_property(card, "position:y", end_y, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(card, "scale", Vector2.ONE, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _play_close_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_exit(self, _card_panel, INTRO_DURATION, self)
+	await _transition_tween.finished
 
 
 func _play_mode_pulse(button: Button) -> void:
@@ -223,6 +249,32 @@ func _add_prestige_button() -> void:
 
 
 func _open_prestige_panel() -> void:
+	if _interaction_locked:
+		return
 	var panel: Node = PrestigePanelScene.instantiate()
 	add_child(panel)
-	panel.connect("closed", Callable(self, "_rebuild_archetype_cards"))
+	panel.connect("closed", Callable(self, "_on_prestige_panel_closed"))
+
+
+func _on_prestige_panel_closed() -> void:
+	_rebuild_archetype_cards(false)
+
+
+func _set_interaction_enabled(enabled: bool) -> void:
+	for button: Button in _mode_buttons:
+		button.disabled = not enabled
+	if _prestige_button != null:
+		_prestige_button.disabled = not enabled
+	for child: Node in _archetype_row.get_children():
+		var card: PanelContainer = child as PanelContainer
+		if card == null or card.get_child_count() == 0:
+			continue
+		var margin: MarginContainer = card.get_child(0) as MarginContainer
+		if margin == null or margin.get_child_count() == 0:
+			continue
+		var card_box: VBoxContainer = margin.get_child(0) as VBoxContainer
+		if card_box == null or card_box.get_child_count() < 3:
+			continue
+		var select_button: Button = card_box.get_child(card_box.get_child_count() - 1) as Button
+		if select_button != null:
+			select_button.disabled = not enabled or select_button.text == "Locked"

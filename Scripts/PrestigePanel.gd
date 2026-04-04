@@ -4,6 +4,7 @@ extends PanelContainer
 
 signal closed()
 
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 
@@ -13,12 +14,16 @@ const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlock
 @onready var _cards_container: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/CardsContainer
 @onready var _close_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/CloseButton
 
+var _transition_tween: Tween = null
+var _is_closing: bool = false
+
 
 func _ready() -> void:
 	_apply_theme_styling()
 	_close_button.pressed.connect(_on_close_pressed)
 	SaveManager.prestige_currency_changed.connect(_on_currency_changed)
 	_rebuild_cards()
+	_play_open_transition()
 
 
 func _apply_theme_styling() -> void:
@@ -119,5 +124,23 @@ func _build_unlock_card(unlock: Resource) -> PanelContainer:
 
 
 func _on_close_pressed() -> void:
+	if _is_closing:
+		return
+	_is_closing = true
+	_close_button.disabled = true
+	await _play_close_transition()
 	closed.emit()
 	queue_free()
+
+
+func _play_open_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_enter(self, _modal, 0.18, null, Vector2(1.03, 1.03))
+
+
+func _play_close_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_exit(self, _modal, 0.16)
+	await _transition_tween.finished

@@ -23,3 +23,35 @@ func test_open_updates_hint_text() -> void:
 	await await_idle_frame()
 	var hint_label: Label = panel.get_node("MarginContainer/VBoxContainer/HintLabel") as Label
 	assert_str(hint_label.text).contains("Stage 1 / 7")
+
+
+func test_open_consumes_loop_reveal_only_once_per_loop() -> void:
+	GameManager.reset_run()
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: Resource = StageMapGenerator.generate(1)
+	panel.call("open", map, 0, -1)
+	await await_idle_frame()
+	assert_bool(panel.get("_last_open_used_loop_reveal")).is_true()
+	panel.visible = false
+	panel.call("open", map, 0, -1)
+	await await_idle_frame()
+	assert_bool(panel.get("_last_open_used_loop_reveal")).is_false()
+
+
+func test_open_reveals_again_when_a_new_loop_is_reached() -> void:
+	GameManager.reset_run()
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map_loop_one: Resource = StageMapGenerator.generate(1)
+	panel.call("open", map_loop_one, 0, -1)
+	await await_idle_frame()
+	assert_bool(panel.get("_last_open_used_loop_reveal")).is_true()
+	GameManager.advance_loop()
+	var map_loop_two: Resource = GameManager.stage_map
+	panel.visible = false
+	panel.call("open", map_loop_two, 0, -1)
+	await await_idle_frame()
+	assert_bool(panel.get("_last_open_used_loop_reveal")).is_true()

@@ -104,6 +104,7 @@ var prestige_starting_gold_bonus: int = 0
 var prestige_shop_tier_active: bool = false
 var prestige_reward_reroll_available: bool = false
 var prestige_reroute_uses: int = 0
+var _revealed_loop_numbers: Array[int] = []
 
 
 func set_archetype(archetype: Archetype) -> void:
@@ -302,6 +303,13 @@ func advance_loop() -> void:
 	loop_advanced.emit(current_loop)
 
 
+func consume_loop_reveal(loop_number: int) -> bool:
+	if loop_number in _revealed_loop_numbers:
+		return false
+	_revealed_loop_numbers.append(loop_number)
+	return true
+
+
 func is_final_stage() -> bool:
 	if stage_map:
 		return current_row >= stage_map.get_row_count() - 1
@@ -355,6 +363,7 @@ func reset_run() -> void:
 	prestige_shop_tier_active = SaveManager.has_prestige_unlock("shop_tier")
 	prestige_reward_reroll_available = SaveManager.has_prestige_unlock("reward_reroll")
 	prestige_reroute_uses = 1 if SaveManager.has_prestige_unlock("reroute_token") else 0
+	_revealed_loop_numbers.clear()
 	stage_target_score = _calculate_stage_target(current_stage)
 	_build_starting_pool()
 	if chosen_archetype == Archetype.FORTUNE_FOOL:
