@@ -34,8 +34,7 @@ const SPAWN_MARGIN: float = 80.0
 const BOTTOM_SPAWN_LIFT: float = 92.0
 const CONTAINMENT_BOUNCE_DAMP: float = 0.45
 const WALL_BOUNCE_DAMPEN_FACTOR: float = 0.6
-const REROLL_LIFT_DELAY: float = 0.06
-const REROLL_LIFT_RANDOM_MAX: float = 0.03
+const REROLL_EXIT_DURATION: float = 0.12
 const THROW_STAGGER_RANDOM_MAX: float = 0.02
 const THROW_STAGGER_SWEEP: float = 0.85
 const THROW_STAGGER_SPAWN_SWEEP_X: float = 52.0
@@ -67,22 +66,33 @@ const BAG_STACK_MAX_RADIUS: float = 22.0
 const VOLLEY_DELAY_START: float = 0.055
 const VOLLEY_DELAY_END: float = 0.012
 const VOLLEY_DELAY_JITTER: float = 0.008
-const VOLLEY_CONE_HALF_ANGLE: float = 0.55
+const VOLLEY_CONE_HALF_ANGLE: float = 1.45
 const VOLLEY_CONE_JITTER: float = 0.15
-const VOLLEY_EMITTER_JITTER_X: float = 15.0
-const VOLLEY_EMITTER_JITTER_Y: float = 8.0
+const VOLLEY_EMITTER_JITTER_X: float = 10.0
+const VOLLEY_EMITTER_JITTER_Y: float = 10.0
 const REROLL_VOLLEY_DELAY_START: float = 0.085
 const REROLL_VOLLEY_DELAY_END: float = 0.028
 const REROLL_VOLLEY_DELAY_JITTER: float = 0.004
-const REROLL_VOLLEY_CONE_HALF_ANGLE: float = 0.24
+const REROLL_VOLLEY_CONE_HALF_ANGLE: float = 0.9
 const REROLL_VOLLEY_CONE_JITTER: float = 0.06
-const REROLL_VOLLEY_EMITTER_SWEEP_X: float = 32.0
+const REROLL_VOLLEY_EMITTER_SWEEP_X: float = 0.0
 const REROLL_VOLLEY_EMITTER_JITTER_X: float = 8.0
-const REROLL_VOLLEY_EMITTER_JITTER_Y: float = 5.0
-const REROLL_VOLLEY_TARGET_SWEEP_X: float = 68.0
-const REROLL_VOLLEY_TARGET_HEIGHT_RATIO: float = 0.52
+const REROLL_VOLLEY_EMITTER_JITTER_Y: float = 8.0
+const REROLL_VOLLEY_TARGET_SWEEP_X: float = 0.0
+const REROLL_VOLLEY_TARGET_HEIGHT_RATIO: float = 0.54
 const REROLL_THROW_IMPULSE_MIN: float = 1080.0
 const REROLL_THROW_IMPULSE_MAX: float = 1580.0
+const VOLLEY_EMITTER_HEIGHT_RATIO: float = 0.54
+const BURST_TARGET_MIN_RING: float = 0.28
+const BURST_TARGET_RADIUS_X: float = 560.0
+const BURST_TARGET_RADIUS_Y: float = 185.0
+const BURST_TARGET_JITTER_X: float = 34.0
+const BURST_TARGET_JITTER_Y: float = 22.0
+const REROLL_BURST_TARGET_RADIUS_X: float = 470.0
+const REROLL_BURST_TARGET_RADIUS_Y: float = 150.0
+const REROLL_BURST_TARGET_JITTER_X: float = 24.0
+const REROLL_BURST_TARGET_JITTER_Y: float = 16.0
+const GOLDEN_ANGLE: float = 2.39996323
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -105,6 +115,7 @@ var _bag_panel: Panel = null
 var _bag_count_label: Label = null
 var _bag_kept_label: Label = null
 var _bag_dice_count: int = 0
+var _reroll_burst_rotation: float = 0.0
 ## When true, dice settle instantly (no physics). Set by tests.
 var instant_mode: bool = false
 
@@ -170,23 +181,32 @@ func throw_dice(pool: Array[DiceData]) -> void:
 
 
 func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
+	if instant_mode:
+		_execute_reroll(indices, pool)
+		return
 	# Move all kept (non-rerolled) dice to the dice bag.
 	var reroll_set: Dictionary = {}
 	for idx: int in indices:
 		reroll_set[idx] = true
-	var has_bag_animation: bool = false
+	_reset_bag()
+	var launch_prep_delay: float = 0.0
 	for i: int in _dice.size():
-		if not reroll_set.has(i) and is_instance_valid(_dice[i]):
+		if not is_instance_valid(_dice[i]):
+			continue
+		if reroll_set.has(i):
+			_animate_reroll_exit(_dice[i])
+			launch_prep_delay = maxf(launch_prep_delay, REROLL_EXIT_DURATION)
+		else:
 			_move_die_to_bag(_dice[i])
-			has_bag_animation = true
+			launch_prep_delay = maxf(launch_prep_delay, BAG_MOVE_DURATION)
 
-	if instant_mode or not has_bag_animation:
+	if instant_mode or launch_prep_delay <= 0.0:
 		_execute_reroll(indices, pool)
 	else:
-		# Wait for the bag animation to finish, then reroll.
+		# Wait for the exit and bag animations to finish, then reroll.
 		var captured_indices: Array[int] = indices.duplicate()
 		var captured_pool: Array[DiceData] = pool.duplicate()
-		get_tree().create_timer(BAG_MOVE_DURATION).timeout.connect(
+		get_tree().create_timer(launch_prep_delay).timeout.connect(
 			_execute_reroll.bind(captured_indices, captured_pool)
 		)
 
@@ -202,6 +222,7 @@ func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:
 		return
 
 	var total: int = valid_indices.size()
+	_reroll_burst_rotation = randf() * TAU
 
 	for slot: int in total:
 		var i: int = valid_indices[slot]
@@ -217,6 +238,10 @@ func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:
 		die._apply_visual()
 
 		if instant_mode:
+			die.collision_layer = 1
+			die.collision_mask = 1
+			die.scale = Vector2.ONE
+			die.modulate = Color.WHITE
 			die.show_face(face)
 			die.freeze = true
 			die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
@@ -356,16 +381,13 @@ func _volley_launch(index: int) -> void:
 	die.tumble(face)
 	die.play_launch_burst()
 
-	# Cone direction: sweep left-to-right across the volley.
 	var total: int = _pending_pool.size()
-	var target: Vector2 = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT * 0.4)
-	var base_dir: Vector2 = (target - emitter).normalized()
-	var base_angle: float = base_dir.angle()
-	var sweep_t: float = lerpf(-1.0, 1.0, float(index) / float(maxi(total - 1, 1)))
-	var cone_angle: float = base_angle + VOLLEY_CONE_HALF_ANGLE * sweep_t + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
-	var direction: Vector2 = Vector2.from_angle(cone_angle)
-
-	var magnitude: float = randf_range(THROW_IMPULSE_MIN, THROW_IMPULSE_MAX)
+	var target: Vector2 = _burst_target_position(index, total, false)
+	var direction: Vector2 = (target - emitter).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT.rotated(randf() * TAU)
+	var travel_ratio: float = clampf(emitter.distance_to(target) / BURST_TARGET_RADIUS_X, BURST_TARGET_MIN_RING, 1.0)
+	var magnitude: float = randf_range(THROW_IMPULSE_MIN, THROW_IMPULSE_MAX) * lerpf(0.92, 1.14, travel_ratio)
 	die.linear_velocity = direction * magnitude
 	die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
 	SFXManager.play_roll()
@@ -373,21 +395,22 @@ func _volley_launch(index: int) -> void:
 
 ## Emitter position for the volley: lower center of the arena.
 func _volley_emitter() -> Vector2:
-	return Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT - SPAWN_MARGIN - BOTTOM_SPAWN_LIFT)
+	return Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT * VOLLEY_EMITTER_HEIGHT_RATIO)
 
 
 func _begin_reroll_launch_sequence(die: PhysicsDie, face: DiceFaceData, slot: int, total: int) -> void:
 	if not is_instance_valid(die):
 		return
+	# Restore visibility — die was invisible from exit animation.
+	die.collision_layer = 1
+	die.collision_mask = 1
+	die.scale = Vector2.ONE
+	die.modulate = Color.WHITE
 	die.physics_state = PhysicsDie.DiePhysicsState.RESOLVING
 	die.freeze = true
 	die.linear_velocity = Vector2.ZERO
 	die.angular_velocity = 0.0
-	die.play_reroll_lift()
-	var launch_delay: float = REROLL_LIFT_DELAY + randf_range(0.0, REROLL_LIFT_RANDOM_MAX)
-	get_tree().create_timer(launch_delay).timeout.connect(
-		_reroll_volley_launch.bind(die, face, slot, total)
-	)
+	_reroll_volley_launch(die, face, slot, total)
 
 
 ## Launch a single rerolled die using the sweep volley pattern.
@@ -395,13 +418,9 @@ func _reroll_volley_launch(die: PhysicsDie, face: DiceFaceData, slot: int, total
 	if not is_instance_valid(die):
 		return
 
-	var slot_unit: float = _stagger_unit(slot, total)
-
-	# Move die to emitter with a narrower sweep and less jitter than the opening volley.
-	var emitter: Vector2 = _volley_emitter()
-	die.position = emitter + Vector2(
-		slot_unit * REROLL_VOLLEY_EMITTER_SWEEP_X + randf_range(-REROLL_VOLLEY_EMITTER_JITTER_X, REROLL_VOLLEY_EMITTER_JITTER_X),
-		randf_range(-REROLL_VOLLEY_EMITTER_JITTER_Y, REROLL_VOLLEY_EMITTER_JITTER_Y))
+	# Give each reroll sequence a fresh spread so low-dice rerolls do not repeat the same path.
+	var emitter: Vector2 = _reroll_emitter_position(slot, total)
+	die.position = emitter
 
 	die.physics_state = PhysicsDie.DiePhysicsState.FLYING
 	die.freeze = false
@@ -409,20 +428,81 @@ func _reroll_volley_launch(die: PhysicsDie, face: DiceFaceData, slot: int, total
 	die.tumble(face)
 	die.play_launch_burst()
 
-	# Cone direction with a tighter, more controlled sweep.
-	var target: Vector2 = Vector2(
-		ARENA_WIDTH / 2.0 + slot_unit * REROLL_VOLLEY_TARGET_SWEEP_X,
-		ARENA_HEIGHT * REROLL_VOLLEY_TARGET_HEIGHT_RATIO
-	)
-	var base_dir: Vector2 = (target - emitter).normalized()
-	var base_angle: float = base_dir.angle()
-	var cone_angle: float = base_angle + REROLL_VOLLEY_CONE_HALF_ANGLE * slot_unit + randf_range(-REROLL_VOLLEY_CONE_JITTER, REROLL_VOLLEY_CONE_JITTER)
-	var direction: Vector2 = Vector2.from_angle(cone_angle)
-
-	var magnitude: float = randf_range(REROLL_THROW_IMPULSE_MIN, REROLL_THROW_IMPULSE_MAX)
+	var target: Vector2 = _reroll_target_position(slot, total)
+	var direction: Vector2 = (target - emitter).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT.rotated(randf() * TAU)
+	var travel_ratio: float = clampf(emitter.distance_to(target) / REROLL_BURST_TARGET_RADIUS_X, BURST_TARGET_MIN_RING, 1.0)
+	var magnitude: float = randf_range(REROLL_THROW_IMPULSE_MIN, REROLL_THROW_IMPULSE_MAX) * lerpf(0.92, 1.08, travel_ratio)
+	magnitude = clampf(magnitude, REROLL_THROW_IMPULSE_MIN, REROLL_THROW_IMPULSE_MAX)
 	die.linear_velocity = direction * magnitude
 	die.angular_velocity = randf_range(THROW_ANGULAR_MIN * 0.8, THROW_ANGULAR_MAX * 0.8)
 	SFXManager.play_roll()
+
+
+func _burst_target_position(index: int, total: int, is_reroll: bool) -> Vector2:
+	var safe_total: int = maxi(total, 1)
+	var burst_center: Vector2 = Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT * REROLL_VOLLEY_TARGET_HEIGHT_RATIO)
+	var radius_x: float = REROLL_BURST_TARGET_RADIUS_X if is_reroll else BURST_TARGET_RADIUS_X
+	var radius_y: float = REROLL_BURST_TARGET_RADIUS_Y if is_reroll else BURST_TARGET_RADIUS_Y
+	var jitter_x: float = REROLL_BURST_TARGET_JITTER_X if is_reroll else BURST_TARGET_JITTER_X
+	var jitter_y: float = REROLL_BURST_TARGET_JITTER_Y if is_reroll else BURST_TARGET_JITTER_Y
+	var spiral_progress: float = sqrt((float(index) + 0.5) / float(safe_total))
+	var ring_ratio: float = lerpf(BURST_TARGET_MIN_RING, 1.0, spiral_progress)
+	var angle: float = GOLDEN_ANGLE * float(index) + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
+	var offset := Vector2(cos(angle) * radius_x * ring_ratio, sin(angle) * radius_y * ring_ratio)
+	offset.x += randf_range(-jitter_x, jitter_x)
+	offset.y += randf_range(-jitter_y, jitter_y)
+	var min_x: float = WALL_THICKNESS + PhysicsDie.COLLISION_RADIUS + SPAWN_EDGE_PADDING
+	var max_x: float = ARENA_WIDTH - WALL_THICKNESS - PhysicsDie.COLLISION_RADIUS - SPAWN_EDGE_PADDING
+	var min_y: float = WALL_THICKNESS + PhysicsDie.COLLISION_RADIUS + SPAWN_EDGE_PADDING
+	var max_y: float = ARENA_HEIGHT - WALL_THICKNESS - PhysicsDie.COLLISION_RADIUS - SPAWN_EDGE_PADDING
+	return Vector2(
+		clampf(burst_center.x + offset.x, min_x, max_x),
+		clampf(burst_center.y + offset.y, min_y, max_y)
+	)
+
+
+func _reroll_emitter_position(slot: int, _total: int) -> Vector2:
+	var base: Vector2 = _volley_emitter()
+	return base + Vector2(
+		slot * REROLL_VOLLEY_EMITTER_SWEEP_X + randf_range(-REROLL_VOLLEY_EMITTER_JITTER_X, REROLL_VOLLEY_EMITTER_JITTER_X),
+		randf_range(-REROLL_VOLLEY_EMITTER_JITTER_Y, REROLL_VOLLEY_EMITTER_JITTER_Y)
+	)
+
+
+func _reroll_target_position(slot: int, total: int) -> Vector2:
+	var safe_total: int = maxi(total, 1)
+	var sector_size: float = TAU / float(safe_total)
+	var ring_ratio: float = randf_range(0.45, 1.0)
+	var angle: float = _reroll_burst_rotation + float(slot) * sector_size + randf_range(-sector_size * 0.38, sector_size * 0.38)
+	var burst_center: Vector2 = Vector2(ARENA_WIDTH * 0.5, ARENA_HEIGHT * REROLL_VOLLEY_TARGET_HEIGHT_RATIO)
+	var offset := Vector2(
+		cos(angle) * REROLL_BURST_TARGET_RADIUS_X * ring_ratio,
+		sin(angle) * REROLL_BURST_TARGET_RADIUS_Y * ring_ratio
+	)
+	offset.x += randf_range(-REROLL_BURST_TARGET_JITTER_X, REROLL_BURST_TARGET_JITTER_X)
+	offset.y += randf_range(-REROLL_BURST_TARGET_JITTER_Y, REROLL_BURST_TARGET_JITTER_Y)
+	var min_x: float = WALL_THICKNESS + PhysicsDie.COLLISION_RADIUS + SPAWN_EDGE_PADDING
+	var max_x: float = ARENA_WIDTH - WALL_THICKNESS - PhysicsDie.COLLISION_RADIUS - SPAWN_EDGE_PADDING
+	var min_y: float = WALL_THICKNESS + PhysicsDie.COLLISION_RADIUS + SPAWN_EDGE_PADDING
+	var max_y: float = ARENA_HEIGHT - WALL_THICKNESS - PhysicsDie.COLLISION_RADIUS - SPAWN_EDGE_PADDING
+	return Vector2(
+		clampf(burst_center.x + offset.x, min_x, max_x),
+		clampf(burst_center.y + offset.y, min_y, max_y)
+	)
+
+
+func _animate_reroll_exit(die: PhysicsDie) -> void:
+	die.collision_layer = 0
+	die.collision_mask = 0
+	die.freeze = true
+	die.physics_state = PhysicsDie.DiePhysicsState.RESOLVING
+	die.linear_velocity = Vector2.ZERO
+	die.angular_velocity = 0.0
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(die, "scale", Vector2(0.18, 0.18), REROLL_EXIT_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_property(die, "modulate:a", 0.0, REROLL_EXIT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 ## Compute cumulative volley delay for a given die index (used by tests).
@@ -697,20 +777,41 @@ func _move_die_to_bag(die: PhysicsDie) -> void:
 	die.collision_layer = 0
 	die.collision_mask = 0
 	die.freeze = true
-	die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+	die.linear_velocity = Vector2.ZERO
+	die.angular_velocity = 0.0
+	die.physics_state = PhysicsDie.DiePhysicsState.KEPT
 	var target: Vector2 = _bag_slot_position(_bag_dice_count)
 	_bag_dice_count += 1
 	if _bag_count_label:
 		_bag_count_label.text = str(_bag_dice_count)
-	var tween: Tween = create_tween().set_parallel(true)
-	tween.tween_property(die, "position", target, BAG_MOVE_DURATION).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(die, "scale", Vector2(BAG_DIE_SCALE, BAG_DIE_SCALE), BAG_MOVE_DURATION).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+	if instant_mode:
+		die.position = target
+		die.scale = Vector2(BAG_DIE_SCALE, BAG_DIE_SCALE)
+	else:
+		var tween: Tween = create_tween().set_parallel(true)
+		tween.tween_property(die, "position", target, BAG_MOVE_DURATION).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+		tween.tween_property(die, "scale", Vector2(BAG_DIE_SCALE, BAG_DIE_SCALE), BAG_MOVE_DURATION).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+
+
+func _stash_die_in_bag(die: PhysicsDie, slot: int) -> void:
+	die.collision_layer = 0
+	die.collision_mask = 0
+	die.freeze = true
+	die.physics_state = PhysicsDie.DiePhysicsState.KEPT
+	die.linear_velocity = Vector2.ZERO
+	die.angular_velocity = 0.0
+	die.position = _bag_slot_position(slot)
+	die.scale = Vector2(BAG_DIE_SCALE, BAG_DIE_SCALE)
+
+
+func _set_bag_count(count: int) -> void:
+	_bag_dice_count = maxi(count, 0)
+	if _bag_count_label:
+		_bag_count_label.text = str(_bag_dice_count)
 
 
 func _reset_bag() -> void:
-	_bag_dice_count = 0
-	if _bag_count_label:
-		_bag_count_label.text = "0"
+	_set_bag_count(0)
 
 
 func _build_walls() -> void:

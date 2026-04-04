@@ -22,6 +22,9 @@ const SHAKE_BIG_BANK: float = 4.0
 const CHAIN_SHAKE_BASE: float = 2.0
 const CHAIN_SHAKE_STEP: float = 0.5
 const CHAIN_SHAKE_DURATION: float = 0.1
+const SCORE_ANIM_SPEEDUP_THRESHOLD: int = 6
+const SCORE_ANIM_SPEEDUP_PER_DIE: float = 0.06
+const SCORE_ANIM_BASE_INTERVAL_FLOOR: float = 0.05
 
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
@@ -79,6 +82,8 @@ var _bust_resolver: RefCounted = null
 var _risk_estimator: RefCounted = null
 var _roll_resolution_service: RefCounted = null
 var _stage_flow: RefCounted = null
+var _defer_stage_clear_overlay: bool = false
+var _pending_stage_clear_overlay: bool = false
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -86,6 +91,7 @@ const StageClearedScene: PackedScene = preload("res://Scenes/StageCleared.tscn")
 const DiceRewardScene: PackedScene = preload("res://Scenes/DiceRewardOverlay.tscn")
 const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToast.tscn")
 const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
+const RestOverlayScene: PackedScene = preload("res://Scenes/RestOverlay.tscn")
 const ArchetypePickerScene: PackedScene = preload("res://Scenes/ArchetypePicker.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
@@ -159,6 +165,7 @@ func _start_new_turn() -> void:
 	turn_number += 1
 	accumulated_stop_count = 0
 	accumulated_shield_count = 0
+	hud.reset_score_feedback_visuals(true)
 	_reroll_count = 0
 	_triggered_combo_ids.clear()
 	hud.set_active_combos([])
@@ -209,7 +216,11 @@ func _on_bank_pressed() -> void:
 	var momentum_mult: float = _get_momentum_multiplier()
 	var banked: int = int(base_banked * streak_mult * momentum_mult)
 	var old_total: int = GameManager.total_score
+	var will_clear_stage: bool = old_total + banked >= GameManager.stage_target_score
+	_defer_stage_clear_overlay = will_clear_stage
+	_pending_stage_clear_overlay = false
 	GameManager.add_score(banked)
+	_defer_stage_clear_overlay = false
 	# Reset momentum after banking (cashes out the bonus).
 	GameManager.reset_momentum()
 	# Accumulate LUCK face values for dice reward rarity.
@@ -287,8 +298,11 @@ func _on_bank_pressed() -> void:
 	# Per-die score count-up followed by cascade checkpoints.
 	var anim_duration: float = _play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
 	_sync_buttons()
-	# Auto-advance to next turn after counting animation finishes.
-	_schedule_auto_advance(anim_duration)
+	if will_clear_stage or _pending_stage_clear_overlay:
+		_schedule_deferred_stage_clear(anim_duration)
+	else:
+		# Auto-advance to next turn after counting animation finishes.
+		_schedule_auto_advance(anim_duration)
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	if turn_state != TurnState.ACTIVE:
@@ -659,6 +673,7 @@ func _apply_bust_outcome(effective_stops: int) -> void:
 	turn_state = TurnState.BUST
 	bank_streak = 0
 	_update_streak_display()
+	hud.reset_score_feedback_visuals(true)
 	GameManager.lose_life()
 	var insurance_payout: int = GameManager.resolve_insurance_bet()
 	AchievementManager.on_bust()
@@ -939,6 +954,13 @@ func _on_highlights_closed() -> void:
 	codex_button.visible = true
 
 func _on_stage_cleared() -> void:
+	if _defer_stage_clear_overlay:
+		_pending_stage_clear_overlay = true
+		return
+	_perform_stage_clear()
+
+
+func _perform_stage_clear() -> void:
 	AchievementManager.on_stage_cleared()
 	_run_active = false
 	roll_button.disabled = true
@@ -953,6 +975,18 @@ func _on_stage_cleared() -> void:
 			"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop, GameManager.current_loop + 1],
 			Color(1.0, 0.85, 0.0))
 	_show_stage_clear_overlay(bonus, surplus, is_loop)
+
+
+func _schedule_deferred_stage_clear(after_delay: float) -> void:
+	_pending_stage_clear_overlay = true
+	get_tree().create_timer(maxf(after_delay, 0.0)).timeout.connect(_trigger_pending_stage_clear, CONNECT_ONE_SHOT)
+
+
+func _trigger_pending_stage_clear() -> void:
+	if not _pending_stage_clear_overlay:
+		return
+	_pending_stage_clear_overlay = false
+	_perform_stage_clear()
 
 func _open_shop(is_loop_complete: bool = false) -> void:
 	_loop_complete_pending = is_loop_complete
@@ -1094,7 +1128,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 	# Time per die: start at base interval, accelerate after ACCEL_START_TIME.
 	const ACCEL_START_TIME: float = 2.0
 	const ACCEL_PERIOD: float = 2.0
-	var base_interval: float = minf(0.15, MAX_SCORE_ANIM_DURATION / float(scoring_indices.size()))
+	var base_interval: float = _score_tick_base_interval(scoring_indices.size(), pool_size)
 	var tween: Tween = create_tween()
 	var running: int = old_total
 	var elapsed: float = 0.0
@@ -1123,6 +1157,14 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 	tween.tween_callback(_show_floating_gold_delta.bind(new_total - old_total)).set_delay(last_interval)
 	tween.tween_callback(hud.finish_score_feedback).set_delay(last_interval)
 	return elapsed + last_interval
+
+
+func _score_tick_base_interval(scoring_die_count: int, pool_size: int) -> float:
+	var safe_scoring_count: int = maxi(scoring_die_count, 1)
+	var base_interval: float = minf(0.15, MAX_SCORE_ANIM_DURATION / float(safe_scoring_count))
+	var extra_dice: int = maxi(pool_size - SCORE_ANIM_SPEEDUP_THRESHOLD, 0)
+	var speed_scale: float = maxf(0.55, 1.0 - float(extra_dice) * SCORE_ANIM_SPEEDUP_PER_DIE)
+	return maxf(SCORE_ANIM_BASE_INTERVAL_FLOOR, base_interval * speed_scale)
 
 
 func _play_score_tick_animation(die_index: int, die_score: int, tick_step: int, old_total: int, new_total: int) -> void:
@@ -1478,9 +1520,23 @@ func _open_forge_from_map() -> void:
 
 
 func _execute_rest_node() -> void:
+	var lives_before: int = GameManager.lives
 	_stage_flow.apply_rest_rewards(REST_HEAL_LIVES, REST_GOLD_BONUS)
+	var lives_after: int = GameManager.lives
 	hud.show_status("Rested! +%d life, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
 	SFXManager.play_stage_clear()
+	_show_rest_overlay(lives_before, lives_after)
+
+
+func _show_rest_overlay(lives_before: int, lives_after: int) -> void:
+	var overlay: ColorRect = RestOverlayScene.instantiate() as ColorRect
+	add_child(overlay)
+	overlay.call("open", REST_HEAL_LIVES, REST_GOLD_BONUS, lives_before, lives_after)
+	overlay.connect("continue_requested", _on_rest_overlay_continue.bind(overlay))
+
+
+func _on_rest_overlay_continue(overlay: ColorRect) -> void:
+	_queue_free_if_valid(overlay)
 	_open_stage_map()
 
 

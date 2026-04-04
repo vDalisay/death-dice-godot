@@ -28,6 +28,9 @@ func test_volley_constants_are_sensible() -> void:
 	assert_float(DiceArena.REROLL_VOLLEY_CONE_JITTER).is_less(DiceArena.VOLLEY_CONE_JITTER)
 	assert_float(DiceArena.REROLL_THROW_IMPULSE_MAX).is_less(DiceArena.THROW_IMPULSE_MAX)
 	assert_float(DiceArena.REROLL_THROW_IMPULSE_MIN).is_less(DiceArena.REROLL_THROW_IMPULSE_MAX)
+	assert_float(DiceArena.REROLL_EXIT_DURATION).is_greater(0.0)
+	assert_float(DiceArena.BURST_TARGET_RADIUS_X).is_greater(DiceArena.REROLL_BURST_TARGET_RADIUS_X)
+	assert_float(DiceArena.BURST_TARGET_RADIUS_Y).is_greater(DiceArena.REROLL_BURST_TARGET_RADIUS_Y)
 
 
 func test_volley_delay_acceleration() -> void:
@@ -47,10 +50,10 @@ func test_reroll_delay_profile_is_slower_than_opening_volley() -> void:
 		assert_float(reroll_delay).is_greater(opening_delay)
 
 
-func test_volley_emitter_is_in_lower_arena() -> void:
+func test_volley_emitter_is_centered_in_arena() -> void:
 	var emitter: Vector2 = _arena._volley_emitter()
 	assert_float(emitter.x).is_equal_approx(DiceArena.ARENA_WIDTH / 2.0, 1.0)
-	assert_float(emitter.y).is_greater(DiceArena.ARENA_HEIGHT * 0.5)
+	assert_float(emitter.y).is_equal_approx(DiceArena.ARENA_HEIGHT * DiceArena.VOLLEY_EMITTER_HEIGHT_RATIO, 1.0)
 
 
 func test_instant_mode_still_works() -> void:
@@ -128,7 +131,7 @@ func test_reroll_unaffected_by_volley() -> void:
 	assert_int(_arena.get_die_count()).is_equal(5)
 
 
-func test_begin_reroll_launch_sequence_adds_lift_phase_before_throw() -> void:
+func test_begin_reroll_launch_sequence_launches_without_lift_pause() -> void:
 	_arena.instant_mode = true
 	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
 	_arena.throw_dice(pool)
@@ -137,9 +140,9 @@ func test_begin_reroll_launch_sequence_adds_lift_phase_before_throw() -> void:
 
 	_arena._begin_reroll_launch_sequence(die, face, 0, 1)
 
-	assert_int(die.physics_state).is_equal(PhysicsDie.DiePhysicsState.RESOLVING)
-	assert_bool(die.freeze).is_true()
-	assert_float(die.linear_velocity.length()).is_equal(0.0)
+	assert_int(die.physics_state).is_equal(PhysicsDie.DiePhysicsState.FLYING)
+	assert_bool(die.freeze).is_false()
+	assert_float(die.linear_velocity.length()).is_greater_equal(DiceArena.REROLL_THROW_IMPULSE_MIN)
 
 
 func test_reroll_volley_launch_uses_controlled_speed_range() -> void:
@@ -156,3 +159,33 @@ func test_reroll_volley_launch_uses_controlled_speed_range() -> void:
 	assert_bool(die.freeze).is_false()
 	assert_float(speed).is_greater_equal(DiceArena.REROLL_THROW_IMPULSE_MIN)
 	assert_float(speed).is_less_equal(DiceArena.REROLL_THROW_IMPULSE_MAX)
+
+
+func test_kept_dice_snap_into_bag_when_rerolling() -> void:
+	_arena.instant_mode = true
+	var pool: Array[DiceData] = [DiceData.make_standard_d6(), DiceData.make_standard_d6()]
+	_arena.throw_dice(pool)
+	var kept_die: PhysicsDie = _arena.get_die(1)
+	# Directly call _move_die_to_bag with instant_mode — snaps position instantly.
+	_arena._reset_bag()
+	_arena._move_die_to_bag(kept_die)
+	var bag_target: Vector2 = _arena._bag_slot_position(0)
+	assert_float(kept_die.position.x).is_equal_approx(bag_target.x, 0.1)
+	assert_float(kept_die.position.y).is_equal_approx(bag_target.y, 0.1)
+	assert_int(kept_die.physics_state).is_equal(PhysicsDie.DiePhysicsState.KEPT)
+	assert_float(kept_die.scale.x).is_equal_approx(DiceArena.BAG_DIE_SCALE, 0.01)
+
+
+func test_reroll_launch_starts_from_center_emitter() -> void:
+	_arena.instant_mode = true
+	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
+	_arena.throw_dice(pool)
+	var die: PhysicsDie = _arena.get_die(0)
+	var face: DiceFaceData = pool[0].roll()
+	_arena._reroll_burst_rotation = 0.0
+
+	_arena._reroll_volley_launch(die, face, 0, 3)
+
+	var emitter: Vector2 = _arena._volley_emitter()
+	assert_float(die.position.distance_to(emitter)).is_less_equal(16.0)
+	assert_float(die.linear_velocity.length()).is_greater_equal(DiceArena.REROLL_THROW_IMPULSE_MIN)

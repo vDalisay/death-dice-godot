@@ -58,13 +58,13 @@ func _ready() -> void:
 
 func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses: int = 0) -> void:
 	_stage_map = stage_map
-	_current_row = current_row
-	_current_col = previous_col
-	_reroute_uses = reroute_uses if current_row > 0 else 0
+	_current_row = _resolve_open_row(current_row)
+	_current_col = _resolve_previous_col(previous_col, _current_row)
+	_reroute_uses = reroute_uses if _current_row > 0 else 0
 	_reroute_enabled = false
 	_title_label.text = "LOOP %d — Choose Your Path" % GameManager.current_loop
-	_backdrop.color.a = 0.0
-	modulate.a = 0.0
+	modulate.a = 1.0
+	_backdrop.modulate.a = 0.0
 	_refresh_hint_label()
 	_refresh_reroute_button()
 	visible = true
@@ -76,6 +76,45 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
 	_pending_open = false
 	_rebuild_map()
 	_play_intro()
+
+
+func _resolve_open_row(requested_row: int) -> int:
+	if _stage_map == null:
+		return maxi(requested_row, 0)
+	var row_count: int = _stage_map.get_row_count()
+	if row_count <= 0:
+		return 0
+	var resolved_row: int = clampi(requested_row, 0, row_count - 1)
+	while resolved_row < row_count - 1 and _row_has_visited_node(resolved_row):
+		resolved_row += 1
+	return resolved_row
+
+
+func _resolve_previous_col(requested_col: int, resolved_row: int) -> int:
+	if _stage_map == null or resolved_row <= 0:
+		return -1
+	var prior_row: Array[MapNodeData] = _stage_map.get_row(resolved_row - 1)
+	if requested_col >= 0 and requested_col < prior_row.size():
+		var requested_node: MapNodeData = prior_row[requested_col] as MapNodeData
+		if requested_node != null and requested_node.visited:
+			return requested_col
+	for idx: int in prior_row.size():
+		var prior_node: MapNodeData = prior_row[idx] as MapNodeData
+		if prior_node != null and prior_node.visited:
+			return idx
+	if requested_col >= 0 and requested_col < prior_row.size():
+		return requested_col
+	return -1
+
+
+func _row_has_visited_node(row_index: int) -> bool:
+	if _stage_map == null:
+		return false
+	var row_nodes: Array[MapNodeData] = _stage_map.get_row(row_index)
+	for node: MapNodeData in row_nodes:
+		if node != null and node.visited:
+			return true
+	return false
 
 
 func _on_map_area_resized() -> void:
@@ -177,27 +216,25 @@ func _draw_connections() -> void:
 				var line: Line2D = Line2D.new()
 				line.add_point(from_pt)
 				line.add_point(to_pt)
-				# Color: visited path, active choice, or dim future.
-				if node.visited:
-					line.default_color = LINE_COLOR_VISITED
-					line.width = LINE_WIDTH
-				elif r == _current_row - 1 and node.visited:
-					line.default_color = LINE_COLOR_ACTIVE
-					line.width = LINE_WIDTH_ACTIVE
-				elif r >= _current_row:
-					# Check if this is a reachable connection from current row.
-					if r == _current_row and _can_reach(r, c):
-						line.default_color = LINE_COLOR_ACTIVE
-						line.width = LINE_WIDTH_ACTIVE
-					else:
-						line.default_color = LINE_COLOR
-						line.width = LINE_WIDTH
-				else:
-					line.default_color = LINE_COLOR
-					line.width = LINE_WIDTH
+				_apply_connection_visual(line, r, c, conn, node)
 				_map_area.add_child(line)
 				_map_area.move_child(line, 0)
 				_connection_lines.append(line)
+
+
+func _apply_connection_visual(line: Line2D, row: int, _col: int, next_col: int, node: MapNodeData) -> void:
+	var target_row: int = row + 1
+	var target_node: MapNodeData = _stage_map.get_node_at(target_row, next_col)
+	if node.visited and target_node != null and target_node.visited:
+		line.default_color = LINE_COLOR_VISITED
+		line.width = LINE_WIDTH
+		return
+	if row == _current_row - 1 and node.visited and _is_reachable_without_reroute(target_row, next_col):
+		line.default_color = LINE_COLOR_ACTIVE
+		line.width = LINE_WIDTH_ACTIVE
+		return
+	line.default_color = LINE_COLOR
+	line.width = LINE_WIDTH
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +412,7 @@ func _show_nodes_immediately() -> void:
 func _play_intro() -> void:
 	if _transition_tween != null:
 		_transition_tween.kill()
+	modulate.a = 1.0
 	_transition_tween = FlowTransitionScript.play_enter(self, _content, PANEL_INTRO_DURATION, _backdrop)
 	if not _last_open_used_loop_reveal:
 		return
