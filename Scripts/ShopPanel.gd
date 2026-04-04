@@ -1,0 +1,642 @@
+class_name ShopPanel
+extends PanelContainer
+## Between-stage shop. The player spends gold to buy dice or upgrade faces.
+## Redesigned as a modal card shop while preserving existing economy logic.
+
+signal shop_closed()
+
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
+const _UITheme := preload("res://Scripts/UITheme.gd")
+
+const ITEM_FONT_SIZE: int = 18
+const REFRESH_COST: int = 5
+const MODAL_INTRO_DURATION: float = 0.22
+const CARD_REVEAL_STAGGER: float = 0.06
+const CARD_REVEAL_DURATION: float = 0.2
+const AFFORDABLE_CARD_ALPHA: float = 1.0
+const BLOCKED_CARD_ALPHA: float = 0.58
+const PURCHASE_FLASH_DURATION: float = 0.18
+
+const DICE_SLOTS: int = 4
+const MODIFIER_SLOTS: int = 2
+const DOUBLE_DOWN_MIN_GOLD: int = 10
+
+var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
+var _ShopItemCardScene: PackedScene = preload("res://Scenes/ShopItemCard.tscn")
+const INSURANCE_BET_MIN_GOLD: int = 10
+const HEAT_BET_MIN_GOLD: int = 15
+const EVEN_ODD_BET_MIN_GOLD: int = 5
+
+var _InsuranceBetScene: PackedScene = preload("res://Scenes/InsuranceBetOverlay.tscn")
+var _HeatBetScene: PackedScene = preload("res://Scenes/HeatBetOverlay.tscn")
+var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn")
+
+@onready var _backdrop: ColorRect = $Backdrop
+@onready var _modal: PanelContainer = $CenterContainer/Modal
+@onready var _gold_badge: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge
+@onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
+@onready var _gold_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge/GoldLabel
+@onready var _dice_container: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceContainer
+@onready var _modifier_container: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierContainer
+@onready var _dice_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceHeader
+@onready var _modifier_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierHeader
+@onready var _pool_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/PoolLabel
+@onready var _refresh_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/RefreshButton
+@onready var _continue_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/ContinueButton
+
+var _dice_items: Array[ShopItemData] = []
+var _modifier_items: Array[ShopItemData] = []
+var _all_items: Array[ShopItemData] = []
+var _buy_buttons: Array[Button] = []
+var _price_labels: Array[Label] = []
+var _card_panels: Array[PanelContainer] = []
+var _double_down_desc_label: Label = null
+var _double_down_overlay: DoubleDownOverlay = null
+var _dd_used_this_shop: bool = false
+var _insurance_overlay: Node = null
+var _heat_overlay: Node = null
+var _even_odd_overlay: Node = null
+var _ib_used_this_shop: bool = false
+var _hb_used_this_shop: bool = false
+var _eo_used_this_shop: bool = false
+var _transition_tween: Tween = null
+var _is_closing: bool = false
+
+
+func _ready() -> void:
+	_apply_theme_styling()
+	_continue_button.pressed.connect(_on_continue_pressed)
+	_refresh_button.pressed.connect(_on_refresh_pressed)
+	GameManager.gold_changed.connect(_on_gold_changed)
+	visible = false
+
+
+# ---------------------------------------------------------------------------
+# Public API — called by RollPhase
+# ---------------------------------------------------------------------------
+
+func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
+	GameManager.on_shop_entered()
+	_dd_used_this_shop = false
+	_ib_used_this_shop = false
+	_hb_used_this_shop = false
+	_eo_used_this_shop = false
+	if is_loop_complete:
+		_title_label.text = "LOOP %d COMPLETE" % (GameManager.current_loop - 1)
+		_continue_button.text = "Start Loop %d" % GameManager.current_loop
+	else:
+		_title_label.text = "STAGE %d COMPLETE" % stage_just_cleared
+		_continue_button.text = "Continue to Stage %d" % (stage_just_cleared + 1)
+	_generate_items()
+	_refresh_display()
+	visible = true
+	_is_closing = false
+	_play_open_intro()
+
+
+# ---------------------------------------------------------------------------
+# Visual styling
+# ---------------------------------------------------------------------------
+
+func _apply_theme_styling() -> void:
+	# Root should be transparent while backdrop + modal do the visual work.
+	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
+	_backdrop.color = Color(0, 0, 0, 0.72)
+
+	_modal.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+	)
+	_gold_badge.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 2)
+	)
+
+	_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_title_label.add_theme_font_size_override("font_size", 18)
+	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_gold_label.add_theme_font_override("font", _UITheme.font_stats())
+	_gold_label.add_theme_font_size_override("font_size", 24)
+	_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_dice_header.add_theme_font_override("font", _UITheme.font_display())
+	_dice_header.add_theme_font_size_override("font_size", 14)
+	_dice_header.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_modifier_header.add_theme_font_override("font", _UITheme.font_display())
+	_modifier_header.add_theme_font_size_override("font_size", 14)
+	_modifier_header.add_theme_color_override("font_color", _UITheme.NEON_PURPLE)
+
+	_pool_label.add_theme_font_override("font", _UITheme.font_body())
+	_pool_label.add_theme_font_size_override("font_size", 18)
+	_pool_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+
+	_refresh_button.text = "Refresh Shop (%s%d)" % [_UITheme.GLYPH_GOLD, REFRESH_COST]
+	_refresh_button.add_theme_font_override("font", _UITheme.font_display())
+	_refresh_button.add_theme_font_size_override("font_size", 12)
+	_continue_button.add_theme_font_override("font", _UITheme.font_display())
+	_continue_button.add_theme_font_size_override("font_size", 12)
+
+
+# ---------------------------------------------------------------------------
+# Item generation
+# ---------------------------------------------------------------------------
+
+func _generate_items() -> void:
+	_dice_items.clear()
+	_modifier_items.clear()
+	_double_down_desc_label = null
+
+	var dice_pool: Array[ShopItemData] = [
+		ShopItemData.make_buy_simple_die(),
+		ShopItemData.make_buy_standard_die(),
+		ShopItemData.make_buy_blank_canvas_die(),
+		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_buy_heart_die(),
+		ShopItemData.make_buy_pink_die(),
+		ShopItemData.make_buy_fortune_die(),
+	]
+	if GameManager.current_loop >= 2 or GameManager.prestige_shop_tier_active:
+		dice_pool.append(ShopItemData.make_buy_runner_die())
+		dice_pool.append(ShopItemData.make_buy_golden_die())
+		dice_pool.append(ShopItemData.make_buy_insurance_die())
+		dice_pool.append(ShopItemData.make_buy_heavy_die())
+		dice_pool.append(ShopItemData.make_buy_explosive_die())
+
+	dice_pool.shuffle()
+	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
+	for i: int in pick_count:
+		_dice_items.append(dice_pool[i])
+
+	if not GameManager.dice_pool.is_empty():
+		_dice_items.append(ShopItemData.make_upgrade_die())
+	if _any_die_has_cursed_stop():
+		_dice_items.append(ShopItemData.make_cleanse_curse())
+	if GameManager.gold >= DOUBLE_DOWN_MIN_GOLD and not _dd_used_this_shop:
+		_dice_items.append(ShopItemData.make_double_down())
+	if GameManager.gold >= INSURANCE_BET_MIN_GOLD and not _ib_used_this_shop:
+		_dice_items.append(ShopItemData.make_insurance_bet())
+	if GameManager.gold >= HEAT_BET_MIN_GOLD and not _hb_used_this_shop:
+		_dice_items.append(ShopItemData.make_heat_bet())
+	if GameManager.gold >= EVEN_ODD_BET_MIN_GOLD and not _eo_used_this_shop:
+		_dice_items.append(ShopItemData.make_even_odd_bet())
+
+	if GameManager.can_add_modifier():
+		var mod_factories: Array[Callable] = RunModifier.all_factories()
+		var available_mods: Array[Callable] = []
+		for factory: Callable in mod_factories:
+			var sample: RunModifier = factory.call() as RunModifier
+			if not GameManager.has_modifier(sample.modifier_type):
+				available_mods.append(factory)
+		available_mods.shuffle()
+		var mod_count: int = mini(MODIFIER_SLOTS, available_mods.size())
+		for i: int in mod_count:
+			var mod: RunModifier = available_mods[i].call() as RunModifier
+			_modifier_items.append(ShopItemData.make_buy_modifier(mod))
+
+	_build_item_cards()
+
+
+func _build_item_cards() -> void:
+	_clear_container(_dice_container)
+	_clear_container(_modifier_container)
+	_all_items.clear()
+	_buy_buttons.clear()
+	_price_labels.clear()
+	_card_panels.clear()
+
+	_dice_header.visible = not _dice_items.is_empty()
+	for item: ShopItemData in _dice_items:
+		var card: PanelContainer = _make_item_card(item)
+		_dice_container.add_child(card)
+		_all_items.append(item)
+
+	_modifier_header.visible = not _modifier_items.is_empty()
+	for item: ShopItemData in _modifier_items:
+		var card: PanelContainer = _make_item_card(item)
+		_modifier_container.add_child(card)
+		_all_items.append(item)
+
+
+func _clear_container(container: Node) -> void:
+	for child: Node in container.get_children():
+		child.queue_free()
+
+
+func _make_item_card(item: ShopItemData) -> PanelContainer:
+	var card: PanelContainer = _ShopItemCardScene.instantiate() as PanelContainer
+	var accent_bar: ColorRect = card.get_node("VBoxContainer/AccentBar") as ColorRect
+	var name_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/NameLabel") as Label
+	var desc_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/DescLabel") as Label
+	var price_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/PriceLabel") as Label
+	var buy_button: Button = card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/BuyButton") as Button
+
+	var accent_color: Color = _item_accent_color(item)
+	accent_bar.color = accent_color
+	card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, accent_color, 2)
+	)
+
+	name_label.text = item.item_name
+	name_label.add_theme_font_override("font", _UITheme.font_display())
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+
+	desc_label.text = _item_description(item)
+	desc_label.add_theme_font_override("font", _UITheme.font_body())
+	desc_label.add_theme_font_size_override("font_size", 13)
+	desc_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+
+	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		buy_button.text = "Play"
+		_double_down_desc_label = desc_label
+	elif item.item_type == ShopItemData.ItemType.INSURANCE_BET or \
+		item.item_type == ShopItemData.ItemType.HEAT_BET or \
+		item.item_type == ShopItemData.ItemType.EVEN_ODD_BET:
+		buy_button.text = "Play"
+	else:
+		buy_button.text = "Buy"
+	buy_button.custom_minimum_size = Vector2(120, 44)
+	buy_button.add_theme_font_override("font", _UITheme.font_display())
+	buy_button.add_theme_font_size_override("font_size", 11)
+	buy_button.pressed.connect(_on_buy_pressed.bind(item))
+
+	if item.cost > 0:
+		price_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, item.cost]
+	else:
+		price_label.text = "FREE"
+	price_label.add_theme_font_override("font", _UITheme.font_stats())
+	price_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
+	price_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+	_buy_buttons.append(buy_button)
+	_price_labels.append(price_label)
+	_card_panels.append(card)
+	return card
+
+
+func _item_description(item: ShopItemData) -> String:
+	if item.item_type == ShopItemData.ItemType.UPGRADE_DIE:
+		return _get_upgrade_preview()
+	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		return _dd_desc_text()
+	return item.description
+
+
+func _item_accent_color(item: ShopItemData) -> Color:
+	match item.item_type:
+		ShopItemData.ItemType.BUY_MODIFIER:
+			return _UITheme.NEON_PURPLE
+		ShopItemData.ItemType.DOUBLE_DOWN:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.INSURANCE_BET:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.HEAT_BET:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.EVEN_ODD_BET:
+			return _UITheme.EXPLOSION_ORANGE
+		ShopItemData.ItemType.UPGRADE_DIE:
+			return _UITheme.ACTION_CYAN
+		ShopItemData.ItemType.CLEANSE_CURSE:
+			return _UITheme.DANGER_RED
+	return _UITheme.SCORE_GOLD
+
+
+# ---------------------------------------------------------------------------
+# Purchase handling
+# ---------------------------------------------------------------------------
+
+func _on_buy_pressed(item: ShopItemData) -> void:
+	var is_overlay_bet: bool = item.item_type == ShopItemData.ItemType.DOUBLE_DOWN \
+		or item.item_type == ShopItemData.ItemType.INSURANCE_BET \
+		or item.item_type == ShopItemData.ItemType.HEAT_BET \
+		or item.item_type == ShopItemData.ItemType.EVEN_ODD_BET
+	if not is_overlay_bet:
+		if not GameManager.spend_gold(item.cost):
+			return
+	if item.cost > 0 and not is_overlay_bet:
+		GameManager.track_shop_spend(item.cost)
+	SFXManager.play_shop_purchase()
+	_play_purchase_feedback(_item_accent_color(item))
+
+	match item.item_type:
+		ShopItemData.ItemType.BUY_STANDARD_DIE:
+			GameManager.add_dice(DiceData.make_standard_d6())
+		ShopItemData.ItemType.BUY_LUCKY_DIE:
+			GameManager.add_dice(DiceData.make_lucky_d6())
+		ShopItemData.ItemType.BUY_GAMBLER_DIE:
+			GameManager.add_dice(DiceData.make_gambler_d6())
+		ShopItemData.ItemType.BUY_GOLDEN_DIE:
+			GameManager.add_dice(DiceData.make_golden_d6())
+		ShopItemData.ItemType.BUY_INSURANCE_DIE:
+			GameManager.add_dice(DiceData.make_insurance_d6())
+		ShopItemData.ItemType.BUY_HEAVY_DIE:
+			GameManager.add_dice(DiceData.make_heavy_d6())
+		ShopItemData.ItemType.BUY_EXPLOSIVE_DIE:
+			GameManager.add_dice(DiceData.make_explosive_d6())
+		ShopItemData.ItemType.BUY_BLANK_CANVAS_DIE:
+			GameManager.add_dice(DiceData.make_blank_canvas_d6())
+		ShopItemData.ItemType.BUY_PINK_DIE:
+			GameManager.add_dice(DiceData.make_pink_d6())
+		ShopItemData.ItemType.BUY_SIMPLE_DIE:
+			GameManager.add_dice(DiceData.make_simple_d6())
+		ShopItemData.ItemType.BUY_FORTUNE_DIE:
+			GameManager.add_dice(DiceData.make_fortune_d6())
+		ShopItemData.ItemType.BUY_HEART_DIE:
+			GameManager.add_dice(DiceData.make_heart_d6())
+		ShopItemData.ItemType.UPGRADE_DIE:
+			_upgrade_random_die()
+		ShopItemData.ItemType.BUY_MODIFIER:
+			if item.modifier != null:
+				GameManager.add_modifier(item.modifier)
+		ShopItemData.ItemType.CLEANSE_CURSE:
+			_cleanse_random_cursed_die()
+		ShopItemData.ItemType.DOUBLE_DOWN:
+			_open_double_down()
+			return
+		ShopItemData.ItemType.INSURANCE_BET:
+			_open_insurance_bet()
+			return
+		ShopItemData.ItemType.HEAT_BET:
+			_open_heat_bet()
+			return
+		ShopItemData.ItemType.EVEN_ODD_BET:
+			_open_even_odd_bet()
+			return
+
+	_refresh_display()
+
+
+func _upgrade_random_die() -> void:
+	if GameManager.dice_pool.is_empty():
+		return
+	var die: DiceData = GameManager.dice_pool[randi() % GameManager.dice_pool.size()]
+	die.upgrade_weakest_face()
+
+
+# ---------------------------------------------------------------------------
+# UI updates
+# ---------------------------------------------------------------------------
+
+func _on_continue_pressed() -> void:
+	if _is_closing:
+		return
+	_is_closing = true
+	_continue_button.disabled = true
+	_refresh_button.disabled = true
+	GameManager.on_shop_exited()
+	await _play_close_transition()
+	visible = false
+	shop_closed.emit()
+
+
+func _on_gold_changed(_new_gold: int) -> void:
+	if visible:
+		_refresh_display()
+
+
+func _refresh_display() -> void:
+	_gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, GameManager.gold]
+	var mod_text: String = ""
+	if not GameManager.active_modifiers.is_empty():
+		var names: Array[String] = []
+		for m: RunModifier in GameManager.active_modifiers:
+			names.append(m.modifier_name)
+		mod_text = "  |  Mods: %s" % ", ".join(names)
+	_pool_label.text = "Dice Pool: %d%s" % [GameManager.dice_pool.size(), mod_text]
+	_refresh_buy_buttons()
+
+
+func _refresh_buy_buttons() -> void:
+	for i: int in _buy_buttons.size():
+		var item: ShopItemData = _all_items[i]
+		var too_expensive: bool = GameManager.gold < item.cost
+		var mod_full: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and not GameManager.can_add_modifier()
+		var already_owned: bool = item.item_type == ShopItemData.ItemType.BUY_MODIFIER and item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type)
+		var blocked: bool = too_expensive or mod_full or already_owned
+		_buy_buttons[i].disabled = blocked
+		_price_labels[i].add_theme_color_override("font_color", _UITheme.DANGER_RED if too_expensive else _UITheme.SCORE_GOLD)
+		_apply_card_affordance(i, blocked, _item_accent_color(item))
+
+	if _double_down_desc_label != null and is_instance_valid(_double_down_desc_label):
+		_double_down_desc_label.text = _dd_desc_text()
+	_refresh_button.disabled = GameManager.gold < REFRESH_COST
+
+
+func _on_refresh_pressed() -> void:
+	if not GameManager.spend_gold(REFRESH_COST):
+		return
+	SFXManager.play_shop_refresh()
+	_generate_items()
+	_refresh_display()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+func _get_upgrade_preview() -> String:
+	if GameManager.dice_pool.is_empty():
+		return "No dice to upgrade."
+	var previews: Array[String] = []
+	for die: DiceData in GameManager.dice_pool:
+		var worst_index: int = -1
+		var worst_power: int = 999
+		for i: int in die.faces.size():
+			var power: int = die._face_power(die.faces[i])
+			if power < worst_power:
+				if die.faces[i].type == DiceFaceData.FaceType.STOP and die._count_stop_faces() <= 1:
+					continue
+				worst_power = power
+				worst_index = i
+		if worst_index >= 0:
+			var face_text: String = die.faces[worst_index].get_display_text()
+			var preview: String = "%s [%s]" % [die.dice_name, face_text]
+			if preview not in previews:
+				previews.append(preview)
+	if previews.is_empty():
+		return "No upgradeable faces."
+	return "Upgrades one random weakest face. Candidates: %s" % ", ".join(previews)
+
+
+func _any_die_has_cursed_stop() -> bool:
+	for die: DiceData in GameManager.dice_pool:
+		for face: DiceFaceData in die.faces:
+			if face.type == DiceFaceData.FaceType.CURSED_STOP:
+				return true
+	return false
+
+
+func _cleanse_random_cursed_die() -> void:
+	var cursed_dice: Array[DiceData] = []
+	for die: DiceData in GameManager.dice_pool:
+		for face: DiceFaceData in die.faces:
+			if face.type == DiceFaceData.FaceType.CURSED_STOP:
+				cursed_dice.append(die)
+				break
+	if cursed_dice.is_empty():
+		return
+	var die: DiceData = cursed_dice[randi() % cursed_dice.size()]
+	for face: DiceFaceData in die.faces:
+		if face.type == DiceFaceData.FaceType.CURSED_STOP:
+			face.type = DiceFaceData.FaceType.STOP
+			break
+
+
+static func _dd_desc_text() -> String:
+	return "Wager all %s%d. Win returns %s%d!" % [
+		_UITheme.GLYPH_GOLD,
+		GameManager.gold,
+		_UITheme.GLYPH_GOLD,
+		GameManager.gold * 2,
+	]
+
+
+func _open_double_down() -> void:
+	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
+		_double_down_overlay.queue_free()
+	_double_down_overlay = _DoubleDownScene.instantiate() as DoubleDownOverlay
+	add_child(_double_down_overlay)
+	_double_down_overlay.resolved.connect(_on_double_down_resolved)
+	_double_down_overlay.open(GameManager.gold)
+
+
+func _on_double_down_resolved() -> void:
+	_dd_used_this_shop = true
+	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
+		_double_down_overlay.queue_free()
+		_double_down_overlay = null
+	_generate_items()
+	_refresh_display()
+
+
+func _play_open_intro() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_enter(self, _modal, MODAL_INTRO_DURATION, _backdrop)
+	for index: int in _card_panels.size():
+		var card: PanelContainer = _card_panels[index]
+		card.modulate.a = 0.0
+		card.position.y += 14.0
+		card.scale = Vector2(0.96, 0.96)
+		_transition_tween.tween_callback(Callable(self, "_reveal_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
+
+
+func _reveal_card(card: PanelContainer) -> void:
+	var tween: Tween = create_tween()
+	var end_y: float = card.position.y - 14.0
+	tween.tween_property(card, "modulate:a", 1.0, CARD_REVEAL_DURATION)
+	tween.parallel().tween_property(card, "position:y", end_y, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(card, "scale", Vector2.ONE, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
+
+
+func _reveal_card_by_index(index: int) -> void:
+	if index < 0 or index >= _card_panels.size():
+		return
+	var card: PanelContainer = _card_panels[index]
+	if not is_instance_valid(card):
+		return
+	_reveal_card(card)
+
+
+func _apply_card_affordance(index: int, blocked: bool, accent_color: Color) -> void:
+	if index < 0 or index >= _card_panels.size():
+		return
+	var card: PanelContainer = _card_panels[index]
+	card.self_modulate = Color(1.0, 1.0, 1.0, AFFORDABLE_CARD_ALPHA) if not blocked else Color(0.82, 0.82, 0.82, BLOCKED_CARD_ALPHA)
+	card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(
+			_UITheme.ELEVATED,
+			_UITheme.CORNER_RADIUS_CARD,
+			accent_color if not blocked else _UITheme.MUTED_TEXT,
+			2
+		)
+	)
+
+
+func _play_purchase_feedback(accent_color: Color) -> void:
+	var modal_tween: Tween = create_tween()
+	modal_tween.tween_property(_modal, "modulate", Color(1.05, 1.05, 1.05, 1.0), PURCHASE_FLASH_DURATION * 0.5)
+	modal_tween.tween_property(_modal, "modulate", Color.WHITE, PURCHASE_FLASH_DURATION * 0.5)
+	var badge_tween: Tween = create_tween()
+	badge_tween.tween_property(_gold_badge, "scale", Vector2(1.08, 1.08), PURCHASE_FLASH_DURATION * 0.45).set_ease(Tween.EASE_OUT)
+	badge_tween.tween_property(_gold_badge, "scale", Vector2.ONE, PURCHASE_FLASH_DURATION * 0.55).set_ease(Tween.EASE_IN)
+	_gold_label.add_theme_color_override("font_color", accent_color)
+	get_tree().create_timer(PURCHASE_FLASH_DURATION).timeout.connect(_restore_gold_label_color, CONNECT_ONE_SHOT)
+
+
+func _play_close_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_exit(self, _modal, 0.16, _backdrop)
+	await _transition_tween.finished
+
+
+func _restore_gold_label_color() -> void:
+	if _gold_label != null and is_instance_valid(_gold_label):
+		_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+
+
+func _open_insurance_bet() -> void:
+	if _insurance_overlay != null and is_instance_valid(_insurance_overlay):
+		_insurance_overlay.queue_free()
+	var gold_before: int = GameManager.gold
+	_insurance_overlay = _InsuranceBetScene.instantiate()
+	add_child(_insurance_overlay)
+	_insurance_overlay.connect("resolved", Callable(self, "_on_insurance_bet_resolved").bind(gold_before))
+	_insurance_overlay.call("open")
+
+
+func _on_insurance_bet_resolved(gold_before: int) -> void:
+	if _insurance_overlay != null and is_instance_valid(_insurance_overlay):
+		_insurance_overlay.queue_free()
+		_insurance_overlay = null
+	if GameManager.gold < gold_before:
+		GameManager.track_shop_spend(gold_before - GameManager.gold)
+		_ib_used_this_shop = true
+	_generate_items()
+	_refresh_display()
+
+
+func _open_heat_bet() -> void:
+	if _heat_overlay != null and is_instance_valid(_heat_overlay):
+		_heat_overlay.queue_free()
+	var gold_before: int = GameManager.gold
+	_heat_overlay = _HeatBetScene.instantiate()
+	add_child(_heat_overlay)
+	_heat_overlay.connect("resolved", Callable(self, "_on_heat_bet_resolved").bind(gold_before))
+	_heat_overlay.call("open")
+
+
+func _on_heat_bet_resolved(gold_before: int) -> void:
+	if _heat_overlay != null and is_instance_valid(_heat_overlay):
+		_heat_overlay.queue_free()
+		_heat_overlay = null
+	if GameManager.gold < gold_before:
+		GameManager.track_shop_spend(gold_before - GameManager.gold)
+		_hb_used_this_shop = true
+	_generate_items()
+	_refresh_display()
+
+
+func _open_even_odd_bet() -> void:
+	if _even_odd_overlay != null and is_instance_valid(_even_odd_overlay):
+		_even_odd_overlay.queue_free()
+	var gold_before: int = GameManager.gold
+	_even_odd_overlay = _EvenOddBetScene.instantiate()
+	add_child(_even_odd_overlay)
+	_even_odd_overlay.connect("resolved", Callable(self, "_on_even_odd_bet_resolved").bind(gold_before))
+	_even_odd_overlay.call("open")
+
+
+func _on_even_odd_bet_resolved(gold_before: int) -> void:
+	if _even_odd_overlay != null and is_instance_valid(_even_odd_overlay):
+		_even_odd_overlay.queue_free()
+		_even_odd_overlay = null
+	if GameManager.gold < gold_before:
+		GameManager.track_shop_spend(gold_before - GameManager.gold)
+		_eo_used_this_shop = true
+	_generate_items()
+	_refresh_display()

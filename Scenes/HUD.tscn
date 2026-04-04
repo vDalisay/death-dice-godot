@@ -1,0 +1,244 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/HUD.gd" id="1"]
+[ext_resource type="PackedScene" path="res://Scenes/ModifierBadge.tscn" id="2"]
+
+[node name="HUD" type="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+script = ExtResource("1")
+
+[node name="TopBar" type="PanelContainer" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+
+[node name="TopBarMargin" type="MarginContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="TopBarRow" type="HBoxContainer" parent="TopBar/TopBarMargin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StageLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = "STAGE 1/5"
+
+[node name="LivesLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+
+[node name="TopSpacer" type="Control" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GoldLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = "G 0"
+
+[node name="LuckLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = ""
+
+[node name="MomentumLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = ""
+
+[node name="HighscoreLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = "HI: 0"
+
+[node name="ModifierRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ModifierTitle" type="Label" parent="ModifierRow"]
+layout_mode = 2
+text = "MODS"
+
+[node name="ModifierBar" type="HBoxContainer" parent="ModifierRow"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ModifierSlot0" parent="ModifierRow/ModifierBar" instance=ExtResource("2")]
+layout_mode = 2
+
+[node name="ModifierSlot1" parent="ModifierRow/ModifierBar" instance=ExtResource("2")]
+layout_mode = 2
+
+[node name="ModifierSlot2" parent="ModifierRow/ModifierBar" instance=ExtResource("2")]
+layout_mode = 2
+
+[node name="ModifierSpacer" type="Control" parent="ModifierRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScoreRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TurnScorePanel" type="PanelContainer" parent="ScoreRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 0)
+
+[node name="TurnScoreMargin" type="MarginContainer" parent="ScoreRow/TurnScorePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="TurnScoreVBox" type="VBoxContainer" parent="ScoreRow/TurnScorePanel/TurnScoreMargin"]
+layout_mode = 2
+alignment = 1
+
+[node name="TurnScoreLabel" type="Label" parent="ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox"]
+layout_mode = 2
+text = "+0"
+horizontal_alignment = 1
+
+[node name="ScoreLabel" type="Label" parent="ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox"]
+layout_mode = 2
+text = "Total: 0"
+horizontal_alignment = 1
+
+[node name="ProgressPanel" type="PanelContainer" parent="ScoreRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ProgressMargin" type="MarginContainer" parent="ScoreRow/ProgressPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="ProgressVBox" type="VBoxContainer" parent="ScoreRow/ProgressPanel/ProgressMargin"]
+layout_mode = 2
+
+[node name="TargetLabel" type="Label" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
+layout_mode = 2
+text = "Target: 30"
+
+[node name="ProgressContentRow" type="HBoxContainer" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StreakSlot" type="Control" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 62)
+
+[node name="ProgressBar" type="ProgressBar" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 18)
+size_flags_horizontal = 3
+show_percentage = false
+max_value = 100.0
+
+[node name="ProgressHintLabel" type="Label" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
+layout_mode = 2
+
+[node name="InfoRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="InfoSpacer" type="Control" parent="InfoRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RiskColumn" type="VBoxContainer" parent="InfoRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="RiskMeter" type="PanelContainer" parent="InfoRow/RiskColumn"]
+layout_mode = 2
+mouse_filter = 0
+
+[node name="RiskMeterMargin" type="MarginContainer" parent="InfoRow/RiskColumn/RiskMeter"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="RiskMeterRow" type="HBoxContainer" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RiskPercentLabel" type="Label" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow"]
+layout_mode = 2
+text = "RISK 0%"
+
+[node name="RiskContainer" type="HBoxContainer" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="StopLabel" type="Label" parent="InfoRow/RiskColumn"]
+layout_mode = 2
+text = "Stops: 0 / 3"
+horizontal_alignment = 2
+
+[node name="ComboRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ComboLabel" type="Label" parent="ComboRow"]
+layout_mode = 2
+text = "COMBOS:"
+
+[node name="ComboContainer" type="HFlowContainer" parent="ComboRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Press 'Roll All' to begin your turn!"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ModifierTooltip" type="PanelContainer" parent="."]
+visible = false
+top_level = true
+z_index = 100
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="ModifierTooltip"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="TooltipVBox" type="VBoxContainer" parent="ModifierTooltip/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="TooltipNameLabel" type="Label" parent="ModifierTooltip/MarginContainer/TooltipVBox"]
+layout_mode = 2
+
+[node name="TooltipDescLabel" type="Label" parent="ModifierTooltip/MarginContainer/TooltipVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(250, 0)
+autowrap_mode = 3
+
+[node name="RiskTooltip" type="PanelContainer" parent="."]
+visible = false
+top_level = true
+z_index = 101
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="RiskTooltip"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="RiskTooltipLabel" type="Label" parent="RiskTooltip/MarginContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 0)
+autowrap_mode = 3

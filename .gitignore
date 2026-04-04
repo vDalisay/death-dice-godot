@@ -1,3 +1,21 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+.claude/worktrees/
+.mcp/
+
+# GdUnit4 generated files
+addons/gdUnit4/test/
+reports/
+
+# Broken submodule (no .gitmodules entry)
+Mcp/godot-mcp-runtime
+
+# Test artifacts
+test_stderr.txt
+test_stdout.txt
+
+# Local planning notes
+PRESTIGE_SIDEBETS_PLAN.md
+market-research-summary.md
+plan-revisedFunDesignBacklog.prompt.md

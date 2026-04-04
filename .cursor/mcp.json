@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "godot": {
+    "godot-runtime": {
       "command": "node",
-      "args": ["Mcp/godot-mcp/build/index.js"],
+      "args": ["Mcp/godot-mcp-runtime/dist/index.js"],
       "env": {
-        "GODOT_PATH": "C:\\Path\\To\\Godot.exe",
+        "GODOT_PATH": "C:\\Users\\Home\\Downloads\\Godot_v4.6.1-stable_mono_win64\\Godot_v4.6.1-stable_mono_win64.exe",
         "DEBUG": "true"
       }
     }
