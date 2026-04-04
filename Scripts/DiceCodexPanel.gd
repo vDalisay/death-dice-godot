@@ -9,9 +9,9 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 const CARD_WIDTH: int = 294
 const CARD_HEIGHT: int = 176
 const FACE_TILE_WIDTH: int = 84
-const FACE_TILE_HEIGHT: int = 32
+const FACE_TILE_HEIGHT: int = 40
 const FACE_TILE_PADDING_X: int = 6
-const FACE_TILE_PADDING_Y: int = 4
+const FACE_TILE_PADDING_Y: int = 6
 
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
@@ -130,6 +130,7 @@ func _build_face_tile(face: DiceFaceData, discovered: bool) -> PanelContainer:
 	var tile := PanelContainer.new()
 	tile.name = "FaceTile"
 	tile.custom_minimum_size = Vector2(FACE_TILE_WIDTH, FACE_TILE_HEIGHT)
+	tile.clip_contents = true
 	var color: Color = _face_accent(face.type) if discovered else _UITheme.MUTED_TEXT
 	tile.add_theme_stylebox_override(
 		"panel",
@@ -141,6 +142,7 @@ func _build_face_tile(face: DiceFaceData, discovered: bool) -> PanelContainer:
 	content_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	content_margin.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	content_margin.grow_vertical = Control.GROW_DIRECTION_BOTH
+	content_margin.clip_contents = true
 	content_margin.add_theme_constant_override("margin_left", FACE_TILE_PADDING_X)
 	content_margin.add_theme_constant_override("margin_top", FACE_TILE_PADDING_Y)
 	content_margin.add_theme_constant_override("margin_right", FACE_TILE_PADDING_X)
@@ -157,6 +159,7 @@ func _build_face_tile(face: DiceFaceData, discovered: bool) -> PanelContainer:
 	label.name = "FaceLabel"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
 	label.add_theme_font_override("font", _UITheme.font_mono())
 	label.add_theme_font_size_override("font_size", 17)
 	if discovered:

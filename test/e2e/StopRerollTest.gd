@@ -485,6 +485,7 @@ func test_accumulated_stops_cause_bust_on_turn_2() -> void:
 
 	# Force all dice to NUMBER, none stopped — clean slate.
 	root.accumulated_stop_count = 0
+	root.accumulated_shield_count = 0
 	for i: int in pool_size:
 		var num_face := DiceFaceData.new()
 		num_face.type = DiceFaceData.FaceType.NUMBER

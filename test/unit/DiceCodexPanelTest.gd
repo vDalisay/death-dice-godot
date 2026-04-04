@@ -78,8 +78,9 @@ func test_face_tile_label_stays_centered_inside_padded_tile_bounds() -> void:
 	var content_margin: MarginContainer = first_tile.find_child("FaceTileMargin", true, false) as MarginContainer
 	var face_label: Label = first_tile.find_child("FaceLabel", true, false) as Label
 	assert_object(content_margin).is_not_null()
-	assert_int(content_margin.get_theme_constant("margin_top")).is_equal(4)
-	assert_int(content_margin.get_theme_constant("margin_bottom")).is_equal(4)
+	assert_bool(first_tile.clip_contents).is_true()
+	assert_int(content_margin.get_theme_constant("margin_top")).is_equal(6)
+	assert_int(content_margin.get_theme_constant("margin_bottom")).is_equal(6)
 	await await_idle_frame()
 	var tile_rect: Rect2 = Rect2(first_tile.global_position, first_tile.size)
 	var content_rect: Rect2 = Rect2(content_margin.global_position, content_margin.size)
@@ -91,5 +92,6 @@ func test_face_tile_label_stays_centered_inside_padded_tile_bounds() -> void:
 	assert_bool(content_rect.end.x <= tile_rect.end.x).is_true()
 	assert_bool(content_rect.end.y <= tile_rect.end.y).is_true()
 	assert_bool(label_rect.position.y >= content_rect.position.y).is_true()
+	assert_bool(label_rect.end.y <= tile_rect.end.y).is_true()
 	assert_bool(absf(label_center.x - tile_center.x) <= 1.0).is_true()
 	assert_bool(absf(label_center.y - tile_center.y) <= 1.0).is_true()
