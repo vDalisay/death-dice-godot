@@ -117,8 +117,8 @@ func test_bust_threshold_standard_turn_4_plus() -> void:
 	for t: int in [4, 5, 10, 99]:
 		var threshold: int = _get_bust_threshold(t)
 		assert_int(threshold)\
-			.override_failure_message("Turn %d should have threshold 3" % t)\
-			.is_equal(3)
+			.override_failure_message("Turn %d should have threshold 4" % t)\
+			.is_equal(4)
 
 
 func test_turn1_immune_to_bust() -> void:
@@ -214,7 +214,7 @@ func _simulate_lock_step(keep: Array[bool], keep_locked: Array[bool]) -> void:
 
 func _get_bust_threshold(turn: int) -> int:
 	if turn <= 3:
-		return RollPhase.BASE_BUST_THRESHOLD + 1
+		return 4
 	return RollPhase.BASE_BUST_THRESHOLD
 
 

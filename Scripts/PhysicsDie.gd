@@ -47,6 +47,7 @@ const KEEP_OPACITY_TWEEN_DURATION: float = 0.12
 const NAME_POPUP_FADE_DURATION: float = 0.1
 const NAME_POPUP_GAP: float = 8.0
 const SHIELD_ABSORB_DURATION: float = 0.3
+const SHIELD_PULSE_DURATION: float = 2.0
 const REROLL_LIFT_OPACITY: float = 0.68
 const LAUNCH_BURST_DURATION: float = 0.28
 const EXPLODE_WOBBLE_STEP: float = 0.04
@@ -78,7 +79,7 @@ const SCALE_DURATION: float = 0.12
 const KEPT_OPACITY: float = 0.7
 
 const TUMBLE_GLYPHS: Array[String] = [
-	"1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "✦3",
+	"1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "✦3", "♥",
 ]
 
 ## Face type → corner glyph (mirrors DieButton mapping)
@@ -93,6 +94,8 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 	7: "←×",    # MULTIPLY_LEFT
 	8: "☠",     # CURSED_STOP
 	9: "!",     # INSURANCE
+	10: "🍀",   # LUCK
+	11: "♥",    # HEART
 }
 
 ## Visual state colors
@@ -417,6 +420,26 @@ func play_shield_absorb() -> void:
 	ParticlePool.release_after(ring, SHIELD_ABSORB_DURATION + 0.2)
 
 
+func play_shield_charge_pulse() -> void:
+	_play_radial_effect(_UITheme.ACTION_CYAN, "SHIELD")
+	var ring: CPUParticles2D = ParticlePool.acquire(self)
+	if ring == null:
+		return
+	ParticlePool.configure_burst(ring, {
+		"amount": 42,
+		"lifetime": SHIELD_PULSE_DURATION,
+		"explosiveness": 0.2,
+		"direction": Vector2.ZERO,
+		"spread": 180.0,
+		"initial_velocity_min": 95.0,
+		"initial_velocity_max": 180.0,
+		"gravity": Vector2.ZERO,
+		"color": _UITheme.ACTION_CYAN,
+	})
+	ring.emitting = true
+	ParticlePool.release_after(ring, SHIELD_PULSE_DURATION + 0.25)
+
+
 func play_reroll_lift() -> void:
 	if _scale_tween and _scale_tween.is_valid():
 		_scale_tween.kill()
@@ -717,6 +740,8 @@ static func face_type_color(ft: DiceFaceData.FaceType) -> Color:
 			return _UITheme.ACTION_CYAN
 		DiceFaceData.FaceType.LUCK:
 			return Color(0.4, 0.9, 0.3)
+		DiceFaceData.FaceType.HEART:
+			return _UITheme.ROSE_ACCENT
 	return _UITheme.MUTED_TEXT
 
 

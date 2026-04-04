@@ -30,10 +30,18 @@ func test_upgrade_die_item() -> void:
 	assert_int(item.item_type).is_equal(ShopItemData.ItemType.UPGRADE_DIE)
 
 
+func test_heart_die_item() -> void:
+	var item: ShopItemData = ShopItemData.make_buy_heart_die()
+	assert_str(item.item_name).is_equal("Heart Die")
+	assert_int(item.cost).is_equal(30)
+	assert_int(item.item_type).is_equal(ShopItemData.ItemType.BUY_HEART_DIE)
+
+
 func test_all_items_have_descriptions() -> void:
 	var items: Array[ShopItemData] = [
 		ShopItemData.make_buy_standard_die(),
 		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_buy_heart_die(),
 		ShopItemData.make_buy_insurance_die(),
 		ShopItemData.make_upgrade_die(),
 	]

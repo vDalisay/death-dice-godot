@@ -61,8 +61,15 @@ func test_caution_archetype_pool() -> void:
 	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
 	GameManager.reset_run()
 	assert_int(GameManager.dice_pool.size()).is_equal(6)
+	var standard_count: int = 0
+	var shield_count: int = 0
 	for die: DiceData in GameManager.dice_pool:
-		assert_str(die.dice_name).is_equal("Standard D6")
+		if die.dice_name == "Standard D6":
+			standard_count += 1
+		elif die.dice_name == "Shield D6":
+			shield_count += 1
+	assert_int(standard_count).is_equal(5)
+	assert_int(shield_count).is_equal(1)
 
 
 func test_risk_it_archetype_pool() -> void:
@@ -183,12 +190,14 @@ func test_shield_wall_doubles_shields() -> void:
 	await runner.simulate_frames(2)
 	if root.turn_state != RollPhase.TurnState.ACTIVE:
 		return
-	# Set up a shield face.
+	root.accumulated_shield_count = 0
 	var shield: DiceFaceData = _make_face(DiceFaceData.FaceType.SHIELD, 1)
 	root.current_results[0] = shield
-	root.dice_stopped[0] = false
+	root._register_rolled_shields([0], false)
 	var normal_shields: int = root._count_shields()
+	root.accumulated_shield_count = 0
 	GameManager.add_modifier(RunModifier.make_shield_wall())
+	root._register_rolled_shields([0], false)
 	var boosted_shields: int = root._count_shields()
 	assert_int(boosted_shields).is_equal(normal_shields * 2)
 	GameManager.active_modifiers.clear()

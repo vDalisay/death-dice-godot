@@ -211,6 +211,10 @@ func _face_glyph(face_type: DiceFaceData.FaceType) -> String:
 			return _UITheme.GLYPH_CURSED
 		DiceFaceData.FaceType.INSURANCE:
 			return "!"
+		DiceFaceData.FaceType.LUCK:
+			return "LK"
+		DiceFaceData.FaceType.HEART:
+			return _UITheme.GLYPH_HEART
 	return "?"
 
 
@@ -236,6 +240,10 @@ func _face_accent(face_type: DiceFaceData.FaceType) -> Color:
 			return _UITheme.ROSE_ACCENT
 		DiceFaceData.FaceType.INSURANCE:
 			return _UITheme.SUCCESS_GREEN
+		DiceFaceData.FaceType.LUCK:
+			return Color(0.6, 0.9, 0.3)
+		DiceFaceData.FaceType.HEART:
+			return _UITheme.ROSE_ACCENT
 	return _UITheme.MUTED_TEXT
 
 

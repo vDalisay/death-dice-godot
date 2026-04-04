@@ -55,6 +55,10 @@ func upgrade_weakest_face(die: DiceData) -> bool:
 			if face.value >= DiceData.MAX_LUCK_VALUE:
 				return false
 			face.value += 1
+		DiceFaceData.FaceType.HEART:
+			if face.value >= DiceData.MAX_HEART_VALUE:
+				return false
+			face.value += 1
 		DiceFaceData.FaceType.MULTIPLY_LEFT:
 			if face.value >= DiceData.MAX_MULTIPLY_LEFT_VALUE:
 				return false
@@ -78,6 +82,8 @@ func face_power(face: DiceFaceData) -> int:
 			return 10
 		DiceFaceData.FaceType.LUCK:
 			return 6 + face.value
+		DiceFaceData.FaceType.HEART:
+			return 7 + face.value
 		DiceFaceData.FaceType.AUTO_KEEP:
 			return 12 + face.value
 		DiceFaceData.FaceType.MULTIPLY:

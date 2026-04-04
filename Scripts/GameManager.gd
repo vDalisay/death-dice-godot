@@ -24,7 +24,7 @@ const ARCHETYPE_NAMES: Dictionary = {
 	Archetype.FORTUNE_FOOL: "Fortune's Fool",
 }
 const ARCHETYPE_DESCRIPTIONS: Dictionary = {
-	Archetype.CAUTION: "6 Standard dice, bust immunity to turn 3.",
+	Archetype.CAUTION: "5 Standard dice + 1 Shield die, bust immunity to turn 3.",
 	Archetype.RISK_IT: "5 Gambler dice, 2x gold per turn.",
 	Archetype.BLANK_SLATE: "8 Blank Canvas dice, shop gold doubled.",
 	Archetype.FORTUNE_FOOL: "10 Fortune dice, LUCK x2, but start with only 15 gold.",
@@ -182,8 +182,9 @@ func _build_starting_pool() -> void:
 	dice_pool.clear()
 	match chosen_archetype:
 		Archetype.CAUTION:
-			for i: int in 6:
+			for i: int in 5:
 				dice_pool.append(DiceData.make_standard_d6())
+			dice_pool.append(DiceData.make_shield_d6())
 		Archetype.RISK_IT:
 			for i: int in 5:
 				dice_pool.append(DiceData.make_gambler_d6())

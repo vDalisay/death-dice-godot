@@ -70,6 +70,50 @@ func test_lucky_d6_name() -> void:
 	assert_str(die.dice_name).is_equal("Lucky D6")
 
 
+func test_shield_d6_face_composition() -> void:
+	var die: DiceData = DiceData.make_shield_d6()
+	var shield_count: int = 0
+	var number_count: int = 0
+	var stop_count: int = 0
+	var blank_count: int = 0
+	for face: DiceFaceData in die.faces:
+		match face.type:
+			DiceFaceData.FaceType.SHIELD:
+				shield_count += 1
+			DiceFaceData.FaceType.NUMBER:
+				number_count += 1
+			DiceFaceData.FaceType.STOP:
+				stop_count += 1
+			DiceFaceData.FaceType.BLANK:
+				blank_count += 1
+	assert_int(shield_count).is_equal(2)
+	assert_int(number_count).is_equal(2)
+	assert_int(stop_count).is_equal(1)
+	assert_int(blank_count).is_equal(1)
+
+
+func test_heart_d6_face_composition() -> void:
+	var die: DiceData = DiceData.make_heart_d6()
+	var heart_count: int = 0
+	var number_count: int = 0
+	var stop_count: int = 0
+	var blank_count: int = 0
+	for face: DiceFaceData in die.faces:
+		match face.type:
+			DiceFaceData.FaceType.HEART:
+				heart_count += 1
+			DiceFaceData.FaceType.NUMBER:
+				number_count += 1
+			DiceFaceData.FaceType.STOP:
+				stop_count += 1
+			DiceFaceData.FaceType.BLANK:
+				blank_count += 1
+	assert_int(heart_count).is_equal(2)
+	assert_int(number_count).is_equal(2)
+	assert_int(stop_count).is_equal(1)
+	assert_int(blank_count).is_equal(1)
+
+
 # ---------------------------------------------------------------------------
 # Upgrade system
 # ---------------------------------------------------------------------------
@@ -144,6 +188,8 @@ func test_face_power_ordering() -> void:
 func test_all_dice_have_at_least_one_stop() -> void:
 	var dice: Array[DiceData] = [
 		DiceData.make_standard_d6(),
+		DiceData.make_shield_d6(),
+		DiceData.make_heart_d6(),
 		DiceData.make_lucky_d6(),
 		DiceData.make_gambler_d6(),
 		DiceData.make_golden_d6(),
@@ -229,9 +275,11 @@ func test_rarity_assignments_by_factory() -> void:
 	assert_int(DiceData.make_simple_d6().rarity).is_equal(DiceData.Rarity.GREY)
 	assert_int(DiceData.make_blank_canvas_d6().rarity).is_equal(DiceData.Rarity.GREY)
 	assert_int(DiceData.make_standard_d6().rarity).is_equal(DiceData.Rarity.GREY)
+	assert_int(DiceData.make_shield_d6().rarity).is_equal(DiceData.Rarity.GREY)
 
 	assert_int(DiceData.make_lucky_d6().rarity).is_equal(DiceData.Rarity.GREEN)
 	assert_int(DiceData.make_heavy_d6().rarity).is_equal(DiceData.Rarity.GREEN)
+	assert_int(DiceData.make_heart_d6().rarity).is_equal(DiceData.Rarity.GREEN)
 
 	assert_int(DiceData.make_golden_d6().rarity).is_equal(DiceData.Rarity.BLUE)
 	assert_int(DiceData.make_gambler_d6().rarity).is_equal(DiceData.Rarity.BLUE)

@@ -19,6 +19,7 @@ enum ItemType {
 	CLEANSE_CURSE,
 	DOUBLE_DOWN,
 	BUY_FORTUNE_DIE,
+	BUY_HEART_DIE,
 	INSURANCE_BET,
 	HEAT_BET,
 	EVEN_ODD_BET,
@@ -128,6 +129,15 @@ static func make_buy_fortune_die() -> ShopItemData:
 	item.description = "Luck faces boost reward rarity. (LK, LK, 2, 2, STOP, STOP)"
 	item.cost = 35
 	item.item_type = ItemType.BUY_FORTUNE_DIE
+	return item
+
+
+static func make_buy_heart_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Heart Die"
+	item.description = "Banked hearts soothe your stop counter. (♥, ♥, 1, 1, STOP, —)"
+	item.cost = 30
+	item.item_type = ItemType.BUY_HEART_DIE
 	return item
 
 

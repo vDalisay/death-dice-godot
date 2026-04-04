@@ -3,7 +3,7 @@ extends RefCounted
 ## Pure helper for bust thresholds, immunity checks, and effective stop math.
 
 const LENIENT_TURN_LIMIT: int = 3
-const LENIENT_THRESHOLD_BONUS: int = 1
+const LENIENT_THRESHOLD: int = 4
 const GLASS_CANNON_THRESHOLD_PENALTY: int = 1
 const LAST_STAND_LIFE_VALUE: int = 1
 const LAST_STAND_THRESHOLD_BONUS: int = 2
@@ -22,7 +22,7 @@ func get_bust_threshold(
 ) -> int:
 	var threshold: int = base_threshold
 	if turn_number <= LENIENT_TURN_LIMIT:
-		threshold += LENIENT_THRESHOLD_BONUS
+		threshold = maxi(threshold, LENIENT_THRESHOLD)
 	if has_glass_cannon:
 		threshold = maxi(MIN_THRESHOLD, threshold - GLASS_CANNON_THRESHOLD_PENALTY)
 	if has_last_stand and lives == LAST_STAND_LIFE_VALUE:

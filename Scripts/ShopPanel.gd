@@ -152,6 +152,7 @@ func _generate_items() -> void:
 		ShopItemData.make_buy_standard_die(),
 		ShopItemData.make_buy_blank_canvas_die(),
 		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_buy_heart_die(),
 		ShopItemData.make_buy_pink_die(),
 		ShopItemData.make_buy_fortune_die(),
 	]
@@ -342,6 +343,8 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_simple_d6())
 		ShopItemData.ItemType.BUY_FORTUNE_DIE:
 			GameManager.add_dice(DiceData.make_fortune_d6())
+		ShopItemData.ItemType.BUY_HEART_DIE:
+			GameManager.add_dice(DiceData.make_heart_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
 			_upgrade_random_die()
 		ShopItemData.ItemType.BUY_MODIFIER:
