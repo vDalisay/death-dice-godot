@@ -92,7 +92,7 @@ func test_constants_are_sensible() -> void:
 	assert_float(DiceArena.BOUNDARY_GLOW_HIT_GAIN).is_greater(0.0)
 	assert_float(DiceArena.BOUNDARY_GLOW_DECAY_PER_SEC).is_greater(0.0)
 	assert_float(DiceArena.THROW_STAGGER_RANDOM_MAX).is_greater_equal(0.0)
-	assert_float(DiceArena.REROLL_LIFT_RANDOM_MAX).is_greater_equal(0.0)
+	assert_float(DiceArena.REROLL_EXIT_DURATION).is_greater(0.0)
 	assert_float(DiceArena.THROW_STAGGER_SWEEP).is_greater(0.0)
 	assert_float(DiceArena.THROW_STAGGER_SPAWN_SWEEP_X).is_greater(0.0)
 	assert_float(DiceArena.THROW_STAGGER_TARGET_SWEEP_X).is_greater(0.0)

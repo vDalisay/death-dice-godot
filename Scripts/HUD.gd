@@ -324,6 +324,7 @@ func begin_score_feedback(start_total: int, final_total: int, is_reroll_bank: bo
 	_score_feedback_is_reroll = is_reroll_bank
 	_score_feedback_display_total = start_total
 	_score_feedback_pending_total = final_total
+	_progress_bar_thickness_bonus = 0.0
 	_stop_progress_tween()
 	_stop_progress_thickness_tween()
 	_set_total_score_label(float(start_total))
@@ -376,6 +377,21 @@ func finish_score_feedback() -> void:
 		_animate_progress_bar_to(_score_to_progress_value(_score_feedback_pending_total), SCORE_STEP_DURATION)
 		_score_feedback_display_total = _score_feedback_pending_total
 	_schedule_progress_deflate()
+	_score_feedback_is_reroll = false
+
+
+func reset_score_feedback_visuals(animated: bool = true) -> void:
+	_score_feedback_active = false
+	_score_feedback_is_reroll = false
+	_score_feedback_pending_total = -1
+	_stop_progress_tween()
+	if animated and progress_bar.custom_minimum_size.y > _progress_bar_base_size.y:
+		_schedule_progress_deflate()
+	else:
+		_stop_progress_thickness_tween()
+		_progress_bar_thickness_bonus = 0.0
+		_set_progress_bar_thickness(_progress_bar_base_size.y)
+		_restore_progress_panel_style()
 
 
 func get_progress_bar_current_height() -> float:
@@ -675,7 +691,11 @@ func _set_progress_bar_thickness(height: float) -> void:
 
 
 func _schedule_progress_deflate() -> void:
-	if not _score_feedback_is_reroll:
+	if progress_bar.custom_minimum_size.y <= _progress_bar_base_size.y:
+		_progress_bar_thickness_bonus = 0.0
+		_restore_progress_panel_style()
+		return
+	if not _score_feedback_is_reroll and _progress_bar_thickness_bonus <= 0.0:
 		_restore_progress_panel_style()
 		return
 	_stop_progress_thickness_tween()

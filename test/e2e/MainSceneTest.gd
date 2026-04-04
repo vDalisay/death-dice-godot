@@ -172,3 +172,41 @@ func test_hud_shows_stage_label() -> void:
 	var root: RollPhase = _get_root(runner)
 	assert_str(root.hud.stage_label.text).contains("ROW")
 	assert_str(root.hud.stage_label.text).contains("1")
+
+
+func test_rest_node_requires_continue_before_stage_map_reopens() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	root._execute_rest_node()
+	await runner.simulate_frames(2)
+	var overlay: ColorRect = root.find_child("RestOverlay", true, false) as ColorRect
+	assert_object(overlay).is_not_null()
+	assert_bool(root.stage_map_panel.visible).is_false()
+	await await_millis(260)
+	var continue_button: Button = overlay.get_node("CenterContainer/Card/MarginContainer/Content/ContinueButton") as Button
+	continue_button.pressed.emit()
+	await runner.simulate_frames(3)
+	assert_bool(root.stage_map_panel.visible).is_true()
+
+
+func test_stage_clear_overlay_waits_for_final_bank_count() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	GameManager.stage_target_score = 5
+	root.turn_state = RollPhase.TurnState.ACTIVE
+	var scoring_face := DiceFaceData.new()
+	scoring_face.type = DiceFaceData.FaceType.NUMBER
+	scoring_face.value = 2
+	for i: int in GameManager.dice_pool.size():
+		root.current_results[i] = scoring_face
+		root.dice_stopped[i] = false
+		root.dice_keep[i] = true
+		root.dice_keep_locked[i] = false
+	root.bank_button.pressed.emit()
+	await runner.simulate_frames(1)
+	assert_object(root.find_child("StageClearedOverlay", true, false)).is_null()
+	await await_millis(1300)
+	await runner.simulate_frames(2)
+	assert_object(root.find_child("StageClearedOverlay", true, false)).is_not_null()

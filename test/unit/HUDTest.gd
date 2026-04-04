@@ -202,6 +202,23 @@ func test_reroll_score_feedback_thickens_then_deflates_progress_bar() -> void:
 	assert_float(hud.get_progress_bar_current_height()).is_equal(base_height)
 
 
+func test_reset_score_feedback_visuals_deflates_progress_bar_to_base() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	var base_height: float = hud.get_progress_bar_current_height()
+	hud.begin_score_feedback(0, 40, true)
+	hud._apply_score_feedback_step(0, 20, 20)
+	await get_tree().process_frame
+	assert_float(hud.get_progress_bar_current_height()).is_greater(base_height)
+	hud.reset_score_feedback_visuals(true)
+	if hud._progress_thickness_tween and hud._progress_thickness_tween.is_valid():
+		await hud._progress_thickness_tween.finished
+	assert_float(hud.get_progress_bar_current_height()).is_equal(base_height)
+
+
 # ---------------------------------------------------------------------------
 # Theme styling applied
 # ---------------------------------------------------------------------------
