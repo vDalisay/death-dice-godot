@@ -3,7 +3,7 @@ extends Control
 ## Turn state machine for the Cubitos-style dice rolling phase.
 ## Owns dice logic. Delegates visuals to DiceArena and HUD.
 
-const BASE_BUST_THRESHOLD: int = 3
+const BASE_BUST_THRESHOLD: int = 4
 const AUTO_ADVANCE_DELAY: float = 0.75
 const MAX_SCORE_ANIM_DURATION: float = 2.0
 const HOT_STREAK_TIER_1: int = 3
@@ -57,6 +57,7 @@ var dice_keep_locked: Array[bool] = []
 ## Running total of STOP faces rolled this turn. Only increases; resets on
 ## bank, bust, or new turn. Used for the accumulated bust check.
 var accumulated_stop_count: int = 0
+var accumulated_shield_count: int = 0
 
 var _run_active: bool = true
 var _loop_complete_pending: bool = false
@@ -153,6 +154,7 @@ func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
 	turn_number += 1
 	accumulated_stop_count = 0
+	accumulated_shield_count = 0
 	_reroll_count = 0
 	_triggered_combo_ids.clear()
 	hud.set_active_combos([])
@@ -189,6 +191,7 @@ func _on_bank_pressed() -> void:
 	turn_state = TurnState.BANKED
 	bank_streak += 1
 	_update_streak_display()
+	var heart_relief: int = _apply_banked_heart_relief()
 	var base_banked: int = _calculate_turn_score()
 	# Iron Bank: +50% score if no rerolls.
 	if GameManager.has_modifier(RunModifier.ModifierType.IRON_BANK) and _reroll_count == 0:
@@ -260,6 +263,8 @@ func _on_bank_pressed() -> void:
 	var mult: int = _get_turn_multiplier()
 	var status_parts: Array[String] = []
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
+	if heart_relief > 0:
+		status_parts.append("HEARTS -%d STOP" % heart_relief)
 	if streak_mult > 1.0:
 		status_parts.append("ON FIRE x%.1f" % streak_mult)
 	if momentum_mult > 1.0:
@@ -446,6 +451,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 
 	# Accumulated bust check: add new stops from this roll to running total
 	accumulated_stop_count += _count_stops_in(rolled_indices)
+	_register_rolled_shields(rolled_indices)
 	var shield_count: int = _count_shields()
 	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
 	var threshold: int = _get_bust_threshold()
@@ -568,10 +574,26 @@ func _count_stops_in(indices: Array[int]) -> int:
 	return _get_roll_resolution_service().count_stops_in(indices, dice_stopped, current_results)
 
 func _count_shields() -> int:
-	return _get_roll_resolution_service().count_shields(
-		current_results,
-		GameManager.has_modifier(RunModifier.ModifierType.SHIELD_WALL)
-	)
+	return accumulated_shield_count
+
+
+func _register_rolled_shields(indices: Array[int], play_feedback: bool = true) -> int:
+	var multiplier: int = 2 if GameManager.has_modifier(RunModifier.ModifierType.SHIELD_WALL) else 1
+	var total: int = 0
+	for i: int in indices:
+		if i < 0 or i >= current_results.size():
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face == null or face.type != DiceFaceData.FaceType.SHIELD:
+			continue
+		total += face.value * multiplier
+		if play_feedback:
+			var shield_die: PhysicsDie = dice_arena.get_die(i)
+			if shield_die:
+				shield_die.play_shield_charge_pulse()
+			SFXManager.play_shield_absorb()
+	accumulated_shield_count += total
+	return total
 
 
 func _accumulate_luck() -> void:
@@ -584,6 +606,27 @@ func _accumulate_luck() -> void:
 			luck_total += maxi(1, face.value)
 	if luck_total > 0:
 		GameManager.add_luck(luck_total)
+
+
+func _count_banked_hearts() -> int:
+	var total: int = 0
+	for i: int in GameManager.dice_pool.size():
+		if dice_stopped[i]:
+			continue
+		if not (dice_keep[i] or dice_keep_locked[i]):
+			continue
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type == DiceFaceData.FaceType.HEART:
+			total += maxi(1, face.value)
+	return total
+
+
+func _apply_banked_heart_relief() -> int:
+	var relief: int = _count_banked_hearts()
+	if relief <= 0 or accumulated_stop_count <= 0:
+		return 0
+	accumulated_stop_count = maxi(0, accumulated_stop_count - relief)
+	return relief
 
 
 func _find_insurance_face_index() -> int:
@@ -669,6 +712,8 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.LUCK:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
+				if face.type == DiceFaceData.FaceType.SHIELD:
+					_register_rolled_shields([i], die != null)
 				if die:
 					die.tumble(face)
 					die.pop()
@@ -699,6 +744,8 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE]:
 				dice_keep[extra_i] = true
 				dice_keep_locked[extra_i] = true
+				if extra_face.type == DiceFaceData.FaceType.SHIELD:
+					_register_rolled_shields([extra_i], extra_die != null)
 			if extra_die:
 				extra_die.tumble(extra_face)
 				_sync_arena_die_state(extra_i)

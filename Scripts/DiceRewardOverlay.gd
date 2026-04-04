@@ -339,4 +339,6 @@ static func _face_color(face: DiceFaceData) -> Color:
 			return Color(0.3, 1.0, 0.6)
 		DiceFaceData.FaceType.LUCK:
 			return Color(0.4, 0.9, 0.3)
+		DiceFaceData.FaceType.HEART:
+			return _UITheme.ROSE_ACCENT
 	return Color(0.9, 0.9, 0.9)

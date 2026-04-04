@@ -59,3 +59,10 @@ func test_insurance_face_display() -> void:
 	var face := DiceFaceData.new()
 	face.type = DiceFaceData.FaceType.INSURANCE
 	assert_str(face.get_display_text()).is_equal("INS")
+
+
+func test_heart_face_display() -> void:
+	var face := DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.HEART
+	face.value = 1
+	assert_str(face.get_display_text()).is_equal("♥")

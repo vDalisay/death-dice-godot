@@ -21,7 +21,7 @@ const PRESS_SCALE: Vector2 = Vector2(0.95, 0.95)
 const SCALE_DURATION: float = 0.12
 
 ## All possible display strings cycled during the tumble animation.
-const TUMBLE_GLYPHS: Array[String] = ["1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "✦3"]
+const TUMBLE_GLYPHS: Array[String] = ["1", "2", "3", "4", "5", "STOP", "★3", "SH", "x2", "✦3", "♥"]
 
 ## Face type → corner glyph
 const FACE_TYPE_GLYPHS: Dictionary = {
@@ -36,6 +36,7 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 	8: "☠",         # CURSED_STOP
 	9: "!",         # INSURANCE
 	10: "🍀",        # LUCK
+	11: "♥",        # HEART
 }
 
 ## State fill colors (dark-on-dark palette)

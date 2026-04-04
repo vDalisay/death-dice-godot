@@ -82,7 +82,7 @@ func test_constants_are_reasonable() -> void:
 
 func test_face_type_glyphs_cover_all_types() -> void:
 	# Verify glyphs exist for all face types we use
-	for face_type: int in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+	for face_type: int in range(DiceFaceData.FaceType.size()):
 		assert_bool(PhysicsDie.FACE_TYPE_GLYPHS.has(face_type)).is_true()
 
 
@@ -137,6 +137,7 @@ func test_face_type_color_covers_all_face_types() -> void:
 func test_motion_polish_methods_do_not_error() -> void:
 	_die.setup(0, DiceData.make_standard_d6())
 	_die.play_keep_lock_snap()
+	_die.play_shield_charge_pulse()
 	_die.play_shield_absorb()
 	_die.play_stop_impact(false)
 	_die.play_stop_impact(true)

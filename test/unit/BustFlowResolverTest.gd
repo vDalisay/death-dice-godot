@@ -11,7 +11,7 @@ func before_test() -> void:
 func test_threshold_lenient_on_turns_1_to_3() -> void:
 	assert_int(_resolver.get_bust_threshold(3, 1, false, false, 3)).is_equal(4)
 	assert_int(_resolver.get_bust_threshold(3, 3, false, false, 3)).is_equal(4)
-	assert_int(_resolver.get_bust_threshold(3, 4, false, false, 3)).is_equal(3)
+	assert_int(_resolver.get_bust_threshold(4, 4, false, false, 3)).is_equal(4)
 
 
 func test_threshold_glass_cannon_penalty_respects_minimum() -> void:
@@ -20,8 +20,8 @@ func test_threshold_glass_cannon_penalty_respects_minimum() -> void:
 
 
 func test_threshold_last_stand_bonus_at_one_life() -> void:
-	assert_int(_resolver.get_bust_threshold(3, 4, false, true, 1)).is_equal(5)
-	assert_int(_resolver.get_bust_threshold(3, 4, false, true, 2)).is_equal(3)
+	assert_int(_resolver.get_bust_threshold(4, 4, false, true, 1)).is_equal(6)
+	assert_int(_resolver.get_bust_threshold(4, 4, false, true, 2)).is_equal(4)
 
 
 func test_immunity_rules_by_archetype_and_stage() -> void:

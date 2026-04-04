@@ -11,6 +11,7 @@ const MAX_MULTIPLY_VALUE: int = 4
 const MAX_EXPLODE_VALUE: int = 5
 const MAX_MULTIPLY_LEFT_VALUE: int = 4
 const MAX_LUCK_VALUE: int = 3
+const MAX_HEART_VALUE: int = 3
 const MAX_CHAIN_ROLLS: int = 10
 
 const DiceUpgradeServiceScript: GDScript = preload("res://Scripts/DiceUpgradeService.gd")
@@ -111,6 +112,46 @@ static func make_lucky_d6() -> DiceData:
 	for config: Array in configs:
 		var face := DiceFaceData.new()
 		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+static func make_shield_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Shield D6"
+	die.rarity = Rarity.GREY
+	var configs: Array = [
+		[DiceFaceData.FaceType.SHIELD, 1],
+		[DiceFaceData.FaceType.SHIELD, 1],
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.STOP,   0],
+		[DiceFaceData.FaceType.BLANK,  0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+static func make_heart_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Heart D6"
+	die.rarity = Rarity.GREEN
+	var configs: Array = [
+		[DiceFaceData.FaceType.HEART,  1],
+		[DiceFaceData.FaceType.HEART,  1],
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.NUMBER, 1],
+		[DiceFaceData.FaceType.STOP,   0],
+		[DiceFaceData.FaceType.BLANK,  0],
+	]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type = config[0]
 		face.value = config[1]
 		die.faces.append(face)
 	return die
@@ -289,6 +330,8 @@ static func make_blank_canvas_d6() -> DiceData:
 static func get_all_known_dice() -> Array[DiceData]:
 	var all: Array[DiceData] = [
 		make_standard_d6(),
+		make_shield_d6(),
+		make_heart_d6(),
 		make_blank_canvas_d6(),
 		make_simple_d6(),
 		make_lucky_d6(),
