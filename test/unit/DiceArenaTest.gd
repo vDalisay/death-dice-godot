@@ -124,3 +124,25 @@ func test_throw_dice_spread_avoids_overlap() -> void:
 		for j: int in range(i + 1, _arena.get_die_count()):
 			var b: PhysicsDie = _arena.get_die(j)
 			assert_float(a.position.distance_to(b.position)).is_greater_equal(min_allowed)
+
+
+func test_large_pool_spawn_positions_stay_centered_and_in_bounds() -> void:
+	var positions: Array[Vector2] = _arena._build_spawn_positions(DiceArena.SpawnOrigin.CENTER_BOTTOM, 30)
+	assert_int(positions.size()).is_equal(30)
+
+	var arena_rect: Rect2 = _arena.get_arena_rect()
+	var min_x: float = arena_rect.position.x + PhysicsDie.COLLISION_RADIUS
+	var max_x: float = arena_rect.end.x - PhysicsDie.COLLISION_RADIUS
+	var min_y: float = arena_rect.position.y + PhysicsDie.COLLISION_RADIUS
+	var max_y: float = arena_rect.end.y - PhysicsDie.COLLISION_RADIUS
+	var average_x: float = 0.0
+
+	for pos: Vector2 in positions:
+		average_x += pos.x
+		assert_float(pos.x).is_greater_equal(min_x)
+		assert_float(pos.x).is_less_equal(max_x)
+		assert_float(pos.y).is_greater_equal(min_y)
+		assert_float(pos.y).is_less_equal(max_y)
+
+	average_x /= float(positions.size())
+	assert_float(average_x).is_equal_approx(DiceArena.ARENA_WIDTH * 0.5, 0.1)

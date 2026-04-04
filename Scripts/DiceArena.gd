@@ -44,6 +44,9 @@ const THROW_STAGGER_MAGNITUDE_VARIANCE: float = 0.12
 const SPAWN_SPACING_MULT: float = 2.2
 const SPAWN_ROW_SPACING_MULT: float = 2.1
 const SPAWN_EDGE_PADDING: float = 8.0
+const SPAWN_LAYOUT_JITTER_X: float = 22.0
+const SPAWN_LAYOUT_JITTER_Y: float = 12.0
+const LARGE_POOL_CENTERING_THRESHOLD: int = 10
 const BOUNDARY_GLOW_HIT_GAIN: float = 0.22
 const BOUNDARY_GLOW_DECAY_PER_SEC: float = 2.1
 const CONTAINMENT_MIN_BOUNCE_SPEED: float = 90.0
@@ -68,6 +71,18 @@ const VOLLEY_CONE_HALF_ANGLE: float = 0.55
 const VOLLEY_CONE_JITTER: float = 0.15
 const VOLLEY_EMITTER_JITTER_X: float = 15.0
 const VOLLEY_EMITTER_JITTER_Y: float = 8.0
+const REROLL_VOLLEY_DELAY_START: float = 0.085
+const REROLL_VOLLEY_DELAY_END: float = 0.028
+const REROLL_VOLLEY_DELAY_JITTER: float = 0.004
+const REROLL_VOLLEY_CONE_HALF_ANGLE: float = 0.24
+const REROLL_VOLLEY_CONE_JITTER: float = 0.06
+const REROLL_VOLLEY_EMITTER_SWEEP_X: float = 32.0
+const REROLL_VOLLEY_EMITTER_JITTER_X: float = 8.0
+const REROLL_VOLLEY_EMITTER_JITTER_Y: float = 5.0
+const REROLL_VOLLEY_TARGET_SWEEP_X: float = 68.0
+const REROLL_VOLLEY_TARGET_HEIGHT_RATIO: float = 0.52
+const REROLL_THROW_IMPULSE_MIN: float = 1080.0
+const REROLL_THROW_IMPULSE_MAX: float = 1580.0
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -117,7 +132,7 @@ func _physics_process(_delta: float) -> void:
 		return
 	# Check if all dice have settled
 	for die: PhysicsDie in _dice:
-		if die.physics_state == PhysicsDie.DiePhysicsState.FLYING:
+		if die.physics_state != PhysicsDie.DiePhysicsState.SETTLED and die.physics_state != PhysicsDie.DiePhysicsState.KEPT:
 			return
 	# All settled
 	_settle_check_active = false
@@ -212,11 +227,11 @@ func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:
 			var captured_face: DiceFaceData = face
 			var captured_total: int = total
 			if slot == 0:
-				_reroll_volley_launch(captured_die, captured_face, captured_slot, captured_total)
+				_begin_reroll_launch_sequence(captured_die, captured_face, captured_slot, captured_total)
 			else:
-				var cumulative: float = volley_cumulative_delay(slot, total) + randf_range(0.0, VOLLEY_DELAY_JITTER)
+				var cumulative: float = reroll_cumulative_delay(slot, total) + randf_range(0.0, REROLL_VOLLEY_DELAY_JITTER)
 				get_tree().create_timer(cumulative).timeout.connect(
-					_reroll_volley_launch.bind(captured_die, captured_face, captured_slot, captured_total)
+					_begin_reroll_launch_sequence.bind(captured_die, captured_face, captured_slot, captured_total)
 				)
 
 	if instant_mode:
@@ -361,16 +376,32 @@ func _volley_emitter() -> Vector2:
 	return Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT - SPAWN_MARGIN - BOTTOM_SPAWN_LIFT)
 
 
+func _begin_reroll_launch_sequence(die: PhysicsDie, face: DiceFaceData, slot: int, total: int) -> void:
+	if not is_instance_valid(die):
+		return
+	die.physics_state = PhysicsDie.DiePhysicsState.RESOLVING
+	die.freeze = true
+	die.linear_velocity = Vector2.ZERO
+	die.angular_velocity = 0.0
+	die.play_reroll_lift()
+	var launch_delay: float = REROLL_LIFT_DELAY + randf_range(0.0, REROLL_LIFT_RANDOM_MAX)
+	get_tree().create_timer(launch_delay).timeout.connect(
+		_reroll_volley_launch.bind(die, face, slot, total)
+	)
+
+
 ## Launch a single rerolled die using the sweep volley pattern.
 func _reroll_volley_launch(die: PhysicsDie, face: DiceFaceData, slot: int, total: int) -> void:
 	if not is_instance_valid(die):
 		return
 
-	# Move die to emitter with jitter.
+	var slot_unit: float = _stagger_unit(slot, total)
+
+	# Move die to emitter with a narrower sweep and less jitter than the opening volley.
 	var emitter: Vector2 = _volley_emitter()
 	die.position = emitter + Vector2(
-		randf_range(-VOLLEY_EMITTER_JITTER_X, VOLLEY_EMITTER_JITTER_X),
-		randf_range(-VOLLEY_EMITTER_JITTER_Y, VOLLEY_EMITTER_JITTER_Y))
+		slot_unit * REROLL_VOLLEY_EMITTER_SWEEP_X + randf_range(-REROLL_VOLLEY_EMITTER_JITTER_X, REROLL_VOLLEY_EMITTER_JITTER_X),
+		randf_range(-REROLL_VOLLEY_EMITTER_JITTER_Y, REROLL_VOLLEY_EMITTER_JITTER_Y))
 
 	die.physics_state = PhysicsDie.DiePhysicsState.FLYING
 	die.freeze = false
@@ -378,17 +409,19 @@ func _reroll_volley_launch(die: PhysicsDie, face: DiceFaceData, slot: int, total
 	die.tumble(face)
 	die.play_launch_burst()
 
-	# Cone direction with sweep bias.
-	var target: Vector2 = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT * 0.4)
+	# Cone direction with a tighter, more controlled sweep.
+	var target: Vector2 = Vector2(
+		ARENA_WIDTH / 2.0 + slot_unit * REROLL_VOLLEY_TARGET_SWEEP_X,
+		ARENA_HEIGHT * REROLL_VOLLEY_TARGET_HEIGHT_RATIO
+	)
 	var base_dir: Vector2 = (target - emitter).normalized()
 	var base_angle: float = base_dir.angle()
-	var sweep_t: float = lerpf(-1.0, 1.0, float(slot) / float(maxi(total - 1, 1)))
-	var cone_angle: float = base_angle + VOLLEY_CONE_HALF_ANGLE * sweep_t + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
+	var cone_angle: float = base_angle + REROLL_VOLLEY_CONE_HALF_ANGLE * slot_unit + randf_range(-REROLL_VOLLEY_CONE_JITTER, REROLL_VOLLEY_CONE_JITTER)
 	var direction: Vector2 = Vector2.from_angle(cone_angle)
 
-	var magnitude: float = randf_range(THROW_IMPULSE_MIN * 0.7, THROW_IMPULSE_MAX * 0.9)
+	var magnitude: float = randf_range(REROLL_THROW_IMPULSE_MIN, REROLL_THROW_IMPULSE_MAX)
 	die.linear_velocity = direction * magnitude
-	die.angular_velocity = randf_range(THROW_ANGULAR_MIN, THROW_ANGULAR_MAX)
+	die.angular_velocity = randf_range(THROW_ANGULAR_MIN * 0.8, THROW_ANGULAR_MAX * 0.8)
 	SFXManager.play_roll()
 
 
@@ -398,6 +431,14 @@ func volley_cumulative_delay(index: int, total: int) -> float:
 	for i: int in range(1, index + 1):
 		var progress: float = float(i) / float(maxi(total - 1, 1))
 		cumulative += lerpf(VOLLEY_DELAY_START, VOLLEY_DELAY_END, progress)
+	return cumulative
+
+
+func reroll_cumulative_delay(index: int, total: int) -> float:
+	var cumulative: float = 0.0
+	for i: int in range(1, index + 1):
+		var progress: float = float(i) / float(maxi(total - 1, 1))
+		cumulative += lerpf(REROLL_VOLLEY_DELAY_START, REROLL_VOLLEY_DELAY_END, progress)
 	return cumulative
 
 
@@ -442,28 +483,57 @@ func _spawn_position_for_origin(origin: SpawnOrigin) -> Vector2:
 	var margin: float = SPAWN_MARGIN
 	var cx: float = ARENA_WIDTH / 2.0
 	var cy: float = ARENA_HEIGHT / 2.0
-	var jitter_x: float = randf_range(-40.0, 40.0)
-	var jitter_y: float = randf_range(-20.0, 20.0)
 	match origin:
 		SpawnOrigin.CENTER_BOTTOM:
-			return Vector2(cx + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
+			return Vector2(cx, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT)
 		SpawnOrigin.CENTER_TOP:
-			return Vector2(cx + jitter_x, margin + jitter_y)
+			return Vector2(cx, margin)
 		SpawnOrigin.TOP_LEFT:
-			return Vector2(margin + jitter_x, margin + jitter_y)
+			return Vector2(margin, margin)
 		SpawnOrigin.TOP_RIGHT:
-			return Vector2(ARENA_WIDTH - margin + jitter_x, margin + jitter_y)
+			return Vector2(ARENA_WIDTH - margin, margin)
 		SpawnOrigin.BOTTOM_LEFT:
-			return Vector2(margin + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
+			return Vector2(margin, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT)
 		SpawnOrigin.BOTTOM_RIGHT:
-			return Vector2(ARENA_WIDTH - margin + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
+			return Vector2(ARENA_WIDTH - margin, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT)
 		SpawnOrigin.LEFT:
-			return Vector2(margin + jitter_x, cy + jitter_y)
+			return Vector2(margin, cy)
 		SpawnOrigin.RIGHT:
-			return Vector2(ARENA_WIDTH - margin + jitter_x, cy + jitter_y)
+			return Vector2(ARENA_WIDTH - margin, cy)
 		SpawnOrigin.TOP:
-			return Vector2(cx + jitter_x, margin + jitter_y)
-	return Vector2(cx + jitter_x, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT + jitter_y)
+			return Vector2(cx, margin)
+	return Vector2(cx, ARENA_HEIGHT - margin - BOTTOM_SPAWN_LIFT)
+
+
+func _spawn_layout_anchor(
+	origin: SpawnOrigin,
+	count: int,
+	row_count: int,
+	max_row_size: int,
+	spacing: float,
+	row_spacing: float,
+	min_x: float,
+	max_x: float,
+	min_y: float,
+	max_y: float
+) -> Vector2:
+	var anchor: Vector2 = _spawn_position_for_origin(origin)
+	var centered_x: float = (min_x + max_x) * 0.5
+	var max_row_span: float = float(maxi(0, max_row_size - 1)) * spacing
+	var left_bound: float = min_x + max_row_span * 0.5
+	var right_bound: float = max_x - max_row_span * 0.5
+	var jitter_scale: float = clampf(
+		1.0 - float(maxi(count - 1, 0)) / float(maxi(LARGE_POOL_CENTERING_THRESHOLD - 1, 1)),
+		0.0,
+		1.0
+	)
+	if count >= LARGE_POOL_CENTERING_THRESHOLD:
+		anchor.x = centered_x
+	else:
+		anchor.x = clampf(anchor.x + randf_range(-SPAWN_LAYOUT_JITTER_X, SPAWN_LAYOUT_JITTER_X) * jitter_scale, left_bound, right_bound)
+	var top_row_y: float = min_y + float(maxi(row_count - 1, 0)) * row_spacing
+	anchor.y = clampf(anchor.y + randf_range(-SPAWN_LAYOUT_JITTER_Y, SPAWN_LAYOUT_JITTER_Y) * jitter_scale, top_row_y, max_y)
+	return anchor
 
 
 func _build_spawn_positions(origin: SpawnOrigin, count: int) -> Array[Vector2]:
@@ -471,15 +541,29 @@ func _build_spawn_positions(origin: SpawnOrigin, count: int) -> Array[Vector2]:
 	if count <= 0:
 		return positions
 
-	var anchor: Vector2 = _spawn_position_for_origin(origin)
 	var radius: float = PhysicsDie.COLLISION_RADIUS
 	var min_x: float = WALL_THICKNESS + radius + SPAWN_EDGE_PADDING
 	var max_x: float = ARENA_WIDTH - WALL_THICKNESS - radius - SPAWN_EDGE_PADDING
+	var min_y: float = WALL_THICKNESS + radius + SPAWN_EDGE_PADDING
+	var max_y: float = ARENA_HEIGHT - WALL_THICKNESS - radius - SPAWN_EDGE_PADDING
 	var usable_width: float = maxf(0.0, max_x - min_x)
 	var spacing: float = maxf(radius * SPAWN_SPACING_MULT, 1.0)
 	var max_per_row: int = maxi(1, int(floor(usable_width / spacing)) + 1)
 	var row_count: int = maxi(1, int(ceil(float(count) / float(max_per_row))))
 	var row_spacing: float = radius * SPAWN_ROW_SPACING_MULT
+	var max_row_size: int = mini(count, max_per_row)
+	var anchor: Vector2 = _spawn_layout_anchor(
+		origin,
+		count,
+		row_count,
+		max_row_size,
+		spacing,
+		row_spacing,
+		min_x,
+		max_x,
+		min_y,
+		max_y
+	)
 
 	var remaining: int = count
 	for row_index: int in row_count:
@@ -487,11 +571,11 @@ func _build_spawn_positions(origin: SpawnOrigin, count: int) -> Array[Vector2]:
 		var in_row: int = int(ceil(float(remaining) / float(rows_left)))
 		remaining -= in_row
 		var total_span: float = float(maxi(0, in_row - 1)) * spacing
-		var start_x: float = anchor.x - total_span * 0.5
-		var row_y: float = anchor.y - row_index * row_spacing
+		var start_x: float = clampf(anchor.x - total_span * 0.5, min_x, max_x - total_span)
+		var row_y: float = clampf(anchor.y - row_index * row_spacing, min_y, max_y)
 		for col: int in in_row:
 			var x: float = clampf(start_x + float(col) * spacing, min_x, max_x)
-			var y: float = clampf(row_y, WALL_THICKNESS + radius + SPAWN_EDGE_PADDING, ARENA_HEIGHT - WALL_THICKNESS - radius - SPAWN_EDGE_PADDING)
+			var y: float = clampf(row_y, min_y, max_y)
 			positions.append(Vector2(x, y))
 
 	return positions
