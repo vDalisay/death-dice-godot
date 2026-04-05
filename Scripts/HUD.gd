@@ -99,6 +99,8 @@ var _held_stop_count: int = 0
 var _near_death_banks: int = 0
 var _contract_progress_service: RefCounted = null
 var _seed_label: Label = null
+var _seed_row: HBoxContainer = null
+var _seed_copy_button: Button = null
 
 
 func _ready() -> void:
@@ -205,6 +207,12 @@ func _apply_theme_styling() -> void:
 		_seed_label.add_theme_font_override("font", _UITheme.font_mono())
 		_seed_label.add_theme_font_size_override("font_size", 11)
 		_seed_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	if _seed_copy_button != null:
+		_seed_copy_button.add_theme_font_override("font", _UITheme.font_mono())
+		_seed_copy_button.add_theme_font_size_override("font_size", 12)
+		_seed_copy_button.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+		_seed_copy_button.custom_minimum_size = Vector2(24, 20)
+		_seed_copy_button.tooltip_text = "Copy seed"
 	_risk_meter.add_theme_stylebox_override("panel",
 		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, _UITheme.PANEL_SURFACE, 0))
 	_risk_percent_label.add_theme_font_override("font", _UITheme.font_display())
@@ -233,26 +241,51 @@ func _create_risk_pips() -> void:
 func _create_seed_label() -> void:
 	if _risk_column == null:
 		return
+	_seed_row = HBoxContainer.new()
+	_seed_row.alignment = BoxContainer.ALIGNMENT_END
+	_seed_row.add_theme_constant_override("separation", 4)
+	_risk_column.add_child(_seed_row)
+	_risk_column.move_child(_seed_row, 0)
 	_seed_label = Label.new()
-	_seed_label.text = ""
-	_seed_label.visible = false
-	_risk_column.add_child(_seed_label)
-	_risk_column.move_child(_seed_label, 0)
+	_seed_label.text = "SEED: -"
+	_seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_seed_row.add_child(_seed_label)
+	_seed_copy_button = Button.new()
+	_seed_copy_button.text = _UITheme.GLYPH_COPY
+	_seed_copy_button.flat = true
+	_seed_copy_button.focus_mode = Control.FOCUS_NONE
+	_seed_copy_button.disabled = true
+	_seed_copy_button.pressed.connect(_on_seed_copy_pressed)
+	_seed_row.add_child(_seed_copy_button)
 
 
 func _refresh_seed_display() -> void:
 	if _seed_label == null:
 		return
-	if GameManager.is_seeded_run and not GameManager.run_seed_text.is_empty():
-		_seed_label.text = "SEED: %s" % GameManager.run_seed_text
-		_seed_label.visible = true
+	var seed_text: String = GameManager.run_seed_text.strip_edges()
+	if seed_text.is_empty():
+		_seed_label.text = "SEED: -"
+		if _seed_copy_button != null:
+			_seed_copy_button.disabled = true
 	else:
-		_seed_label.text = ""
-		_seed_label.visible = false
+		_seed_label.text = "SEED: %s" % seed_text
+		if _seed_copy_button != null:
+			_seed_copy_button.disabled = false
+	_seed_label.visible = true
+	if _seed_row != null:
+		_seed_row.visible = true
 
 
 func _on_run_seed_changed(_is_seeded: bool, _seed_text: String) -> void:
 	_refresh_seed_display()
+
+
+func _on_seed_copy_pressed() -> void:
+	var seed_text: String = GameManager.run_seed_text.strip_edges()
+	if seed_text.is_empty():
+		return
+	DisplayServer.clipboard_set(seed_text)
+	show_status("Seed copied.", _UITheme.ACTION_CYAN)
 
 
 func _cache_modifier_badges() -> void:

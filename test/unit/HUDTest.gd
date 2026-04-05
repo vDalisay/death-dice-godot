@@ -5,13 +5,34 @@ extends GdUnitTestSuite
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const HUDScene: PackedScene = preload("res://Scenes/HUD.tscn")
 
+var _saved_is_seeded_run: bool = false
+var _saved_run_seed_text: String = ""
+var _saved_seed_version: int = 1
+var _saved_rng_stream_states: Dictionary = {}
+
 
 func before_test() -> void:
+	_saved_is_seeded_run = GameManager.is_seeded_run
+	_saved_run_seed_text = GameManager.run_seed_text
+	_saved_seed_version = GameManager.run_seed_version
+	_saved_rng_stream_states = GameManager.snapshot_rng_stream_states()
 	GameManager.active_modifiers.clear()
 	GameManager.clear_active_loop_contract()
 	GameManager.set_held_stop_count(0)
 	GameManager.near_death_banks_this_stage = 0
 	GameManager.near_death_banks_this_run = 0
+
+
+func after_test() -> void:
+	if _saved_run_seed_text.is_empty():
+		GameManager.clear_active_run_identity()
+		return
+	GameManager.restore_run_identity(
+		_saved_run_seed_text,
+		_saved_is_seeded_run,
+		_saved_seed_version,
+		_saved_rng_stream_states
+	)
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +184,27 @@ func test_contract_label_reflects_active_contract_progress() -> void:
 	var contract_label: Label = hud.get_node("InfoRow/RiskColumn/ContractLabel") as Label
 	assert_bool(contract_label.visible).is_true()
 	assert_str(contract_label.text).is_equal("Safe Hands 1/3")
+
+
+func test_seed_label_shows_for_unseeded_run_when_seed_exists() -> void:
+	GameManager.restore_run_identity("hud-unseeded-seed", false, 1)
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	assert_object(hud._seed_label).is_not_null()
+	assert_bool(hud._seed_label.visible).is_true()
+	assert_str(hud._seed_label.text).is_equal("SEED: hud-unseeded-seed")
+	assert_object(hud._seed_copy_button).is_not_null()
+	assert_bool(hud._seed_copy_button.disabled).is_false()
+
+
+func test_seed_copy_button_disabled_when_seed_missing() -> void:
+	GameManager.clear_active_run_identity()
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	assert_str(hud._seed_label.text).is_equal("SEED: -")
+	assert_bool(hud._seed_copy_button.disabled).is_true()
 
 
 func test_score_label_total_format() -> void:
