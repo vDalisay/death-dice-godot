@@ -8,26 +8,26 @@ signal node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool)
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
-const NODE_SIZE: float = 92.0
-const MIN_H_SPACING: float = 116.0
-const LINE_WIDTH: float = 3.0
-const LINE_WIDTH_ACTIVE: float = 4.5
-const LINE_COLOR: Color = Color("#3A3129", 0.55)
-const LINE_COLOR_VISITED: Color = Color("#7F6C57", 0.42)
-const LINE_COLOR_ACTIVE: Color = Color("#89C6C7", 0.80)
-const LINE_COLOR_SELECTED: Color = Color("#D7A769", 0.92)
-const LINE_COLOR_FUTURE: Color = Color("#201D22", 0.58)
-const VISITED_ALPHA: float = 0.42
-const FUTURE_ALPHA: float = 0.34
-const UNREACHABLE_ALPHA: float = 0.60
-const CURRENT_ROW_GLOW: Color = Color("#89C6C7")
-const SELECTED_GLOW: Color = Color("#E1D0A2")
-const REROUTE_GLOW: Color = Color("#D7A769")
-const ICON_FONT_SIZE: int = 11
-const STATE_FONT_SIZE: int = 10
-const PANEL_INTRO_DURATION: float = 0.22
-const NODE_REVEAL_STAGGER: float = 0.04
-const NODE_REVEAL_DURATION: float = 0.16
+const NODE_SIZE: float = _UITheme.STAGE_MAP_NODE_SIZE
+const MIN_H_SPACING: float = _UITheme.STAGE_MAP_MIN_SPACING
+const LINE_WIDTH: float = _UITheme.STAGE_MAP_LINE_WIDTH
+const LINE_WIDTH_ACTIVE: float = _UITheme.STAGE_MAP_LINE_WIDTH_ACTIVE
+const LINE_COLOR: Color = _UITheme.STAGE_MAP_LINE_COLOR
+const LINE_COLOR_VISITED: Color = _UITheme.STAGE_MAP_LINE_COLOR_VISITED
+const LINE_COLOR_ACTIVE: Color = _UITheme.STAGE_MAP_LINE_COLOR_ACTIVE
+const LINE_COLOR_SELECTED: Color = _UITheme.STAGE_MAP_LINE_COLOR_SELECTED
+const LINE_COLOR_FUTURE: Color = _UITheme.STAGE_MAP_LINE_COLOR_FUTURE
+const VISITED_ALPHA: float = _UITheme.STAGE_MAP_ALPHA_VISITED
+const FUTURE_ALPHA: float = _UITheme.STAGE_MAP_ALPHA_FUTURE
+const UNREACHABLE_ALPHA: float = _UITheme.STAGE_MAP_ALPHA_UNREACHABLE
+const CURRENT_ROW_GLOW: Color = _UITheme.STAGE_MAP_GLOW_CURRENT_ROW
+const SELECTED_GLOW: Color = _UITheme.STAGE_MAP_GLOW_SELECTED
+const REROUTE_GLOW: Color = _UITheme.STAGE_MAP_GLOW_REROUTE
+const ICON_FONT_SIZE: int = _UITheme.STAGE_MAP_ICON_FONT_SIZE
+const STATE_FONT_SIZE: int = _UITheme.STAGE_MAP_STATE_FONT_SIZE
+const PANEL_INTRO_DURATION: float = _UITheme.STAGE_MAP_PANEL_INTRO_DURATION
+const NODE_REVEAL_STAGGER: float = _UITheme.STAGE_MAP_NODE_REVEAL_STAGGER
+const NODE_REVEAL_DURATION: float = _UITheme.STAGE_MAP_NODE_REVEAL_DURATION
 
 @onready var _backdrop: ColorRect = $AtmosphereLayer/Backdrop
 @onready var _content: VBoxContainer = $MarginContainer/RootVBox
@@ -172,7 +172,7 @@ func _rebuild_map() -> void:
     if area_w < 1.0 or area_h < 1.0:
         return
     var row_count: int = _stage_map.get_row_count()
-    var v_padding: float = 34.0
+    var v_padding: float = _UITheme.STAGE_MAP_PADDING_V
     var usable_h: float = area_h - v_padding * 2.0
     var row_step_y: float = usable_h / float(maxi(row_count - 1, 1))
     for r: int in row_count:
@@ -335,35 +335,11 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
 
 
 func _get_medallion_size(node_type: MapNodeData.NodeType) -> Vector2:
-    match node_type:
-        MapNodeData.NodeType.SHOP:
-            return Vector2(80.0, 68.0)
-        MapNodeData.NodeType.RANDOM_EVENT:
-            return Vector2(70.0, 82.0)
-        MapNodeData.NodeType.FORGE:
-            return Vector2(82.0, 82.0)
-        MapNodeData.NodeType.REST:
-            return Vector2(72.0, 72.0)
-        MapNodeData.NodeType.SPECIAL_STAGE:
-            return Vector2(86.0, 86.0)
-        _:
-            return Vector2(76.0, 76.0)
+    return _UITheme.get_stage_map_medallion_size(int(node_type))
 
 
 func _get_medallion_corner(node_type: MapNodeData.NodeType) -> int:
-    match node_type:
-        MapNodeData.NodeType.SHOP:
-            return 10
-        MapNodeData.NodeType.RANDOM_EVENT:
-            return 22
-        MapNodeData.NodeType.FORGE:
-            return 6
-        MapNodeData.NodeType.REST:
-            return 26
-        MapNodeData.NodeType.SPECIAL_STAGE:
-            return 14
-        _:
-            return 12
+    return _UITheme.get_stage_map_medallion_corner(int(node_type))
 
 
 func _refresh_visual_state() -> void:
@@ -697,41 +673,21 @@ func _play_close_transition() -> void:
 
 func _apply_theme_styling() -> void:
     add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color.TRANSPARENT, 0))
-    _backdrop.color = Color("#090A0F", 0.95)
-    _header_panel.add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color("#120F15", 0.94), 14, Color("#564535"), 1))
-    _board_frame.add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color("#17131A", 0.96), 18, Color("#5C4A38"), 2))
-    _inspector_panel.add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color("#151117", 0.97), 16, Color("#473A2F"), 1))
-    _footer_panel.add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color("#100D13", 0.94), 14, Color("#43372C"), 1))
-    _title_label.add_theme_font_override("font", _UITheme.font_display())
-    _title_label.add_theme_font_size_override("font_size", 18)
-    _title_label.add_theme_color_override("font_color", Color("#E5D9B7"))
-    _context_label.add_theme_font_override("font", _UITheme.font_mono())
-    _context_label.add_theme_font_size_override("font_size", 18)
-    _context_label.add_theme_color_override("font_color", Color("#A8A099"))
-    _header_seal.add_theme_font_override("font", _UITheme.font_mono())
-    _header_seal.add_theme_font_size_override("font_size", 20)
-    _header_seal.add_theme_color_override("font_color", Color("#8F7C63"))
-    _board_label.add_theme_font_override("font", _UITheme.font_mono())
-    _board_label.add_theme_font_size_override("font_size", 20)
-    _board_label.add_theme_color_override("font_color", Color("#907A60"))
-    _inspector_eyebrow.add_theme_font_override("font", _UITheme.font_mono())
-    _inspector_eyebrow.add_theme_font_size_override("font_size", 18)
-    _inspector_eyebrow.add_theme_color_override("font_color", Color("#8F7C63"))
-    _selected_node_title.add_theme_font_override("font", _UITheme.font_display())
-    _selected_node_title.add_theme_font_size_override("font_size", 16)
-    _selected_node_title.add_theme_color_override("font_color", Color("#EAE1C8"))
-    _selected_node_type.add_theme_font_override("font", _UITheme.font_mono())
-    _selected_node_type.add_theme_font_size_override("font_size", 18)
-    _selected_node_type.add_theme_color_override("font_color", Color("#B7AB95"))
-    _selected_node_flavor.add_theme_font_override("font", _UITheme.font_body())
-    _selected_node_flavor.add_theme_font_size_override("font_size", 15)
-    _selected_node_flavor.add_theme_color_override("font_color", Color("#C9BEAE"))
-    _selected_node_summary.add_theme_font_override("font", _UITheme.font_body())
-    _selected_node_summary.add_theme_font_size_override("font_size", 15)
-    _selected_node_summary.add_theme_color_override("font_color", Color("#E3D8C4"))
-    _selected_node_rule.add_theme_font_override("font", _UITheme.font_body())
-    _selected_node_rule.add_theme_font_size_override("font_size", 15)
-    _selected_node_rule.add_theme_color_override("font_color", Color("#D7A769"))
+    _backdrop.color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, 0.95)
+    _header_panel.add_theme_stylebox_override("panel", _UITheme.make_stage_family_panel_style("header", 14, 1))
+    _board_frame.add_theme_stylebox_override("panel", _UITheme.make_stage_family_panel_style("board", 18, 2))
+    _inspector_panel.add_theme_stylebox_override("panel", _UITheme.make_stage_family_panel_style("inspector", 16, 1))
+    _footer_panel.add_theme_stylebox_override("panel", _UITheme.make_stage_family_panel_style("footer", 14, 1))
+    _UITheme.apply_stage_map_label_style(_title_label, "title")
+    _UITheme.apply_stage_map_label_style(_context_label, "context")
+    _UITheme.apply_stage_map_label_style(_header_seal, "seal")
+    _UITheme.apply_stage_map_label_style(_board_label, "board")
+    _UITheme.apply_stage_map_label_style(_inspector_eyebrow, "eyebrow")
+    _UITheme.apply_stage_map_label_style(_selected_node_title, "node_title")
+    _UITheme.apply_stage_map_label_style(_selected_node_type, "node_type")
+    _UITheme.apply_stage_map_label_style(_selected_node_flavor, "flavor")
+    _UITheme.apply_stage_map_label_style(_selected_node_summary, "summary")
+    _UITheme.apply_stage_map_label_style(_selected_node_rule, "rule")
     _reroute_button.add_theme_font_override("font", _UITheme.font_display())
     _reroute_button.add_theme_font_size_override("font_size", 12)
     _reroute_button.add_theme_stylebox_override("normal", _UITheme.make_panel_stylebox(Color("#231913"), 12, REROUTE_GLOW, 2))
@@ -739,9 +695,5 @@ func _apply_theme_styling() -> void:
     _reroute_button.add_theme_stylebox_override("pressed", _UITheme.make_panel_stylebox(Color("#1A120E"), 12, REROUTE_GLOW, 2))
     _reroute_button.add_theme_color_override("font_color", Color("#F2DFB6"))
     _reroute_button.add_theme_color_override("font_hover_color", Color.WHITE)
-    _hint_label.add_theme_font_override("font", _UITheme.font_body())
-    _hint_label.add_theme_font_size_override("font_size", 15)
-    _hint_label.add_theme_color_override("font_color", Color("#D4C8B7"))
-    _legend_label.add_theme_font_override("font", _UITheme.font_mono())
-    _legend_label.add_theme_font_size_override("font_size", 16)
-    _legend_label.add_theme_color_override("font_color", Color("#8A7F73"))
+    _UITheme.apply_stage_map_label_style(_hint_label, "hint")
+    _UITheme.apply_stage_map_label_style(_legend_label, "legend")

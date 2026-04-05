@@ -54,22 +54,22 @@ func open(initial_mode: int) -> void:
 
 func _apply_theme() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	color = Color(0.1, 0.1, 0.15, 0.92)
-	_card_panel.custom_minimum_size = PANEL_MIN_SIZE
+	color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, _UITheme.STAGE_FAMILY_BACKDROP_ALPHA)
+	_card_panel.custom_minimum_size = Vector2(maxf(PANEL_MIN_SIZE.x, _UITheme.STAGE_FAMILY_MEDIUM_PANEL_WIDTH), PANEL_MIN_SIZE.y)
 	_card_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.SCORE_GOLD, 2)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.text = "Choose Your Archetype"
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 36)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_mode_description.text = "Gauntlet: steeper stage scaling, separate records"
 	_mode_description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_mode_description.add_theme_font_override("font", _UITheme.font_mono())
 	_mode_description.add_theme_font_size_override("font_size", 14)
-	_mode_description.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_mode_description.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 	_archetype_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_archetype_row.add_theme_constant_override("separation", CARD_ROW_SPACING)
 	var mode_row: HBoxContainer = _classic_button.get_parent() as HBoxContainer

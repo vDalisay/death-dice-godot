@@ -6,7 +6,6 @@ signal contract_selected(contract_id: String)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
-const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
@@ -31,17 +30,18 @@ func open(loop_number: int, offers: Array[LoopContractData]) -> void:
 
 func _apply_theme() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	color = Color(0.07, 0.08, 0.12, 0.92)
+	color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, _UITheme.STAGE_FAMILY_BACKDROP_ALPHA)
+	_card_panel.custom_minimum_size = Vector2(_UITheme.STAGE_FAMILY_MEDIUM_PANEL_WIDTH, 440)
 	_card_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 30)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_subtitle_label.add_theme_font_override("font", _UITheme.font_body())
 	_subtitle_label.add_theme_font_size_override("font_size", 14)
-	_subtitle_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_subtitle_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 
 
 func _rebuild_cards(offers: Array[LoopContractData]) -> void:

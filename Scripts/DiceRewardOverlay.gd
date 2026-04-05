@@ -6,7 +6,7 @@ signal reward_chosen(die: DiceData)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
-const BACKDROP_ALPHA: float = 0.72
+const BACKDROP_ALPHA: float = 0.52
 const CARD_WIDTH: int = 220
 const CARD_HEIGHT: int = 320
 const FACE_GRID_COLUMNS: int = 3
@@ -53,14 +53,14 @@ func _ready() -> void:
 func _apply_theme_styling() -> void:
 	_card_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 20)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_hint_label.add_theme_font_override("font", _UITheme.font_body())
 	_hint_label.add_theme_font_size_override("font_size", 14)
-	_hint_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_hint_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 
 
 func open(luck: int) -> void:

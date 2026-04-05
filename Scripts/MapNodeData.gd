@@ -2,7 +2,6 @@ class_name MapNodeData
 extends Resource
 ## A single node on the stage map. Holds type, connections to next row, and visit state.
 
-const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 enum NodeType { NORMAL_STAGE, SHOP, RANDOM_EVENT, FORGE, REST, SPECIAL_STAGE }

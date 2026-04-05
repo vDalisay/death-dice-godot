@@ -10,6 +10,7 @@ const START_INTERVAL: float = 0.06
 const DIE_FACES: Array[int] = [1, 2, 3, 4, 5, 6]
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
+@onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/TitleLabel
 @onready var _die_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/DieLabel
@@ -38,13 +39,14 @@ func _ready() -> void:
 
 func _apply_theme_styling() -> void:
 	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
+	_backdrop.color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, _UITheme.STAGE_FAMILY_BACKDROP_ALPHA)
 	_modal.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 20)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 
 	_die_label.add_theme_font_override("font", _UITheme.font_stats())
 	_die_label.add_theme_font_size_override("font_size", 120)

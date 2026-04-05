@@ -8,8 +8,8 @@ const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd"
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 const PermanentUpgradeDataScript: GDScript = preload("res://Scripts/PermanentUpgradeData.gd")
-const PermanentUpgradeData := preload("res://Scripts/PermanentUpgradeData.gd")
 
+@onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
 @onready var _currency_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CurrencyLabel
@@ -34,23 +34,24 @@ func _ready() -> void:
 
 func _apply_theme_styling() -> void:
 	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
+	_backdrop.color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, _UITheme.STAGE_FAMILY_BACKDROP_ALPHA)
 	_modal.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 20)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_title_label.text = "META LAB"
 
 	_currency_label.add_theme_font_override("font", _UITheme.font_stats())
 	_currency_label.add_theme_font_size_override("font_size", 18)
-	_currency_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_currency_label.add_theme_color_override("font_color", _UITheme.STAGE_MAP_GLOW_CURRENT_ROW)
 
 	_meta_currency_label.add_theme_font_override("font", _UITheme.font_stats())
 	_meta_currency_label.add_theme_font_size_override("font_size", 18)
-	_meta_currency_label.add_theme_color_override("font_color", _UITheme.SUCCESS_GREEN)
+	_meta_currency_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 
 	_close_button.add_theme_font_override("font", _UITheme.font_display())
 	_close_button.add_theme_font_size_override("font_size", 13)

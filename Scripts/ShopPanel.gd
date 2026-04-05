@@ -37,7 +37,15 @@ var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
 @onready var _gold_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge/GoldLabel
 @onready var _offer_summary_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/OfferSummaryLabel
-@onready var _offer_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/OfferGrid
+@onready var _dice_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection
+@onready var _dice_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceSectionHeader
+@onready var _dice_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceGrid
+@onready var _modifiers_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection
+@onready var _modifiers_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection/ModifiersSectionHeader
+@onready var _modifiers_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection/ModifiersGrid
+@onready var _bets_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection
+@onready var _bets_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsSectionHeader
+@onready var _bets_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsGrid
 @onready var _details_panel: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel
 @onready var _details_eyebrow_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsEyebrowLabel
 @onready var _details_title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel
@@ -50,6 +58,7 @@ var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn
 
 var _dice_items: Array[ShopItemData] = []
 var _modifier_items: Array[ShopItemData] = []
+var _bet_items: Array[ShopItemData] = []
 var _all_items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
 var _price_labels: Array[Label] = []
@@ -106,20 +115,20 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 func _apply_theme_styling() -> void:
 	# Root should be transparent while backdrop + modal do the visual work.
 	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color(0, 0, 0, 0), 0))
-	_backdrop.color = Color(0, 0, 0, 0.72)
+	_backdrop.color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, _UITheme.STAGE_FAMILY_BACKDROP_ALPHA)
 
 	_modal.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.ACTION_CYAN, 2)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_gold_badge.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 2)
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.STAGE_MAP_GLOW_REROUTE, 2)
 	)
 
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 18)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 
 	_gold_label.add_theme_font_override("font", _UITheme.font_stats())
 	_gold_label.add_theme_font_size_override("font_size", 24)
@@ -127,26 +136,32 @@ func _apply_theme_styling() -> void:
 
 	_offer_summary_label.add_theme_font_override("font", _UITheme.font_body())
 	_offer_summary_label.add_theme_font_size_override("font_size", 14)
-	_offer_summary_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_offer_summary_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
+
+	for header: Label in [_dice_section_header, _modifiers_section_header, _bets_section_header]:
+		header.add_theme_font_override("font", _UITheme.font_mono())
+		header.add_theme_font_size_override("font_size", 15)
+		header.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
+
 	_details_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.NEON_PURPLE, 1)
+		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
 	)
 	_details_eyebrow_label.add_theme_font_override("font", _UITheme.font_display())
 	_details_eyebrow_label.add_theme_font_size_override("font_size", 12)
-	_details_eyebrow_label.add_theme_color_override("font_color", _UITheme.NEON_PURPLE)
+	_details_eyebrow_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
 	_details_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_details_title_label.add_theme_font_size_override("font_size", 14)
-	_details_title_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_details_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_details_keyword_label.add_theme_font_override("font", _UITheme.font_mono())
 	_details_keyword_label.add_theme_font_size_override("font_size", 18)
-	_details_keyword_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_details_keyword_label.add_theme_color_override("font_color", _UITheme.STAGE_MAP_GLOW_CURRENT_ROW)
 	_details_description_label.add_theme_font_override("font", _UITheme.font_body())
 	_details_description_label.add_theme_font_size_override("font_size", 14)
-	_details_description_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_details_description_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
 	_details_state_label.add_theme_font_override("font", _UITheme.font_body())
 	_details_state_label.add_theme_font_size_override("font_size", 13)
-	_details_state_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_details_state_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 
 	_pool_label.add_theme_font_override("font", _UITheme.font_body())
 	_pool_label.add_theme_font_size_override("font_size", 18)
@@ -166,6 +181,7 @@ func _apply_theme_styling() -> void:
 func _generate_items() -> void:
 	_dice_items.clear()
 	_modifier_items.clear()
+	_bet_items.clear()
 
 	var dice_pool: Array[ShopItemData] = [
 		ShopItemData.make_buy_simple_die(),
@@ -193,13 +209,13 @@ func _generate_items() -> void:
 	if _any_die_has_cursed_stop():
 		_dice_items.append(ShopItemData.make_cleanse_curse())
 	if GameManager.gold >= DOUBLE_DOWN_MIN_GOLD and not _dd_used_this_shop:
-		_dice_items.append(ShopItemData.make_double_down())
+		_bet_items.append(ShopItemData.make_double_down())
 	if GameManager.gold >= INSURANCE_BET_MIN_GOLD and not _ib_used_this_shop:
-		_dice_items.append(ShopItemData.make_insurance_bet())
+		_bet_items.append(ShopItemData.make_insurance_bet())
 	if GameManager.gold >= HEAT_BET_MIN_GOLD and not _hb_used_this_shop:
-		_dice_items.append(ShopItemData.make_heat_bet())
+		_bet_items.append(ShopItemData.make_heat_bet())
 	if GameManager.gold >= EVEN_ODD_BET_MIN_GOLD and not _eo_used_this_shop:
-		_dice_items.append(ShopItemData.make_even_odd_bet())
+		_bet_items.append(ShopItemData.make_even_odd_bet())
 
 	if GameManager.can_add_modifier():
 		var mod_factories: Array[Callable] = RunModifier.all_factories()
@@ -218,22 +234,32 @@ func _generate_items() -> void:
 
 
 func _build_item_cards() -> void:
-	_clear_container(_offer_grid)
+	_clear_container(_dice_grid)
+	_clear_container(_modifiers_grid)
+	_clear_container(_bets_grid)
 	_all_items.clear()
 	_buy_buttons.clear()
 	_price_labels.clear()
 	_card_panels.clear()
 	_selected_item = null
 	_selected_card_index = -1
+	_dice_section.visible = not _dice_items.is_empty()
+	_modifiers_section.visible = not _modifier_items.is_empty()
+	_bets_section.visible = not _bet_items.is_empty()
 
 	for item: ShopItemData in _dice_items:
 		var card: PanelContainer = _make_item_card(item)
-		_offer_grid.add_child(card)
+		_dice_grid.add_child(card)
 		_all_items.append(item)
 
 	for item: ShopItemData in _modifier_items:
 		var card: PanelContainer = _make_item_card(item)
-		_offer_grid.add_child(card)
+		_modifiers_grid.add_child(card)
+		_all_items.append(item)
+
+	for item: ShopItemData in _bet_items:
+		var card: PanelContainer = _make_item_card(item)
+		_bets_grid.add_child(card)
 		_all_items.append(item)
 
 	if not _all_items.is_empty():
@@ -499,7 +525,10 @@ func _on_gold_changed(_new_gold: int) -> void:
 
 func _refresh_display() -> void:
 	_gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, GameManager.gold]
-	_offer_summary_label.text = "%d dice offers | %d mod offers | %d total" % [_dice_items.size(), _modifier_items.size(), _all_items.size()]
+	_offer_summary_label.text = "%d dice | %d modifiers | %d bets" % [_dice_items.size(), _modifier_items.size(), _bet_items.size()]
+	_dice_section_header.text = "AVAILABLE DICE (%d)" % _dice_items.size()
+	_modifiers_section_header.text = "PASSIVE UPGRADES (%d)" % _modifier_items.size()
+	_bets_section_header.text = "SIDE BETS (%d)" % _bet_items.size()
 	var mod_text: String = ""
 	if not GameManager.active_modifiers.is_empty():
 		var names: Array[String] = []

@@ -27,7 +27,7 @@ func _ready() -> void:
 func _apply_theme_styling() -> void:
 	_card.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.DANGER_RED, 2)
+		_UITheme.make_panel_stylebox(_UITheme.STAGE_FAMILY_INSPECTOR_FILL, _UITheme.CORNER_RADIUS_MODAL, _UITheme.DANGER_RED, 2)
 	)
 	_message_label.add_theme_font_override("font", _UITheme.font_display())
 	_message_label.add_theme_font_size_override("font_size", 32)
@@ -55,7 +55,7 @@ func play(life_loss: int) -> void:
 	var tween: Tween = create_tween()
 	tween.tween_interval(PRE_FLASH_DELAY)
 	# Fade in backdrop + card, drop card from above to center.
-	tween.tween_property(self, "color:a", 0.75, 0.15)
+	tween.tween_property(self, "color:a", _UITheme.STAGE_FAMILY_BACKDROP_ALPHA, 0.15)
 	tween.parallel().tween_property(_card, "modulate:a", 1.0, 0.12)
 	tween.parallel().tween_property(_card, "position", _card_rest_position, DROP_DURATION) \
 		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)

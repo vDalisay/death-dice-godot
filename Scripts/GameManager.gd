@@ -2,7 +2,6 @@ extends Node
 ## Global score and run state. Registered as autoload "GameManager".
 
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
-const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const MAX_LIVES: int = 3

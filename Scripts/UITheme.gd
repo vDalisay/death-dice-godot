@@ -190,6 +190,195 @@ static func apply_label_style(control: Control, font: Font, font_size: int, font
 	control.add_theme_color_override("font_color", font_color)
 
 
+# ---------------------------------------------------------------------------
+# Stage Family Tokens (route-board visual language)
+# ---------------------------------------------------------------------------
+const STAGE_FAMILY_BACKDROP_COLOR: Color = Color("#090A0F")
+const STAGE_FAMILY_BACKDROP_ALPHA: float = 0.52
+const STAGE_FAMILY_ATMOS_TOP_SHADE: Color = Color(0.0, 0.0, 0.0, 0.24)
+const STAGE_FAMILY_ATMOS_BOTTOM_SHADE: Color = Color(0.0, 0.0, 0.0, 0.34)
+
+const STAGE_FAMILY_MARGIN_X: int = 24
+const STAGE_FAMILY_MARGIN_Y: int = 20
+const STAGE_FAMILY_WIDE_PANEL_WIDTH: int = 1080
+const STAGE_FAMILY_MEDIUM_PANEL_WIDTH: int = 920
+
+const STAGE_FAMILY_HEADER_FILL: Color = Color("#120F15", 0.94)
+const STAGE_FAMILY_BOARD_FILL: Color = Color("#17131A", 0.96)
+const STAGE_FAMILY_INSPECTOR_FILL: Color = Color("#151117", 0.97)
+const STAGE_FAMILY_FOOTER_FILL: Color = Color("#100D13", 0.94)
+
+const STAGE_FAMILY_HEADER_BORDER: Color = Color("#564535")
+const STAGE_FAMILY_BOARD_BORDER: Color = Color("#5C4A38")
+const STAGE_FAMILY_INSPECTOR_BORDER: Color = Color("#473A2F")
+const STAGE_FAMILY_FOOTER_BORDER: Color = Color("#43372C")
+
+const STAGE_FAMILY_TITLE_COLOR: Color = Color("#E5D9B7")
+const STAGE_FAMILY_CONTEXT_COLOR: Color = Color("#A8A099")
+const STAGE_FAMILY_ACCENT_TEXT: Color = Color("#8F7C63")
+const STAGE_FAMILY_BODY_TEXT: Color = Color("#D4C8B7")
+const STAGE_FAMILY_MUTED_TEXT: Color = Color("#8A7F73")
+
+
+# ---------------------------------------------------------------------------
+# Stage Map Specific Tokens
+# ---------------------------------------------------------------------------
+const STAGE_MAP_NODE_SIZE: float = 92.0
+const STAGE_MAP_MIN_SPACING: float = 116.0
+const STAGE_MAP_PADDING_V: float = 34.0
+
+const STAGE_MAP_LINE_WIDTH: float = 3.0
+const STAGE_MAP_LINE_WIDTH_ACTIVE: float = 4.5
+const STAGE_MAP_LINE_COLOR: Color = Color("#3A3129", 0.55)
+const STAGE_MAP_LINE_COLOR_VISITED: Color = Color("#7F6C57", 0.42)
+const STAGE_MAP_LINE_COLOR_ACTIVE: Color = Color("#89C6C7", 0.80)
+const STAGE_MAP_LINE_COLOR_SELECTED: Color = Color("#D7A769", 0.92)
+const STAGE_MAP_LINE_COLOR_FUTURE: Color = Color("#201D22", 0.58)
+
+const STAGE_MAP_ALPHA_VISITED: float = 0.42
+const STAGE_MAP_ALPHA_FUTURE: float = 0.34
+const STAGE_MAP_ALPHA_UNREACHABLE: float = 0.60
+
+const STAGE_MAP_GLOW_CURRENT_ROW: Color = Color("#89C6C7")
+const STAGE_MAP_GLOW_SELECTED: Color = Color("#E1D0A2")
+const STAGE_MAP_GLOW_REROUTE: Color = Color("#D7A769")
+
+const STAGE_MAP_ICON_FONT_SIZE: int = 11
+const STAGE_MAP_STATE_FONT_SIZE: int = 10
+const STAGE_MAP_PANEL_INTRO_DURATION: float = 0.22
+const STAGE_MAP_NODE_REVEAL_STAGGER: float = 0.04
+const STAGE_MAP_NODE_REVEAL_DURATION: float = 0.16
+
+const STAGE_MAP_MEDALLION_CORNER_SHOP: int = 10
+const STAGE_MAP_MEDALLION_CORNER_RANDOM: int = 22
+const STAGE_MAP_MEDALLION_CORNER_FORGE: int = 6
+const STAGE_MAP_MEDALLION_CORNER_REST: int = 26
+const STAGE_MAP_MEDALLION_CORNER_SPECIAL: int = 14
+const STAGE_MAP_MEDALLION_CORNER_DEFAULT: int = 12
+
+
+static func make_stage_family_panel_style(variant: String, corner: int, border_width: int = 1) -> StyleBoxFlat:
+	var fill: Color = STAGE_FAMILY_BOARD_FILL
+	var border: Color = STAGE_FAMILY_BOARD_BORDER
+	match variant:
+		"header":
+			fill = STAGE_FAMILY_HEADER_FILL
+			border = STAGE_FAMILY_HEADER_BORDER
+		"board":
+			fill = STAGE_FAMILY_BOARD_FILL
+			border = STAGE_FAMILY_BOARD_BORDER
+		"inspector":
+			fill = STAGE_FAMILY_INSPECTOR_FILL
+			border = STAGE_FAMILY_INSPECTOR_BORDER
+		"footer":
+			fill = STAGE_FAMILY_FOOTER_FILL
+			border = STAGE_FAMILY_FOOTER_BORDER
+	var width: int = maxi(border_width, 0)
+	return make_panel_stylebox(fill, corner, border, width)
+
+
+static func get_stage_map_medallion_corner(node_type: int) -> int:
+	match node_type:
+		0:
+			return STAGE_MAP_MEDALLION_CORNER_SHOP
+		1:
+			return STAGE_MAP_MEDALLION_CORNER_RANDOM
+		2:
+			return STAGE_MAP_MEDALLION_CORNER_FORGE
+		3:
+			return STAGE_MAP_MEDALLION_CORNER_REST
+		4:
+			return STAGE_MAP_MEDALLION_CORNER_SPECIAL
+		_:
+			return STAGE_MAP_MEDALLION_CORNER_DEFAULT
+
+
+static func get_stage_map_medallion_size(node_type: int) -> Vector2:
+	match node_type:
+		0:
+			return Vector2(80.0, 68.0)
+		1:
+			return Vector2(70.0, 82.0)
+		2:
+			return Vector2(82.0, 82.0)
+		3:
+			return Vector2(72.0, 72.0)
+		4:
+			return Vector2(86.0, 86.0)
+		_:
+			return Vector2(76.0, 76.0)
+
+
+static func apply_stage_map_label_style(label: Label, role: String) -> void:
+	label.add_theme_font_override("font", _resolve_stage_map_font(role))
+	label.add_theme_font_size_override("font_size", _resolve_stage_map_font_size(role))
+	label.add_theme_color_override("font_color", _resolve_stage_map_label_color(role))
+
+
+static func _resolve_stage_map_font(role: String) -> Font:
+	match role:
+		"title", "node_title", "button":
+			return font_display()
+		"context", "seal", "board", "eyebrow", "node_type", "legend":
+			return font_mono()
+		_:
+			return font_body()
+
+
+static func _resolve_stage_map_font_size(role: String) -> int:
+	match role:
+		"title":
+			return 18
+		"context":
+			return 18
+		"seal", "board":
+			return 20
+		"eyebrow":
+			return 18
+		"node_title":
+			return 16
+		"node_type":
+			return 18
+		"rule", "flavor", "summary", "hint":
+			return 15
+		"legend":
+			return 16
+		"button":
+			return 12
+		_:
+			return 15
+
+
+static func _resolve_stage_map_label_color(role: String) -> Color:
+	match role:
+		"title":
+			return STAGE_FAMILY_TITLE_COLOR
+		"context":
+			return STAGE_FAMILY_CONTEXT_COLOR
+		"seal":
+			return STAGE_FAMILY_ACCENT_TEXT
+		"board":
+			return Color("#907A60")
+		"eyebrow":
+			return STAGE_FAMILY_ACCENT_TEXT
+		"node_title":
+			return Color("#EAE1C8")
+		"node_type":
+			return Color("#B7AB95")
+		"flavor":
+			return Color("#C9BEAE")
+		"summary":
+			return Color("#E3D8C4")
+		"rule":
+			return STAGE_MAP_GLOW_REROUTE
+		"hint":
+			return STAGE_FAMILY_BODY_TEXT
+		"legend":
+			return STAGE_FAMILY_MUTED_TEXT
+		_:
+			return BRIGHT_TEXT
+
+
 ## Build and return a Theme resource with the full design-system applied.
 static func build_theme() -> Theme:
 	var t := Theme.new()

@@ -4,7 +4,6 @@ extends RefCounted
 
 const StageMapDataScript := preload("res://Scripts/StageMapData.gd")
 const MapNodeDataScript := preload("res://Scripts/MapNodeData.gd")
-const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const NORMAL_STAGE_RATIO: float = 0.5

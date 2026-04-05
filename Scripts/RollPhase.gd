@@ -115,7 +115,6 @@ const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoo
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
-const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 func _ready() -> void:
 	_turn_score_service = TurnScoreServiceScript.new()

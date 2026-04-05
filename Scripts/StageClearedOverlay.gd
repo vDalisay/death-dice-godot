@@ -5,7 +5,7 @@ signal proceed_requested
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
-const BACKDROP_ALPHA: float = 0.72
+const BACKDROP_ALPHA: float = 0.52
 const COUNT_DURATION: float = 0.45
 const SPARKLE_DELAY: float = 0.4
 const SPARKLE_AMOUNT: int = 50
@@ -35,11 +35,11 @@ func _ready() -> void:
 func _apply_theme_styling() -> void:
 	_card.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.SCORE_GOLD, 2)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 22)
-	_title_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 
 	_breakdown_title.add_theme_font_override("font", _UITheme.font_display())
 	_breakdown_title.add_theme_font_size_override("font_size", 12)

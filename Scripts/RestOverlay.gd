@@ -5,7 +5,7 @@ signal continue_requested
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
-const BACKDROP_ALPHA: float = 0.68
+const BACKDROP_ALPHA: float = 0.52
 const INTRO_DURATION: float = 0.22
 const CARD_SCALE_START: float = 1.1
 
@@ -24,17 +24,17 @@ func _ready() -> void:
 func _apply_theme_styling() -> void:
 	_card.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.SUCCESS_GREEN, 2)
+		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 20)
-	_title_label.add_theme_color_override("font_color", _UITheme.SUCCESS_GREEN)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_summary_label.add_theme_font_override("font", _UITheme.font_stats())
 	_summary_label.add_theme_font_size_override("font_size", 18)
-	_summary_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_summary_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
 	_detail_label.add_theme_font_override("font", _UITheme.font_body())
 	_detail_label.add_theme_font_size_override("font_size", 14)
-	_detail_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_detail_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 	_continue_button.add_theme_font_override("font", _UITheme.font_display())
 	_continue_button.add_theme_font_size_override("font_size", 13)
 
