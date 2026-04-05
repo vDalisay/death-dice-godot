@@ -139,7 +139,7 @@ var _popup_tween: Tween = null
 var _is_hovered: bool = false
 var _peak_speed_since_launch: float = 0.0
 var _last_motion_velocity: Vector2 = Vector2.ZERO
-var _popup_bounds: Rect2 = Rect2.ZERO
+var _popup_bounds: Rect2 = Rect2()
 var _has_popup_bounds: bool = false
 
 # ---------------------------------------------------------------------------
