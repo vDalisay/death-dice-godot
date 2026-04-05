@@ -117,3 +117,18 @@ func test_open_builds_three_reward_cards() -> void:
 	await await_idle_frame()
 	overlay.call("open", 0)
 	assert_int(overlay.get("_cards").size()).is_equal(3)
+
+
+func test_open_offers_one_reroll_evolving_die() -> void:
+	GameManager.current_loop = 2
+	var overlay: ColorRect = auto_free(OverlayScene.instantiate()) as ColorRect
+	add_child(overlay)
+	await await_idle_frame()
+	overlay.call("open", 0)
+	var options: Array[DiceData] = overlay.get("_dice_options") as Array[DiceData]
+	var evolving_count: int = 0
+	for die: DiceData in options:
+		if die != null and die.is_reroll_evolving():
+			evolving_count += 1
+	assert_int(options.size()).is_equal(3)
+	assert_int(evolving_count).is_equal(1)

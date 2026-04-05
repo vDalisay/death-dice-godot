@@ -10,11 +10,12 @@ func before_test() -> void:
 
 func test_get_all_known_dice_returns_all_types() -> void:
 	var all: Array[DiceData] = DiceData.get_all_known_dice()
-	assert_int(all.size()).is_equal(13)
+	assert_int(all.size()).is_equal(16)
 	var names: Array[String] = []
 	for die: DiceData in all:
 		names.append(die.dice_name)
 	assert_array(names).contains(["Standard D6", "Shield D6", "Heart D6", "Blank Canvas D6", "Simple D6",
+		"Spark Chaser D6", "Surge Chaser D6", "Tempest Chaser D6",
 		"Lucky D6", "Heavy D6", "Gambler D6", "Golden D6",
 		"Insurance D6", "Explosive D6", "Pink D6", "Fortune D6"])
 

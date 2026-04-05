@@ -83,6 +83,7 @@ func _on_forge_pressed() -> void:
 	var die_b: DiceData = GameManager.dice_pool[_selected_indices[1]]
 
 	var result_die: DiceData = _roll_forge_result(die_a.rarity, die_b.rarity)
+	result_die = _apply_reroll_affinity(result_die, die_a, die_b)
 	if result_die == null:
 		_result_label.text = "Cannot forge these dice!"
 		return
@@ -95,7 +96,7 @@ func _on_forge_pressed() -> void:
 	GameManager.add_dice(result_die)
 	SaveManager.discover_die(result_die.dice_name)
 
-	_result_label.text = "Forged: %s (%s)" % [result_die.dice_name, RARITY_NAMES[result_die.rarity]]
+	_result_label.text = "Forged: %s (%s)" % [result_die.get_display_name(), RARITY_NAMES[result_die.rarity]]
 	_result_label.modulate = result_die.get_rarity_color_value()
 	_result_card.visible = true
 	_animate_result_card()
@@ -122,7 +123,7 @@ func _refresh_grid() -> void:
 		var die: DiceData = GameManager.dice_pool[i]
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(DICE_BUTTON_WIDTH, DICE_BUTTON_HEIGHT)
-		btn.text = "%s\n%s" % [die.dice_name, RARITY_NAMES[die.rarity]]
+		btn.text = "%s\n%s" % [die.get_display_name(), RARITY_NAMES[die.rarity]]
 		btn.tooltip_text = "%s\nFaces: %s" % [
 			RARITY_NAMES[die.rarity],
 			_face_summary(die)
@@ -291,6 +292,26 @@ func _face_summary(die: DiceData) -> String:
 	for face: DiceFaceData in die.faces:
 		faces.append(face.get_display_text())
 	return ", ".join(faces)
+
+
+static func _apply_reroll_affinity(result_die: DiceData, die_a: DiceData, die_b: DiceData) -> DiceData:
+	if result_die == null:
+		return null
+	var evolving_inputs: Array[DiceData] = []
+	if die_a != null and die_a.is_reroll_evolving():
+		evolving_inputs.append(die_a)
+	if die_b != null and die_b.is_reroll_evolving():
+		evolving_inputs.append(die_b)
+	if evolving_inputs.is_empty():
+		return result_die
+	var affinity_tier: int = 0
+	for die: DiceData in evolving_inputs:
+		affinity_tier = maxi(affinity_tier, die.reroll_tier)
+	if evolving_inputs.size() >= 2:
+		affinity_tier = mini(2, affinity_tier + 1)
+	var affinity_die: DiceData = DiceData.make_reroll_chaser_d6(affinity_tier)
+	affinity_die.reroll_affinity_locked = true
+	return affinity_die
 
 
 ## Roll the forge outcome based on two sacrifice rarity tiers.

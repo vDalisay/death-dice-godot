@@ -146,6 +146,7 @@ var _last_motion_velocity: Vector2 = Vector2.ZERO
 var _bg_panel: Panel = null
 var _face_label: Label = null
 var _glyph_label: Label = null
+var _tier_label: Label = null
 var _name_popup: Panel = null
 var _name_popup_faces: HBoxContainer = null
 var _collision_shape: CollisionShape2D = null
@@ -202,6 +203,17 @@ func _ready() -> void:
 	_glyph_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 	_glyph_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_glyph_label)
+
+	_tier_label = Label.new()
+	_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_tier_label.size = Vector2(DIE_SIZE - 8, 18)
+	_tier_label.position = Vector2(-DIE_SIZE / 2.0 + 6, -DIE_SIZE / 2.0 + 6)
+	_tier_label.pivot_offset = Vector2((DIE_SIZE - 8) / 2.0, 9.0)
+	_tier_label.add_theme_font_override("font", _UITheme.font_mono())
+	_tier_label.add_theme_font_size_override("font_size", 11)
+	_tier_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_tier_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_tier_label)
 
 	# Hover popup showing face squares (hidden by default)
 	_name_popup = Panel.new()
@@ -263,6 +275,8 @@ func setup(index: int, data: DiceData) -> void:
 		_face_label.text = "?"
 	if _glyph_label:
 		_glyph_label.text = ""
+	if _tier_label:
+		_tier_label.text = data.get_reroll_tier_label() if data and data.is_reroll_evolving() else ""
 	_apply_visual()
 
 
@@ -872,6 +886,9 @@ func _apply_visual() -> void:
 		_face_label.add_theme_color_override("font_color", text_color)
 	if _glyph_label:
 		_glyph_label.add_theme_color_override("font_color", glyph_color)
+	if _tier_label:
+		_tier_label.visible = die_data != null and die_data.is_reroll_evolving()
+		_tier_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN if not is_stopped else _UITheme.DANGER_RED)
 
 
 func _set_random_glyph() -> void:

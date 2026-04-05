@@ -63,6 +63,7 @@ var current_results: Array[DiceFaceData] = []
 var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
+var _die_reroll_counts: Array[int] = []
 
 ## Running total of STOP faces rolled this turn. Only increases; resets on
 ## bank, bust, or new turn. Used for the accumulated bust check.
@@ -184,6 +185,8 @@ func _start_new_turn() -> void:
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
+	_die_reroll_counts.resize(count)
+	_die_reroll_counts.fill(0)
 	dice_stopped.resize(count)
 	dice_stopped.fill(false)
 	dice_keep.resize(count)
@@ -297,6 +300,7 @@ func _on_bank_pressed() -> void:
 	var mult: int = _get_turn_multiplier()
 	var status_parts: Array[String] = []
 	var contract_status: String = ""
+	var evolution_status: String = ""
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
 	var contract_context: Dictionary = {
 		"effective_stops": bank_effective_stops,
@@ -309,6 +313,7 @@ func _on_bank_pressed() -> void:
 		"entered_high_risk": _turn_entered_high_risk,
 	}
 	contract_status = _update_active_contract_on_bank(contract_context)
+	evolution_status = _apply_reroll_evolutions()
 	if heart_relief > 0:
 		status_parts.append("HEARTS -%d STOP" % heart_relief)
 	if is_near_death_bank:
@@ -319,6 +324,8 @@ func _on_bank_pressed() -> void:
 		status_parts.append("MOMENTUM x%.2f" % momentum_mult)
 	if contract_status != "":
 		status_parts.append(contract_status)
+	if evolution_status != "":
+		status_parts.append(evolution_status)
 	status_parts.append("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score])
 	if not is_jackpot:
 		hud.show_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
@@ -420,6 +427,7 @@ func _reroll_selected_dice() -> void:
 		# Stopped dice are rerolled too (Cubitos-style: pick them up and retry)
 		if dice_stopped[i]:
 			dice_stopped[i] = false
+		_die_reroll_counts[i] += 1
 		rerolled.append(i)
 	if rerolled.is_empty():
 		# No dice to reroll — all are kept/locked, so auto-bank.
@@ -622,6 +630,23 @@ func _calculate_turn_score() -> int:
 		GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE),
 		GameManager.has_modifier(RunModifier.ModifierType.CHAIN_LIGHTNING)
 	)
+
+
+func _apply_reroll_evolutions() -> String:
+	var evolved_names: Array[String] = []
+	for i: int in GameManager.dice_pool.size():
+		if i >= _die_reroll_counts.size():
+			continue
+		var die: DiceData = GameManager.dice_pool[i]
+		if die == null or not die.is_reroll_evolving():
+			continue
+		if die.apply_reroll_progress(_die_reroll_counts[i]):
+			SaveManager.discover_die(die.dice_name)
+			evolved_names.append(die.get_display_name())
+	if evolved_names.is_empty():
+		return ""
+	_sync_all_dice()
+	return "EVOLVED %s" % ", ".join(evolved_names)
 
 
 func _get_roll_resolution_service() -> RefCounted:

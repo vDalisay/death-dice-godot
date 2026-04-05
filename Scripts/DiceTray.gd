@@ -27,7 +27,7 @@ func build(count: int) -> void:
 		if i < GameManager.dice_pool.size():
 			btn.custom_color = GameManager.dice_pool[i].custom_color
 			btn.rarity_color = GameManager.dice_pool[i].get_rarity_color_value()
-			btn.set_die_name(GameManager.dice_pool[i].dice_name)
+			btn.set_die_name(GameManager.dice_pool[i].get_display_name())
 		btn.toggled_keep.connect(_on_die_toggled)
 		add_child(btn)
 		_buttons.append(btn)
