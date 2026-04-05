@@ -29,6 +29,7 @@ func test_volley_constants_are_sensible() -> void:
 	assert_float(DiceArena.REROLL_THROW_IMPULSE_MAX).is_less(DiceArena.THROW_IMPULSE_MAX)
 	assert_float(DiceArena.REROLL_THROW_IMPULSE_MIN).is_less(DiceArena.REROLL_THROW_IMPULSE_MAX)
 	assert_float(DiceArena.REROLL_EXIT_DURATION).is_greater(0.0)
+	assert_float(DiceArena.REROLL_EXIT_DURATION).is_less(DiceArena.BAG_MOVE_DURATION)
 	assert_float(DiceArena.BURST_TARGET_RADIUS_X).is_greater(DiceArena.REROLL_BURST_TARGET_RADIUS_X)
 	assert_float(DiceArena.BURST_TARGET_RADIUS_Y).is_greater(DiceArena.REROLL_BURST_TARGET_RADIUS_Y)
 
@@ -91,27 +92,63 @@ func test_volley_launch_out_of_bounds_is_safe() -> void:
 
 
 func test_volley_cone_direction_spread() -> void:
-	## First and last die in a large pool should be aimed at opposite
-	## sides of the cone, giving measurable angular separation.
+	## Opposite slots in a large pool should be aimed into clearly different
+	## regions of the arena, giving measurable angular separation.
 	var pool: Array[DiceData] = []
 	for _i: int in 20:
 		pool.append(DiceData.make_standard_d6())
 	_arena._pending_pool = pool
 
-	# Launch first die and record its position + velocity direction.
+	# Launch first die and record its velocity direction.
 	_arena._volley_launch(0)
 	var first_die: PhysicsDie = _arena.get_die(0)
 	var first_angle: float = first_die.linear_velocity.angle()
 
-	# Launch last die.
-	_arena._volley_launch(19)
-	# It's the second die added, so index 1 in _dice array.
-	var last_die: PhysicsDie = _arena._dice[1]
-	var last_angle: float = last_die.linear_velocity.angle()
+	# Launch the opposite slot in the spread.
+	_arena._volley_launch(10)
+	var opposite_die: PhysicsDie = _arena._dice[1]
+	var opposite_angle: float = opposite_die.linear_velocity.angle()
 
-	# The angular difference should be significant (at least half the cone width).
-	var angle_diff: float = absf(angle_difference(first_angle, last_angle))
-	assert_float(angle_diff).is_greater(DiceArena.VOLLEY_CONE_HALF_ANGLE * 0.5)
+	# The angular difference should remain substantial.
+	var angle_diff: float = absf(angle_difference(first_angle, opposite_angle))
+	assert_float(angle_diff).is_greater(1.0)
+
+
+func test_large_pool_burst_targets_cover_the_arena() -> void:
+	var positions: Array[Vector2] = []
+	for index: int in 16:
+		positions.append(_arena._burst_target_position(index, 16, false))
+	assert_int(positions.size()).is_equal(16)
+	var center_x: float = DiceArena.ARENA_WIDTH * 0.5
+	var center_y: float = DiceArena.ARENA_HEIGHT * DiceArena.REROLL_VOLLEY_TARGET_HEIGHT_RATIO
+	var min_x: float = positions[0].x
+	var max_x: float = positions[0].x
+	var min_y: float = positions[0].y
+	var max_y: float = positions[0].y
+	for position: Vector2 in positions:
+		min_x = minf(min_x, position.x)
+		max_x = maxf(max_x, position.x)
+		min_y = minf(min_y, position.y)
+		max_y = maxf(max_y, position.y)
+	assert_float(min_x).is_less(center_x - DiceArena.BURST_TARGET_RADIUS_X * 0.35)
+	assert_float(max_x).is_greater(center_x + DiceArena.BURST_TARGET_RADIUS_X * 0.35)
+	assert_float(min_y).is_less(center_y - DiceArena.BURST_TARGET_RADIUS_Y * 0.35)
+	assert_float(max_y).is_greater(center_y + DiceArena.BURST_TARGET_RADIUS_Y * 0.35)
+
+
+func test_reroll_exit_animates_upward_pop() -> void:
+	_arena.instant_mode = true
+	var pool: Array[DiceData] = [DiceData.make_standard_d6()]
+	_arena.throw_dice(pool)
+	var die: PhysicsDie = _arena.get_die(0)
+	var start_position: Vector2 = die.position
+	_arena._animate_reroll_exit(die)
+	assert_int(die.physics_state).is_equal(PhysicsDie.DiePhysicsState.RESOLVING)
+	assert_int(die.collision_layer).is_equal(0)
+	assert_int(die.collision_mask).is_equal(0)
+	await get_tree().create_timer(DiceArena.REROLL_EXIT_DURATION + 0.02).timeout
+	assert_float(die.position.y).is_less(start_position.y)
+	assert_float(die.modulate.a).is_less_equal(0.05)
 
 
 func test_reroll_unaffected_by_volley() -> void:
@@ -123,7 +160,6 @@ func test_reroll_unaffected_by_volley() -> void:
 	_arena.throw_dice(pool)
 	assert_int(_arena.get_die_count()).is_equal(5)
 
-	var old_face: DiceFaceData = _arena.get_die(0).current_face
 	_arena.reroll_dice([0], pool)
 	# Die 0 should have a new face (it was rerolled).
 	assert_object(_arena.get_die(0).current_face).is_not_null()

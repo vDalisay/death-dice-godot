@@ -10,32 +10,209 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="Backdrop" type="ColorRect" parent="."]
+[node name="AtmosphereLayer" type="Control" parent="."]
 layout_mode = 2
-color = Color(0, 0, 0, 0.72)
 mouse_filter = 2
+
+[node name="Backdrop" type="ColorRect" parent="AtmosphereLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0196078, 0.0196078, 0.0352941, 0.94)
+
+[node name="DeskGlow" type="ColorRect" parent="AtmosphereLayer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -520.0
+offset_top = -240.0
+offset_right = 520.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.117647, 0.109804, 0.0901961, 0.35)
+
+[node name="TopShade" type="ColorRect" parent="AtmosphereLayer"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_bottom = 220.0
+grow_horizontal = 2
+color = Color(0, 0, 0, 0.42)
+
+[node name="BottomShade" type="ColorRect" parent="AtmosphereLayer"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -180.0
+grow_horizontal = 2
+grow_vertical = 0
+color = Color(0, 0, 0, 0.48)
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 40
+theme_override_constants/margin_left = 36
 theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 40
+theme_override_constants/margin_right = 36
 theme_override_constants/margin_bottom = 24
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+[node name="RootVBox" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 16
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="HeaderPanel" type="PanelContainer" parent="MarginContainer/RootVBox"]
 layout_mode = 2
-text = "Choose Your Path"
-horizontal_alignment = 1
+size_flags_horizontal = 3
 
-[node name="MapArea" type="Control" parent="MarginContainer/VBoxContainer"]
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/RootVBox/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="HeaderRow" type="HBoxContainer" parent="MarginContainer/RootVBox/HeaderPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleStack" type="VBoxContainer" parent="MarginContainer/RootVBox/HeaderPanel/MarginContainer/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/RootVBox/HeaderPanel/MarginContainer/HeaderRow/TitleStack"]
+layout_mode = 2
+text = "ROUTE BOARD"
+
+[node name="ContextLabel" type="Label" parent="MarginContainer/RootVBox/HeaderPanel/MarginContainer/HeaderRow/TitleStack"]
+layout_mode = 2
+text = "Loop 1  |  Stage 1 / 7"
+
+[node name="HeaderSeal" type="Label" parent="MarginContainer/RootVBox/HeaderPanel/MarginContainer/HeaderRow"]
+layout_mode = 2
+horizontal_alignment = 2
+vertical_alignment = 1
+text = "CHOOSE THE NEXT MARK"
+
+[node name="BodyRow" type="HBoxContainer" parent="MarginContainer/RootVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="BoardFrame" type="PanelContainer" parent="MarginContainer/RootVBox/BodyRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/RootVBox/BodyRow/BoardFrame"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="BoardVBox" type="VBoxContainer" parent="MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="BoardLabel" type="Label" parent="MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox"]
+layout_mode = 2
+text = "ETCHED ROUTES"
+
+[node name="MapArea" type="Control" parent="MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 420)
+
+[node name="InspectorPanel" type="PanelContainer" parent="MarginContainer/RootVBox/BodyRow"]
+custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="HintLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel"]
 layout_mode = 2
-text = "Row 1 / 7"
-horizontal_alignment = 1
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="InspectorVBox" type="VBoxContainer" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="InspectorEyebrow" type="Label" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+layout_mode = 2
+text = "SELECTED NODE"
+
+[node name="SelectedNodeTitle" type="Label" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+layout_mode = 2
+autowrap_mode = 2
+text = "No node selected"
+
+[node name="SelectedNodeType" type="Label" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+layout_mode = 2
+text = "Route marker"
+
+[node name="SelectedNodeFlavor" type="Label" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+layout_mode = 2
+autowrap_mode = 2
+text = "Hover a reachable node to inspect it."
+
+[node name="SelectedNodeSummary" type="Label" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+layout_mode = 2
+autowrap_mode = 2
+text = "Node rules and rewards appear here."
+
+[node name="SelectedNodeRule" type="Label" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+visible = false
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="Spacer" type="Control" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RerouteButton" type="Button" parent="MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox"]
+visible = false
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Preview Reroute"
+
+[node name="FooterPanel" type="PanelContainer" parent="MarginContainer/RootVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/RootVBox/FooterPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="FooterRow" type="HBoxContainer" parent="MarginContainer/RootVBox/FooterPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HintLabel" type="Label" parent="MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 2
+text = "Stage 1 / 7"
+
+[node name="LegendLabel" type="Label" parent="MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow"]
+layout_mode = 2
+horizontal_alignment = 2
+text = "Cold edge: current route  |  Ash: spent  |  Brass: reroute"

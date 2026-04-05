@@ -2,6 +2,7 @@ extends Node
 ## Global score and run state. Registered as autoload "GameManager".
 
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const MAX_LIVES: int = 3
 const STARTING_DICE_COUNT: int = 5
@@ -105,6 +106,8 @@ var prestige_shop_tier_active: bool = false
 var prestige_reward_reroll_available: bool = false
 var prestige_reroute_uses: int = 0
 var _revealed_loop_numbers: Array[int] = []
+var active_special_stage_id: String = ""
+var _special_stage_first_reroll_used: bool = false
 
 
 func set_archetype(archetype: Archetype) -> void:
@@ -148,6 +151,7 @@ func heal_lives(amount: int) -> void:
 
 
 func begin_stage_from_map() -> void:
+	clear_special_stage()
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
@@ -275,6 +279,7 @@ func get_run_mode_name() -> String:
 
 
 func advance_stage() -> void:
+	clear_special_stage()
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
@@ -290,6 +295,7 @@ func advance_row(col: int) -> void:
 
 
 func advance_loop() -> void:
+	clear_special_stage()
 	total_stages_cleared += 1
 	current_loop += 1
 	current_stage = 1
@@ -342,6 +348,7 @@ func lose_life() -> void:
 # ---------------------------------------------------------------------------
 
 func reset_run() -> void:
+	clear_special_stage()
 	current_stage = 1
 	current_loop = 1
 	current_row = 0
@@ -377,6 +384,98 @@ func reset_run() -> void:
 	gold_changed.emit(gold)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
+
+
+func enter_special_stage(rule_id: String) -> void:
+	if not SpecialStageRegistryScript.call("has_rule", rule_id):
+		clear_special_stage()
+		return
+	active_special_stage_id = rule_id
+	_special_stage_first_reroll_used = false
+
+
+func clear_special_stage() -> void:
+	active_special_stage_id = ""
+	_special_stage_first_reroll_used = false
+
+
+func has_active_special_stage() -> bool:
+	return active_special_stage_id != ""
+
+
+func get_active_special_stage_name() -> String:
+	if not has_active_special_stage():
+		return ""
+	return str(SpecialStageRegistryScript.call("get_rule_name", active_special_stage_id))
+
+
+func get_active_special_stage_summary() -> String:
+	if not has_active_special_stage():
+		return ""
+	return str(SpecialStageRegistryScript.call("get_rule_summary", active_special_stage_id))
+
+
+func get_active_special_stage_color() -> Color:
+	if not has_active_special_stage():
+		return Color.WHITE
+	return SpecialStageRegistryScript.call("get_rule_color", active_special_stage_id) as Color
+
+
+func begin_special_stage_turn() -> void:
+	_special_stage_first_reroll_used = false
+
+
+func apply_special_stage_reroll_bonus(reroll_count: int) -> String:
+	if active_special_stage_id != "lucky_floor":
+		return ""
+	if reroll_count != 1 or _special_stage_first_reroll_used:
+		return ""
+	_special_stage_first_reroll_used = true
+	add_luck(2)
+	return "Lucky Floor: first reroll +2 LUCK"
+
+
+func get_special_stage_bank_preview(effective_stops: int, reroll_count: int) -> Dictionary:
+	var result: Dictionary = {
+		"bonus_score": 0,
+		"bonus_gold": 0,
+		"bonus_luck": 0,
+		"status_parts": [],
+	}
+	match active_special_stage_id:
+		"lucky_floor":
+			if reroll_count >= 2:
+				result["bonus_gold"] = 12
+				(result["status_parts"] as Array[String]).append("Lucky Floor +12g")
+		"clean_room":
+			if effective_stops <= 1:
+				result["bonus_score"] = 6
+				(result["status_parts"] as Array[String]).append("Clean Room +6 score")
+		"precision_hall":
+			if effective_stops == 2:
+				result["bonus_gold"] = 8
+				(result["status_parts"] as Array[String]).append("Precision Hall +8g")
+	return result
+
+
+func get_special_stage_clear_rewards(effective_stops: int, will_clear_stage: bool) -> Dictionary:
+	var result: Dictionary = {
+		"bonus_gold": 0,
+		"bonus_luck": 0,
+		"status_parts": [],
+	}
+	if not will_clear_stage:
+		return result
+	match active_special_stage_id:
+		"clean_room":
+			if effective_stops <= 1:
+				result["bonus_gold"] = 15
+				(result["status_parts"] as Array[String]).append("Clean clear +15g")
+		"precision_hall":
+			if effective_stops == 2:
+				result["bonus_luck"] = 3
+				(result["status_parts"] as Array[String]).append("Exact clear +3 LUCK")
+	return result
 
 
 # ---------------------------------------------------------------------------

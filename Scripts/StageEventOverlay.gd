@@ -9,6 +9,11 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 const BACKDROP_ALPHA: float = 0.72
 const CARD_WIDTH: int = 280
 const CARD_HEIGHT: int = 220
+const FACE_GRID_COLUMNS: int = 3
+const RESULT_CARD_WIDTH: int = 220
+const RESULT_CARD_HEIGHT: int = 260
+const RESULT_TRANSITION_DELAY: float = 0.45
+const RESULT_CLOSE_DELAY: float = 0.2
 
 # ---------------------------------------------------------------------------
 # Event definitions
@@ -61,11 +66,15 @@ const PRESTIGE_CURSES: Array[Dictionary] = [
 @onready var _flavor_label: Label = $CenterContainer/Card/MarginContainer/Content/FlavorLabel
 @onready var _choice_row: HBoxContainer = $CenterContainer/Card/MarginContainer/Content/ChoiceRow
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
+@onready var _content: VBoxContainer = $CenterContainer/Card/MarginContainer/Content
 
 var _blessing: Dictionary = {}
 var _curse: Dictionary = {}
 var _choice_cards: Array[PanelContainer] = []
 var _resolved: bool = false
+var _continue_button: Button = null
+var _pending_summary: String = ""
+var _pending_status_color: Color = Color.WHITE
 
 
 func _ready() -> void:
@@ -87,15 +96,16 @@ func _apply_theme_styling() -> void:
 
 func open() -> void:
 	_resolved = false
+	_pending_summary = ""
+	_pending_status_color = Color.WHITE
+	_title_label.text = "RANDOM EVENT"
+	_flavor_label.text = "Choose your fate..."
+	_clear_choice_cards()
+	_remove_continue_button()
 	var blessing_pool: Array[Dictionary] = _build_blessing_pool()
 	var curse_pool: Array[Dictionary] = _build_curse_pool()
 	_blessing = blessing_pool[randi() % blessing_pool.size()].duplicate()
 	_curse = curse_pool[randi() % curse_pool.size()].duplicate()
-
-	# Clear old cards.
-	for card: PanelContainer in _choice_cards:
-		card.queue_free()
-	_choice_cards.clear()
 
 	# Build two choice cards.
 	var blessing_card: PanelContainer = _build_choice_card(_blessing, true)
@@ -203,7 +213,12 @@ func _on_choice_made(chose_blessing: bool) -> void:
 
 	var chosen_event: Dictionary = _blessing if chose_blessing else _curse
 	var chosen_idx: int = 0 if chose_blessing else 1
-	_apply_effect(chosen_event)
+	var effect_result: Dictionary = _apply_effect(chosen_event)
+	var summary: String = _build_effect_summary(chosen_event, effect_result)
+	var status_color: Color = _UITheme.SUCCESS_GREEN if chose_blessing else _UITheme.DANGER_RED
+	_pending_summary = summary
+	_pending_status_color = status_color
+	_disable_choice_buttons()
 
 	# Animate: chosen card scales up, other fades out.
 	for i: int in _choice_cards.size():
@@ -215,13 +230,20 @@ func _on_choice_made(chose_blessing: bool) -> void:
 			var tw: Tween = create_tween()
 			tw.tween_property(card, "modulate:a", 0.0, 0.25)
 
-	# After short delay, close and emit.
+	if _has_gained_dice_result(effect_result):
+		var result_tween: Tween = create_tween()
+		result_tween.tween_interval(RESULT_TRANSITION_DELAY)
+		result_tween.tween_callback(_show_reward_result.bind(chosen_event, effect_result))
+		return
+
+	_queue_close(summary, status_color)
+
+
+func _queue_close(summary: String, status_color: Color) -> void:
 	var close_tween: Tween = create_tween()
-	close_tween.tween_interval(0.6)
+	close_tween.tween_interval(RESULT_CLOSE_DELAY)
 	close_tween.tween_property(self, "color:a", 0.0, 0.2)
 	close_tween.parallel().tween_property(_card_panel, "modulate:a", 0.0, 0.2)
-	var summary: String = _build_effect_summary(chosen_event)
-	var status_color: Color = _UITheme.SUCCESS_GREEN if chose_blessing else _UITheme.DANGER_RED
 	close_tween.tween_callback(_emit_event_resolved.bind(summary, status_color))
 
 
@@ -233,13 +255,13 @@ func _emit_event_resolved(summary: String, status_color: Color) -> void:
 # Effect application
 # ---------------------------------------------------------------------------
 
-func _apply_effect(event: Dictionary) -> void:
+func _apply_effect(event: Dictionary) -> Dictionary:
 	var effect_type: EffectType = event.get("type", EffectType.GAIN_GOLD) as EffectType
 	match effect_type:
 		EffectType.BOOST_NUMBERS:
 			_boost_number_faces(1)
 		EffectType.GAIN_RANDOM_DICE:
-			_gain_random_dice(2)
+			return {"gained_dice": _gain_random_dice(2)}
 		EffectType.FREE_BUST:
 			GameManager.set_event_free_bust(true)
 		EffectType.BOOST_SHIELDS:
@@ -265,6 +287,7 @@ func _apply_effect(event: Dictionary) -> void:
 		EffectType.DOUBLE_CURSED_STOP:
 			_add_cursed_stop_to_random_die()
 			_add_cursed_stop_to_random_die()
+	return {}
 
 
 func _build_blessing_pool() -> Array[Dictionary]:
@@ -283,12 +306,15 @@ func _build_curse_pool() -> Array[Dictionary]:
 	return curse_pool
 
 
-func _build_effect_summary(event: Dictionary) -> String:
+func _build_effect_summary(event: Dictionary, effect_result: Dictionary = {}) -> String:
 	var effect_type: EffectType = event.get("type", EffectType.GAIN_GOLD) as EffectType
 	match effect_type:
 		EffectType.BOOST_NUMBERS:
 			return "EVENT: all NUMBER faces gain +1 this loop"
 		EffectType.GAIN_RANDOM_DICE:
+			var gained_dice: Array[DiceData] = _extract_gained_dice(effect_result)
+			if gained_dice.size() >= 2:
+				return "EVENT: gained %s and %s" % [gained_dice[0].dice_name, gained_dice[1].dice_name]
 			return "EVENT: gained 2 random dice"
 		EffectType.FREE_BUST:
 			return "EVENT: next bust this loop is free"
@@ -331,14 +357,207 @@ func _boost_shield_faces(amount: int) -> void:
 				face.value += amount
 
 
-func _gain_random_dice(count: int) -> void:
+func _gain_random_dice(count: int) -> Array[DiceData]:
 	var factory_methods: Array[String] = [
 		"make_simple_d6", "make_standard_d6", "make_lucky_d6", "make_blank_canvas_d6",
 	]
+	var gained_dice: Array[DiceData] = []
 	for _i: int in count:
 		var method: String = factory_methods[randi() % factory_methods.size()]
 		var die: DiceData = Callable(DiceData, method).call() as DiceData
 		GameManager.add_dice(die)
+		gained_dice.append(die)
+	return gained_dice
+
+
+func _clear_choice_cards() -> void:
+	for card: PanelContainer in _choice_cards:
+		if not is_instance_valid(card):
+			continue
+		if card.get_parent() != null:
+			card.get_parent().remove_child(card)
+		card.queue_free()
+	_choice_cards.clear()
+
+
+func _disable_choice_buttons() -> void:
+	for card: PanelContainer in _choice_cards:
+		var button: Button = _find_button(card)
+		if button != null:
+			button.disabled = true
+
+
+func _show_reward_result(event: Dictionary, effect_result: Dictionary) -> void:
+	var gained_dice: Array[DiceData] = _extract_gained_dice(effect_result)
+	if gained_dice.is_empty():
+		_queue_close(_pending_summary, _pending_status_color)
+		return
+	_clear_choice_cards()
+	_remove_continue_button()
+	_title_label.text = "REWARD GAINED"
+	_flavor_label.text = "%s delivered these dice." % (event.get("name", "Your event") as String)
+	for die: DiceData in gained_dice:
+		var reward_card: PanelContainer = _build_reward_die_card(die)
+		reward_card.modulate.a = 0.0
+		reward_card.position.y += 14.0
+		_choice_row.add_child(reward_card)
+		_choice_cards.append(reward_card)
+	var continue_button: Button = _build_continue_button()
+	_content.add_child(continue_button)
+	_continue_button = continue_button
+	for index: int in _choice_cards.size():
+		var reward_tween: Tween = create_tween()
+		reward_tween.tween_interval(0.05 * index)
+		reward_tween.tween_property(_choice_cards[index], "modulate:a", 1.0, 0.18)
+		reward_tween.parallel().tween_property(_choice_cards[index], "position:y", _choice_cards[index].position.y - 14.0, 0.18).set_ease(Tween.EASE_OUT)
+
+
+func _build_reward_die_card(die: DiceData) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(RESULT_CARD_WIDTH, RESULT_CARD_HEIGHT)
+	var rarity_color: Color = DiceData.get_rarity_color(die.rarity)
+	card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, 12, rarity_color, 3)
+	)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	card.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	margin.add_child(vbox)
+
+	var rarity_label := Label.new()
+	rarity_label.text = _rarity_name(die.rarity)
+	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rarity_label.add_theme_font_override("font", _UITheme.font_body())
+	rarity_label.add_theme_font_size_override("font_size", 11)
+	rarity_label.add_theme_color_override("font_color", rarity_color)
+	vbox.add_child(rarity_label)
+
+	var name_label := Label.new()
+	name_label.text = die.dice_name
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_override("font", _UITheme.font_stats())
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	vbox.add_child(name_label)
+
+	var grid := GridContainer.new()
+	grid.columns = FACE_GRID_COLUMNS
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	vbox.add_child(grid)
+
+	for face: DiceFaceData in die.faces:
+		var face_label := Label.new()
+		face_label.text = face.get_display_text()
+		face_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		face_label.custom_minimum_size = Vector2(52, 32)
+		face_label.add_theme_font_override("font", _UITheme.font_mono())
+		face_label.add_theme_font_size_override("font_size", 14)
+		face_label.add_theme_color_override("font_color", _face_color(face))
+		var face_bg := PanelContainer.new()
+		face_bg.add_theme_stylebox_override(
+			"panel",
+			_UITheme.make_panel_stylebox(Color(0.15, 0.15, 0.2, 1.0), 4)
+		)
+		face_bg.add_child(face_label)
+		grid.add_child(face_bg)
+
+	return card
+
+
+func _build_continue_button() -> Button:
+	var button := Button.new()
+	button.text = "Continue"
+	button.custom_minimum_size = Vector2(220, 40)
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	button.add_theme_font_override("font", _UITheme.font_display())
+	button.add_theme_font_size_override("font_size", 12)
+	button.focus_mode = Control.FOCUS_NONE
+	button.pressed.connect(_on_result_continue_pressed)
+	return button
+
+
+func _on_result_continue_pressed() -> void:
+	if _continue_button != null:
+		_continue_button.disabled = true
+	_queue_close(_pending_summary, _pending_status_color)
+
+
+func _remove_continue_button() -> void:
+	if _continue_button == null or not is_instance_valid(_continue_button):
+		_continue_button = null
+		return
+	if _continue_button.get_parent() != null:
+		_continue_button.get_parent().remove_child(_continue_button)
+	_continue_button.queue_free()
+	_continue_button = null
+
+
+func _has_gained_dice_result(effect_result: Dictionary) -> bool:
+	return not _extract_gained_dice(effect_result).is_empty()
+
+
+func _extract_gained_dice(effect_result: Dictionary) -> Array[DiceData]:
+	var gained_dice: Array[DiceData] = []
+	for die_variant: Variant in effect_result.get("gained_dice", []):
+		var die: DiceData = die_variant as DiceData
+		if die != null:
+			gained_dice.append(die)
+	return gained_dice
+
+
+func _find_button(node: Node) -> Button:
+	if node is Button:
+		return node as Button
+	for child: Node in node.get_children():
+		var button: Button = _find_button(child)
+		if button != null:
+			return button
+	return null
+
+
+static func _rarity_name(rarity: DiceData.Rarity) -> String:
+	match rarity:
+		DiceData.Rarity.GREY:
+			return "COMMON"
+		DiceData.Rarity.GREEN:
+			return "UNCOMMON"
+		DiceData.Rarity.BLUE:
+			return "RARE"
+		DiceData.Rarity.PURPLE:
+			return "EPIC"
+	return "COMMON"
+
+
+static func _face_color(face: DiceFaceData) -> Color:
+	match face.type:
+		DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
+			return Color(1.0, 0.3, 0.3)
+		DiceFaceData.FaceType.BLANK:
+			return Color(0.5, 0.5, 0.5)
+		DiceFaceData.FaceType.SHIELD:
+			return Color(0.3, 0.8, 1.0)
+		DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+			return Color(1.0, 0.85, 0.0)
+		DiceFaceData.FaceType.EXPLODE:
+			return Color(1.0, 0.5, 0.0)
+		DiceFaceData.FaceType.INSURANCE:
+			return Color(0.3, 1.0, 0.6)
+		DiceFaceData.FaceType.LUCK:
+			return Color(0.4, 0.9, 0.3)
+		DiceFaceData.FaceType.HEART:
+			return _UITheme.ROSE_ACCENT
+	return Color(0.9, 0.9, 0.9)
 
 
 func _lose_random_die() -> void:

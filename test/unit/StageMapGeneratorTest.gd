@@ -23,3 +23,15 @@ func test_allocate_node_types_keeps_minimum_normals() -> void:
 			normal_count += 1
 	assert_int(normal_count).is_greater_equal(StageMapData.MIN_NORMAL_STAGES)
 	assert_int(types[types.size() - 1]).is_equal(MapNodeData.NodeType.NORMAL_STAGE)
+
+
+func test_generate_loop_three_assigns_special_stage_nodes() -> void:
+	var map: StageMapData = StageMapGenerator.generate(3)
+	var final_row: Array[MapNodeData] = map.get_row(StageMapData.ROWS_PER_LOOP - 1)
+	assert_int((final_row[0] as MapNodeData).type).is_equal(MapNodeData.NodeType.NORMAL_STAGE)
+	var special_count: int = 0
+	for r: int in map.get_row_count():
+		for node: MapNodeData in map.get_row(r):
+			if node.type == MapNodeData.SPECIAL_STAGE_TYPE:
+				special_count += 1
+	assert_int(special_count).is_greater_equal(1)

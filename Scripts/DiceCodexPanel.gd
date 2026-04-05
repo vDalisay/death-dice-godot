@@ -12,6 +12,7 @@ const FACE_TILE_WIDTH: int = 84
 const FACE_TILE_HEIGHT: int = 40
 const FACE_TILE_PADDING_X: int = 6
 const FACE_TILE_PADDING_Y: int = 6
+const FACE_LABEL_FONT_SIZE: int = 15
 
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
@@ -151,17 +152,24 @@ func _build_face_tile(face: DiceFaceData, discovered: bool) -> PanelContainer:
 
 	var center := CenterContainer.new()
 	center.name = "FaceTileCenter"
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	center.grow_vertical = Control.GROW_DIRECTION_BOTH
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content_margin.add_child(center)
 
 	var label := Label.new()
 	label.name = "FaceLabel"
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.custom_minimum_size = Vector2(0, FACE_TILE_HEIGHT - FACE_TILE_PADDING_Y * 2)
 	label.add_theme_font_override("font", _UITheme.font_mono())
-	label.add_theme_font_size_override("font_size", 17)
+	label.add_theme_font_size_override("font_size", FACE_LABEL_FONT_SIZE)
 	if discovered:
 		label.text = "%s %s" % [_face_glyph(face.type), face.get_display_text()]
 		label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)

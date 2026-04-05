@@ -10,7 +10,7 @@ func test_card_has_required_nodes() -> void:
 	await await_idle_frame()
 	assert_object(card.get_node("VBoxContainer/AccentBar")).is_not_null()
 	assert_object(card.get_node("VBoxContainer/MarginContainer/Content/NameLabel")).is_not_null()
-	assert_object(card.get_node("VBoxContainer/MarginContainer/Content/DescLabel")).is_not_null()
+	assert_object(card.get_node("VBoxContainer/MarginContainer/Content/KeywordLabel")).is_not_null()
 	assert_object(card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/PriceLabel")).is_not_null()
 	assert_object(card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/BuyButton")).is_not_null()
 

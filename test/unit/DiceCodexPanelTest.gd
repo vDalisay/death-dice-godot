@@ -76,14 +76,19 @@ func test_face_tile_label_stays_centered_inside_padded_tile_bounds() -> void:
 	var faces_grid: GridContainer = first_card.find_child("FacesGrid", true, false) as GridContainer
 	var first_tile: PanelContainer = faces_grid.get_child(0) as PanelContainer
 	var content_margin: MarginContainer = first_tile.find_child("FaceTileMargin", true, false) as MarginContainer
+	var center: CenterContainer = first_tile.find_child("FaceTileCenter", true, false) as CenterContainer
 	var face_label: Label = first_tile.find_child("FaceLabel", true, false) as Label
 	assert_object(content_margin).is_not_null()
+	assert_object(center).is_not_null()
 	assert_bool(first_tile.clip_contents).is_true()
 	assert_int(content_margin.get_theme_constant("margin_top")).is_equal(6)
 	assert_int(content_margin.get_theme_constant("margin_bottom")).is_equal(6)
+	assert_int(face_label.get_theme_font_size("font_size")).is_equal(15)
+	assert_int(face_label.text_overrun_behavior).is_equal(TextServer.OVERRUN_TRIM_ELLIPSIS)
 	await await_idle_frame()
 	var tile_rect: Rect2 = Rect2(first_tile.global_position, first_tile.size)
 	var content_rect: Rect2 = Rect2(content_margin.global_position, content_margin.size)
+	var center_rect: Rect2 = Rect2(center.global_position, center.size)
 	var label_rect: Rect2 = Rect2(face_label.global_position, face_label.size)
 	var tile_center: Vector2 = tile_rect.get_center()
 	var label_center: Vector2 = label_rect.get_center()
@@ -91,7 +96,34 @@ func test_face_tile_label_stays_centered_inside_padded_tile_bounds() -> void:
 	assert_bool(content_rect.position.y >= tile_rect.position.y).is_true()
 	assert_bool(content_rect.end.x <= tile_rect.end.x).is_true()
 	assert_bool(content_rect.end.y <= tile_rect.end.y).is_true()
+	assert_bool(center_rect.position.x >= content_rect.position.x).is_true()
+	assert_bool(center_rect.position.y >= content_rect.position.y).is_true()
+	assert_bool(center_rect.end.x <= content_rect.end.x).is_true()
+	assert_bool(center_rect.end.y <= content_rect.end.y).is_true()
+	assert_bool(label_rect.position.x >= content_rect.position.x).is_true()
+	assert_bool(label_rect.end.x <= content_rect.end.x).is_true()
 	assert_bool(label_rect.position.y >= content_rect.position.y).is_true()
-	assert_bool(label_rect.end.y <= tile_rect.end.y).is_true()
+	assert_bool(label_rect.end.y <= content_rect.end.y).is_true()
 	assert_bool(absf(label_center.x - tile_center.x) <= 1.0).is_true()
 	assert_bool(absf(label_center.y - tile_center.y) <= 1.0).is_true()
+
+
+func test_face_tile_long_text_stays_contained() -> void:
+	var panel: DiceCodexPanel = auto_free(CodexScene.instantiate()) as DiceCodexPanel
+	add_child(panel)
+	await await_idle_frame()
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
+	face.value = 999
+	var tile: PanelContainer = panel._build_face_tile(face, true)
+	auto_free(tile)
+	add_child(tile)
+	await await_idle_frame()
+	var content_margin: MarginContainer = tile.find_child("FaceTileMargin", true, false) as MarginContainer
+	var face_label: Label = tile.find_child("FaceLabel", true, false) as Label
+	var content_rect: Rect2 = Rect2(content_margin.global_position, content_margin.size)
+	var label_rect: Rect2 = Rect2(face_label.global_position, face_label.size)
+	assert_bool(label_rect.position.x >= content_rect.position.x).is_true()
+	assert_bool(label_rect.end.x <= content_rect.end.x).is_true()
+	assert_bool(label_rect.position.y >= content_rect.position.y).is_true()
+	assert_bool(label_rect.end.y <= content_rect.end.y).is_true()
