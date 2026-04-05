@@ -4,11 +4,11 @@ extends GdUnitTestSuite
 const PickerScene: PackedScene = preload("res://Scenes/ArchetypePicker.tscn")
 
 
-func test_picker_rebuilds_three_archetype_cards() -> void:
+func test_picker_rebuilds_five_archetype_cards() -> void:
 	var picker: ColorRect = auto_free(PickerScene.instantiate()) as ColorRect
 	add_child(picker)
 	await await_idle_frame()
-	assert_int((picker.get_node("CenterContainer/Card/MarginContainer/Content/ArchetypeRow") as HBoxContainer).get_child_count()).is_equal(3)
+	assert_int((picker.get_node("CenterContainer/Card/MarginContainer/Content/ArchetypeRow") as HBoxContainer).get_child_count()).is_equal(5)
 
 
 func test_open_keeps_selected_mode_buttons_available() -> void:
@@ -33,7 +33,7 @@ func test_closing_prestige_restores_visible_archetype_cards() -> void:
 	prestige_panel.call("_on_close_pressed")
 	await await_millis(220)
 	var row: HBoxContainer = picker.get_node("CenterContainer/Card/MarginContainer/Content/ArchetypeRow") as HBoxContainer
-	assert_int(row.get_child_count()).is_equal(3)
+	assert_int(row.get_child_count()).is_equal(5)
 	for child: Node in row.get_children():
 		var card: PanelContainer = child as PanelContainer
 		assert_object(card).is_not_null()

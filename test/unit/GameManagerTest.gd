@@ -209,6 +209,26 @@ func test_register_near_death_bank_increments_counters() -> void:
 	await assert_signal(_gm).is_emitted("near_death_banked", [3, 4])
 
 
+func test_stop_collector_bank_rewards_scale_with_effective_stops() -> void:
+	_gm.current_loop = 3
+	_gm.set_archetype(_gm.Archetype.STOP_COLLECTOR)
+	var rewards: Dictionary = _gm.get_archetype_bank_rewards(2, false)
+	assert_int(int(rewards.get("gold", 0))).is_equal(4)
+	assert_int(int(rewards.get("exp", 0))).is_equal(1)
+
+
+func test_last_call_heals_once_per_stage() -> void:
+	_gm.set_archetype(_gm.Archetype.LAST_CALL)
+	_gm.lives = 2
+	var first_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
+	var second_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
+	assert_int(int(first_rewards.get("heal", 0))).is_equal(1)
+	assert_int(int(second_rewards.get("heal", 0))).is_equal(0)
+	_gm.advance_stage()
+	var next_stage_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
+	assert_int(int(next_stage_rewards.get("heal", 0))).is_equal(1)
+
+
 func test_spend_gold_succeeds() -> void:
 	_gm.gold = 100
 	var result: bool = _gm.spend_gold(40)

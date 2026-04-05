@@ -227,11 +227,26 @@ func _on_bank_pressed() -> void:
 	var is_near_death_bank: bool = bank_threshold > 1 and bank_effective_stops == bank_threshold - 1
 	var meta_exp_reward: int = 0
 	var meta_shard_reward: int = 0
+	var archetype_rewards: Dictionary = {
+		"gold": 0,
+		"exp": 0,
+		"stop_shards": 0,
+		"heal": 0,
+	}
 	if is_near_death_bank:
 		GameManager.register_near_death_bank(bank_effective_stops, bank_threshold)
 		GameManager.add_gold(NEAR_DEATH_GOLD_BONUS)
 		if SaveManager.has_permanent_upgrade("shard_magnet"):
 			meta_shard_reward += META_NEAR_DEATH_SHARD_REWARD
+	archetype_rewards = GameManager.get_archetype_bank_rewards(bank_effective_stops, is_near_death_bank)
+	if int(archetype_rewards.get("gold", 0)) > 0:
+		GameManager.add_gold(int(archetype_rewards.get("gold", 0)))
+	if int(archetype_rewards.get("exp", 0)) > 0:
+		GameManager.add_run_exp(int(archetype_rewards.get("exp", 0)))
+	if int(archetype_rewards.get("stop_shards", 0)) > 0:
+		GameManager.add_run_stop_shards(int(archetype_rewards.get("stop_shards", 0)))
+	if int(archetype_rewards.get("heal", 0)) > 0:
+		GameManager.heal_lives(int(archetype_rewards.get("heal", 0)))
 	if SaveManager.has_permanent_upgrade("reroll_ledger") and _reroll_count >= 2:
 		meta_exp_reward += META_LEDGER_EXP_REWARD
 	if SaveManager.has_permanent_upgrade("close_call_study") and _turn_entered_high_risk:
@@ -333,6 +348,14 @@ func _on_bank_pressed() -> void:
 		status_parts.append("HEARTS -%d STOP" % heart_relief)
 	if is_near_death_bank:
 		status_parts.append("NEAR DEATH +%dg" % NEAR_DEATH_GOLD_BONUS)
+	if int(archetype_rewards.get("gold", 0)) > 0:
+		status_parts.append("ARCHETYPE +%dg" % int(archetype_rewards.get("gold", 0)))
+	if int(archetype_rewards.get("exp", 0)) > 0:
+		status_parts.append("CAPSTONE +%d EXP" % int(archetype_rewards.get("exp", 0)))
+	if int(archetype_rewards.get("stop_shards", 0)) > 0:
+		status_parts.append("CAPSTONE +%d SHARD" % int(archetype_rewards.get("stop_shards", 0)))
+	if int(archetype_rewards.get("heal", 0)) > 0:
+		status_parts.append("LAST CALL +%d LIFE" % int(archetype_rewards.get("heal", 0)))
 	if meta_exp_reward > 0:
 		status_parts.append("LAB +%d EXP" % meta_exp_reward)
 	if meta_shard_reward > 0:

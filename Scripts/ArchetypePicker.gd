@@ -98,6 +98,8 @@ func _rebuild_archetype_cards(animate_cards: bool = false) -> void:
 		GameManager.Archetype.CAUTION,
 		GameManager.Archetype.RISK_IT,
 		GameManager.Archetype.BLANK_SLATE,
+		GameManager.Archetype.STOP_COLLECTOR,
+		GameManager.Archetype.LAST_CALL,
 	]
 	if SaveManager.has_prestige_unlock("new_archetype"):
 		archetypes.append(GameManager.Archetype.FORTUNE_FOOL)

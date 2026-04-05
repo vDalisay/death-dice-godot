@@ -14,20 +14,25 @@ const LOOP_BONUS_GOLD_STEP: int = 10
 const MAX_MODIFIERS: int = 3
 const MISER_SPEND_THRESHOLD: int = 15
 const MISER_BONUS_GOLD: int = 20
+const ARCHETYPE_CAPSTONE_LOOP: int = 3
 
-enum Archetype { CAUTION, RISK_IT, BLANK_SLATE, FORTUNE_FOOL }
+enum Archetype { CAUTION, RISK_IT, BLANK_SLATE, FORTUNE_FOOL, STOP_COLLECTOR, LAST_CALL }
 enum RunMode { CLASSIC, GAUNTLET }
 const ARCHETYPE_NAMES: Dictionary = {
 	Archetype.CAUTION: "Caution",
 	Archetype.RISK_IT: "Risk It",
 	Archetype.BLANK_SLATE: "Blank Slate",
 	Archetype.FORTUNE_FOOL: "Fortune's Fool",
+	Archetype.STOP_COLLECTOR: "Stop Collector",
+	Archetype.LAST_CALL: "Last Call",
 }
 const ARCHETYPE_DESCRIPTIONS: Dictionary = {
 	Archetype.CAUTION: "5 Standard dice + 1 Shield die, bust immunity to turn 3.",
 	Archetype.RISK_IT: "5 Gambler dice, 2x gold per turn.",
 	Archetype.BLANK_SLATE: "8 Blank Canvas dice, shop gold doubled.",
 	Archetype.FORTUNE_FOOL: "10 Fortune dice, LUCK x2, but start with only 15 gold.",
+	Archetype.STOP_COLLECTOR: "4 Standard + Gambler + Shield. Banked stops pay gold. Capstone: loop 3+ banks at 2+ stops earn EXP.",
+	Archetype.LAST_CALL: "3 Gambler + 2 Heavy + 1 Shield. Near-death banks heal once per stage. Capstone: loop 3+ near-death banks earn a Shard.",
 }
 ## Loops required to unlock each archetype (0 = always available).
 const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
@@ -35,6 +40,8 @@ const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
 	Archetype.RISK_IT: 1,
 	Archetype.BLANK_SLATE: 3,
 	Archetype.FORTUNE_FOOL: 0,
+	Archetype.STOP_COLLECTOR: 2,
+	Archetype.LAST_CALL: 4,
 }
 const RUN_MODE_NAMES: Dictionary = {
 	RunMode.CLASSIC: "Classic",
@@ -119,6 +126,7 @@ var prestige_shop_tier_active: bool = false
 var prestige_reward_reroll_available: bool = false
 var prestige_reroute_uses: int = 0
 var _revealed_loop_numbers: Array[int] = []
+var _last_call_heal_used_this_stage: bool = false
 
 
 func set_archetype(archetype: Archetype) -> void:
@@ -257,6 +265,17 @@ func _build_starting_pool() -> void:
 		Archetype.FORTUNE_FOOL:
 			for i: int in 10:
 				dice_pool.append(DiceData.make_fortune_d6())
+		Archetype.STOP_COLLECTOR:
+			for i: int in 4:
+				dice_pool.append(DiceData.make_standard_d6())
+			dice_pool.append(DiceData.make_gambler_d6())
+			dice_pool.append(DiceData.make_shield_d6())
+		Archetype.LAST_CALL:
+			for i: int in 3:
+				dice_pool.append(DiceData.make_gambler_d6())
+			for i: int in 2:
+				dice_pool.append(DiceData.make_heavy_d6())
+			dice_pool.append(DiceData.make_shield_d6())
 
 
 func add_dice(die: DiceData) -> void:
@@ -342,6 +361,7 @@ func advance_stage() -> void:
 	current_stage += 1
 	total_score = 0
 	near_death_banks_this_stage = 0
+	_last_call_heal_used_this_stage = false
 	reset_momentum()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
@@ -359,6 +379,7 @@ func advance_loop() -> void:
 	current_stage = 1
 	total_score = 0
 	near_death_banks_this_stage = 0
+	_last_call_heal_used_this_stage = false
 	reset_momentum()
 	_reset_event_flags()
 	clear_active_loop_contract()
@@ -424,6 +445,7 @@ func reset_run() -> void:
 	held_stop_count = 0
 	near_death_banks_this_stage = 0
 	near_death_banks_this_run = 0
+	_last_call_heal_used_this_stage = false
 	event_free_bust = false
 	event_target_multiplier = 1.0
 	reset_momentum()
@@ -452,6 +474,27 @@ func reset_run() -> void:
 	held_stops_changed.emit(held_stop_count)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
+
+
+func get_archetype_bank_rewards(effective_stops: int, is_near_death_bank: bool) -> Dictionary:
+	var rewards: Dictionary = {
+		"gold": 0,
+		"exp": 0,
+		"stop_shards": 0,
+		"heal": 0,
+	}
+	match chosen_archetype:
+		Archetype.STOP_COLLECTOR:
+			rewards["gold"] = maxi(0, effective_stops) * 2
+			if current_loop >= ARCHETYPE_CAPSTONE_LOOP and effective_stops >= 2:
+				rewards["exp"] = 1
+		Archetype.LAST_CALL:
+			if is_near_death_bank and lives < MAX_LIVES and not _last_call_heal_used_this_stage:
+				rewards["heal"] = 1
+				_last_call_heal_used_this_stage = true
+			if current_loop >= ARCHETYPE_CAPSTONE_LOOP and is_near_death_bank:
+				rewards["stop_shards"] = 1
+	return rewards
 
 
 # ---------------------------------------------------------------------------
