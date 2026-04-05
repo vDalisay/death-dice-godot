@@ -108,8 +108,8 @@ func _apply_theme() -> void:
 func _set_mode(mode: int) -> void:
 	_selected_mode = mode
 	var classic_selected: bool = _selected_mode == int(GameManager.RunMode.CLASSIC)
-	_classic_button.modulate = Color(1.0, 0.9, 0.35) if classic_selected else Color(0.8, 0.8, 0.8)
-	_gauntlet_button.modulate = Color(1.0, 0.35, 0.35) if not classic_selected else Color(0.8, 0.8, 0.8)
+	_classic_button.modulate = _UITheme.STATUS_HIGHLIGHT if classic_selected else _UITheme.STAGE_FAMILY_CONTEXT_COLOR
+	_gauntlet_button.modulate = _UITheme.STATUS_DANGER if not classic_selected else _UITheme.STAGE_FAMILY_CONTEXT_COLOR
 	var selected_button: Button = _classic_button if classic_selected else _gauntlet_button
 	_play_mode_pulse(selected_button)
 

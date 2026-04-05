@@ -40,20 +40,20 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 }
 
 ## State fill colors (dark-on-dark palette)
-const FILL_UNROLLED: Color    = Color("#2A2A3E")
-const FILL_REROLLABLE: Color  = Color("#1A1A2E")
-const FILL_KEPT: Color        = Color("#0A2A0A")
-const FILL_KEEP_LOCKED: Color = Color("#0A2A0A")
-const FILL_AUTO_KEPT: Color   = Color("#1A1A2E")
-const FILL_STOPPED: Color     = Color("#2A0A0A")
+const FILL_UNROLLED: Color    = _UITheme.ELEVATED
+const FILL_REROLLABLE: Color  = _UITheme.DIE_FILL_DEFAULT
+const FILL_KEPT: Color        = _UITheme.DIE_FILL_KEPT
+const FILL_KEEP_LOCKED: Color = _UITheme.DIE_FILL_KEPT
+const FILL_AUTO_KEPT: Color   = _UITheme.DIE_FILL_AUTO_KEPT
+const FILL_STOPPED: Color     = _UITheme.DIE_FILL_STOPPED
 
 ## State border colors
-const BORDER_UNROLLED: Color    = Color("#444466")
+const BORDER_UNROLLED: Color    = _UITheme.DIE_BORDER_DEFAULT
 const BORDER_REROLLABLE: Color  = Color.TRANSPARENT  # Uses rarity color
-const BORDER_KEPT: Color        = Color("#00E676")
-const BORDER_KEEP_LOCKED: Color = Color("#00E676")
-const BORDER_AUTO_KEPT: Color   = Color("#FFD700")
-const BORDER_STOPPED: Color     = Color("#FF1744")
+const BORDER_KEPT: Color        = _UITheme.DIE_BORDER_KEPT
+const BORDER_KEEP_LOCKED: Color = _UITheme.DIE_BORDER_LOCKED
+const BORDER_AUTO_KEPT: Color   = _UITheme.DIE_BORDER_AUTO_KEPT
+const BORDER_STOPPED: Color     = _UITheme.DIE_BORDER_STOPPED
 
 var die_index: int = -1
 var die_state: DieState = DieState.UNROLLED
@@ -291,13 +291,13 @@ func _apply_visual() -> void:
 		match _current_face.type:
 			DiceFaceData.FaceType.INSURANCE:
 				if die_state == DieState.AUTO_KEPT:
-					fill = Color("#0A2A2A")
+					fill = _UITheme.DIE_FILL_INSURANCE
 					border = _UITheme.ACTION_CYAN
 					corner_glyph = "!"
 					icon_color = _UITheme.ACTION_CYAN
 			DiceFaceData.FaceType.CURSED_STOP:
 				if die_state == DieState.STOPPED:
-					fill = Color("#1A0A2A")
+					fill = _UITheme.DIE_FILL_CURSED
 					border = _UITheme.NEON_PURPLE
 					icon_color = _UITheme.NEON_PURPLE
 

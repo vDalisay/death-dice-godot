@@ -53,6 +53,7 @@ const CONTAINMENT_INWARD_NUDGE: float = 54.0
 const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
+const PREVIEW_BOUNDS_PADDING: float = 10.0
 
 # Dice bag (kept-dice staging area)
 const BAG_PANEL_W: float = 176.0
@@ -133,6 +134,7 @@ func _ready() -> void:
 	_build_walls()
 	_build_dice_bag()
 	_update_centering()
+	_refresh_popup_bounds_for_dice()
 	var viewport: Viewport = get_viewport()
 	if viewport and not viewport.size_changed.is_connected(_update_centering):
 		viewport.size_changed.connect(_update_centering)
@@ -168,6 +170,7 @@ func throw_dice(pool: Array[DiceData]) -> void:
 			var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
 			add_child(die)
 			die.setup(i, pool[i])
+			_apply_popup_bounds_to_die(die)
 			_dice.append(die)
 			die.toggled_keep.connect(_on_die_toggled)
 			die.shift_toggled_keep.connect(_on_die_shift_toggled)
@@ -339,6 +342,7 @@ func restore_dice_state(
 		var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
 		add_child(die)
 		die.setup(i, pool[i])
+		_apply_popup_bounds_to_die(die)
 		_dice.append(die)
 		die.toggled_keep.connect(_on_die_toggled)
 		die.shift_toggled_keep.connect(_on_die_shift_toggled)
@@ -409,6 +413,7 @@ func _volley_launch(index: int) -> void:
 	var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
 	add_child(die)
 	die.setup(index, data)
+	_apply_popup_bounds_to_die(die)
 	_dice.append(die)
 	die.toggled_keep.connect(_on_die_toggled)
 	die.shift_toggled_keep.connect(_on_die_shift_toggled)
@@ -723,6 +728,28 @@ func _update_centering() -> void:
 		return
 	var viewport_size: Vector2 = Vector2(viewport.size)
 	position = (viewport_size - Vector2(ARENA_WIDTH, ARENA_HEIGHT)) * 0.5
+	_refresh_popup_bounds_for_dice()
+
+
+func _get_popup_bounds_global() -> Rect2:
+	var local_rect: Rect2 = get_arena_rect().grow(-PREVIEW_BOUNDS_PADDING)
+	var top_left: Vector2 = to_global(local_rect.position)
+	var bottom_right: Vector2 = to_global(local_rect.end)
+	return Rect2(top_left, bottom_right - top_left)
+
+
+func _apply_popup_bounds_to_die(die: PhysicsDie) -> void:
+	if die == null or not is_instance_valid(die):
+		return
+	die.set_popup_bounds(_get_popup_bounds_global())
+
+
+func _refresh_popup_bounds_for_dice() -> void:
+	var popup_bounds: Rect2 = _get_popup_bounds_global()
+	for die: PhysicsDie in _dice:
+		if die == null or not is_instance_valid(die):
+			continue
+		die.set_popup_bounds(popup_bounds)
 
 
 ## Returns a target point for the throw impulse based on spawn origin.
