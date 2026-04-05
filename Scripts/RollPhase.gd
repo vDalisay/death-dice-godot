@@ -931,12 +931,18 @@ func _estimate_bust_odds(effective_stops: int, threshold: int) -> float:
 	)
 
 
-func _build_risk_details(effective_stops: int, shield_count: int, threshold: int, bust_odds: float) -> String:
+func _build_risk_details(
+	effective_stops: int,
+	shield_count: int,
+	threshold: int,
+	bust_odds: float,
+	reroll_ev: float
+) -> String:
 	if _risk_estimator == null:
 		_risk_estimator = BustRiskEstimatorScript.new()
 	var rerollable_count: int = _get_rerollable_count()
 	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
-	return _risk_estimator.build_risk_details(
+	var details: String = _risk_estimator.build_risk_details(
 		effective_stops,
 		shield_count,
 		threshold,
@@ -945,6 +951,46 @@ func _build_risk_details(effective_stops: int, shield_count: int, threshold: int
 		rerollable_count,
 		_reroll_count
 	)
+	details += "\nHeld stops: %d | Near-death banks this stage: %d | Reroll EV: %s%.1f" % [
+		GameManager.held_stop_count,
+		GameManager.near_death_banks_this_stage,
+		"+" if reroll_ev >= 0.0 else "",
+		reroll_ev,
+	]
+	return details
+
+
+func _estimate_reroll_ev(effective_stops: int, threshold: int) -> float:
+	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
+	var expected_gain: float = 0.0
+	for i: int in GameManager.dice_pool.size():
+		if i >= dice_keep.size() or i >= dice_keep_locked.size():
+			continue
+		if dice_keep[i] or dice_keep_locked[i]:
+			continue
+		var die_data: DiceData = GameManager.dice_pool[i]
+		if die_data == null or die_data.faces.is_empty():
+			continue
+		expected_gain += _estimate_die_expected_value(die_data)
+	var survival_chance: float = 1.0 - next_roll_chance
+	return expected_gain * survival_chance - float(_calculate_turn_score()) * next_roll_chance
+
+
+func _estimate_die_expected_value(die_data: DiceData) -> float:
+	if die_data == null or die_data.faces.is_empty():
+		return 0.0
+	var total_value: float = 0.0
+	for face: DiceFaceData in die_data.faces:
+		if face == null:
+			continue
+		match face.type:
+			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+				total_value += float(face.value)
+			DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+				total_value += float(maxi(1, face.value))
+			DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.LUCK, DiceFaceData.FaceType.HEART:
+				total_value += float(maxi(1, face.value)) * 0.6
+	return total_value / float(die_data.faces.size())
 
 ## Sync the i-th PhysicsDie's visual flags to match RollPhase tracking state.
 func _sync_arena_die_state(index: int) -> void:
@@ -970,11 +1016,12 @@ func _sync_ui() -> void:
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
 	var bust_odds: float = _estimate_bust_odds(effective_stops, threshold)
+	var reroll_ev: float = _estimate_reroll_ev(effective_stops, threshold)
 	if turn_state == TurnState.ACTIVE and _is_high_risk_turn(effective_stops, threshold, bust_odds):
 		_turn_entered_high_risk = true
-	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds)
+	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds, reroll_ev)
 	var turn_score: int = _calculate_turn_score()
-	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details)
+	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details, reroll_ev)
 	_sync_buttons()
 
 	match turn_state:
