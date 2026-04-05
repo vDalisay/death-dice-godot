@@ -6,6 +6,7 @@ signal contract_selected(contract_id: String)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel

@@ -1,5 +1,8 @@
 extends GdUnitTestSuite
 
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
+const PermanentUpgradeData := preload("res://Scripts/PermanentUpgradeData.gd")
+
 
 func test_loop_contract_data_to_dict_includes_reward_fields() -> void:
 	var data: LoopContractData = auto_free(preload("res://Scripts/LoopContractData.gd").new())

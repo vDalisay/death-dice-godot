@@ -2,6 +2,7 @@ extends GdUnitTestSuite
 
 const PanelScene: PackedScene = preload("res://Scenes/ContractSelectionPanel.tscn")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 
 func test_open_builds_one_card_per_offer() -> void:

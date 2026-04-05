@@ -3,6 +3,7 @@ extends RefCounted
 ## Static catalog and offer rules for loop contracts.
 
 const LoopContractDataScript: GDScript = preload("res://Scripts/LoopContractData.gd")
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 
 static func make(

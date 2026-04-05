@@ -1,6 +1,7 @@
 extends GdUnitTestSuite
 
 const PrestigeScene: PackedScene = preload("res://Scenes/PrestigePanel.tscn")
+const PermanentUpgradeData := preload("res://Scripts/PermanentUpgradeData.gd")
 
 var _saved_prestige_currency: int = 0
 var _saved_experience_currency: int = 0

@@ -1,6 +1,7 @@
 extends GdUnitTestSuite
 
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 
 func test_loop_one_offers_three_teaching_contracts() -> void:

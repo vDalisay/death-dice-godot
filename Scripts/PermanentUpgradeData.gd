@@ -71,7 +71,7 @@ static func make(
 	stop_shard_cost_value: int,
 	tag_list: Array[String] = []
 ) -> PermanentUpgradeData:
-	var data := PermanentUpgradeData.new()
+	var data := new()
 	data.upgrade_id = id
 	data.display_name = name
 	data.description = desc

@@ -8,6 +8,7 @@ const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 const ContractProgressServiceScript: GDScript = preload("res://Scripts/ContractProgressService.gd")
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 const SCORE_COUNT_DURATION: float = 0.5
 const SCORE_STEP_DURATION: float = 0.18

@@ -8,6 +8,7 @@ const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd"
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 const PermanentUpgradeDataScript: GDScript = preload("res://Scripts/PermanentUpgradeData.gd")
+const PermanentUpgradeData := preload("res://Scripts/PermanentUpgradeData.gd")
 
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel

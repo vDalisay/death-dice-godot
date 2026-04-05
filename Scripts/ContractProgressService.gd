@@ -3,6 +3,7 @@ extends RefCounted
 ## Pure contract progress tracking and completion evaluation.
 
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+const LoopContractData := preload("res://Scripts/LoopContractData.gd")
 
 
 func make_initial_progress(contract_id: String) -> Dictionary:
