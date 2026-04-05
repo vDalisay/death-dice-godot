@@ -23,6 +23,41 @@ const MUTED_TEXT: Color       = Color("#8888AA")
 const BRIGHT_TEXT: Color      = Color("#E2E8F0")
 
 # ---------------------------------------------------------------------------
+# Semantic Surface / Frame Tokens
+# ---------------------------------------------------------------------------
+const FRAME_DEFAULT: Color = Color("#5C4A38")
+const FRAME_RITUAL: Color = Color("#7A664A")
+const FRAME_DANGER: Color = Color("#7A3340")
+
+const SURFACE_ASH: Color = Color("#18151B")
+const SURFACE_INSET_ASH: Color = Color("#1D1920")
+const SURFACE_DIGITAL: Color = Color("#10171D")
+
+const STATUS_NEUTRAL: Color = Color("#C8BEAF")
+const STATUS_INFO: Color = Color("#7AB4C6")
+const STATUS_SUCCESS: Color = Color("#8FCB97")
+const STATUS_WARNING: Color = Color("#D4A76A")
+const STATUS_DANGER: Color = Color("#D5747D")
+const STATUS_HIGHLIGHT: Color = Color("#E4CD8D")
+const STATUS_CONTRACT: Color = Color("#90C7D3")
+const STATUS_COMBO: Color = Color("#C992AD")
+
+const DIE_FILL_DEFAULT: Color = Color("#1A1A2E")
+const DIE_FILL_KEPT: Color = Color("#0F2614")
+const DIE_FILL_STOPPED: Color = Color("#291118")
+const DIE_FILL_AUTO_KEPT: Color = Color("#1E1A24")
+const DIE_FILL_INSURANCE: Color = Color("#11252A")
+const DIE_FILL_CURSED: Color = Color("#1A0E24")
+
+const DIE_BORDER_DEFAULT: Color = Color("#4A4457")
+const DIE_BORDER_KEPT: Color = Color("#66B37A")
+const DIE_BORDER_STOPPED: Color = Color("#C95B68")
+const DIE_BORDER_AUTO_KEPT: Color = Color("#BFA362")
+const DIE_BORDER_LOCKED: Color = Color("#77B888")
+
+const FACE_INSET_SURFACE: Color = SURFACE_INSET_ASH
+
+# ---------------------------------------------------------------------------
 # Rarity Colors
 # ---------------------------------------------------------------------------
 const RARITY_GREY: Color   = Color("#888888")
@@ -163,6 +198,35 @@ static func make_panel_stylebox(bg: Color = PANEL_SURFACE, corner: int = CORNER_
 		sb.border_width_bottom = border_width
 		sb.border_color = border_color
 	return sb
+
+
+static func make_semantic_frame_panel(
+	surface: Color,
+	frame: Color,
+	corner: int = CORNER_RADIUS_CARD,
+	border_width: int = 1
+) -> StyleBoxFlat:
+	return make_panel_stylebox(surface, corner, frame, border_width)
+
+
+static func status_color(key: String) -> Color:
+	match key:
+		"info":
+			return STATUS_INFO
+		"success":
+			return STATUS_SUCCESS
+		"warning":
+			return STATUS_WARNING
+		"danger":
+			return STATUS_DANGER
+		"highlight":
+			return STATUS_HIGHLIGHT
+		"contract":
+			return STATUS_CONTRACT
+		"combo":
+			return STATUS_COMBO
+		_:
+			return STATUS_NEUTRAL
 
 
 static func apply_modal_panel_style(panel: PanelContainer, border_color: Color = MACHINE_BORDER_DANGER, border_width: int = MACHINE_BORDER_WIDTH, bg: Color = PANEL_SURFACE) -> void:

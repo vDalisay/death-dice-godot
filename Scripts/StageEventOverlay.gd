@@ -74,7 +74,7 @@ var _choice_cards: Array[PanelContainer] = []
 var _resolved: bool = false
 var _continue_button: Button = null
 var _pending_summary: String = ""
-var _pending_status_color: Color = Color.WHITE
+var _pending_status_color: Color = _UITheme.STATUS_NEUTRAL
 
 
 func _ready() -> void:
@@ -84,20 +84,20 @@ func _ready() -> void:
 func _apply_theme_styling() -> void:
 	_card_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_MODAL, 2)
 	)
 	_title_label.add_theme_font_override("font", _UITheme.font_display())
 	_title_label.add_theme_font_size_override("font_size", 20)
-	_title_label.add_theme_color_override("font_color", _UITheme.NEON_PURPLE)
+	_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_TITLE_COLOR)
 	_flavor_label.add_theme_font_override("font", _UITheme.font_body())
 	_flavor_label.add_theme_font_size_override("font_size", 14)
-	_flavor_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_flavor_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 
 
 func open() -> void:
 	_resolved = false
 	_pending_summary = ""
-	_pending_status_color = Color.WHITE
+	_pending_status_color = _UITheme.STATUS_NEUTRAL
 	_title_label.text = "RANDOM EVENT"
 	_flavor_label.text = "Choose your fate..."
 	_prepare_choice_surface()
@@ -118,7 +118,7 @@ func open() -> void:
 func open_from_resume(snapshot: Dictionary) -> void:
 	_resolved = false
 	_pending_summary = ""
-	_pending_status_color = Color.WHITE
+	_pending_status_color = _UITheme.STATUS_NEUTRAL
 	_title_label.text = "RANDOM EVENT"
 	_flavor_label.text = "Choose your fate..."
 	_prepare_choice_surface()
@@ -178,7 +178,7 @@ func _build_choice_card(event: Dictionary, is_blessing: bool) -> PanelContainer:
 	var border_color: Color = _UITheme.SUCCESS_GREEN if is_blessing else _UITheme.DANGER_RED
 	card.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, 12, border_color, 3)
+		_UITheme.make_semantic_frame_panel(_UITheme.SURFACE_ASH, border_color, 12, 3)
 	)
 
 	var margin := MarginContainer.new()
@@ -460,7 +460,7 @@ func _build_reward_die_card(die: DiceData) -> PanelContainer:
 	var rarity_color: Color = DiceData.get_rarity_color(die.rarity)
 	card.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, 12, rarity_color, 3)
+		_UITheme.make_semantic_frame_panel(_UITheme.SURFACE_ASH, rarity_color, 12, 3)
 	)
 
 	var margin := MarginContainer.new()
@@ -509,7 +509,7 @@ func _build_reward_die_card(die: DiceData) -> PanelContainer:
 		var face_bg := PanelContainer.new()
 		face_bg.add_theme_stylebox_override(
 			"panel",
-			_UITheme.make_panel_stylebox(Color(0.15, 0.15, 0.2, 1.0), 4)
+			_UITheme.make_panel_stylebox(_UITheme.FACE_INSET_SURFACE, 4, _UITheme.FRAME_DEFAULT, 1)
 		)
 		face_bg.add_child(face_label)
 		grid.add_child(face_bg)
@@ -584,22 +584,22 @@ static func _rarity_name(rarity: DiceData.Rarity) -> String:
 static func _face_color(face: DiceFaceData) -> Color:
 	match face.type:
 		DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
-			return Color(1.0, 0.3, 0.3)
+			return _UITheme.STATUS_DANGER
 		DiceFaceData.FaceType.BLANK:
-			return Color(0.5, 0.5, 0.5)
+			return _UITheme.MUTED_TEXT
 		DiceFaceData.FaceType.SHIELD:
-			return Color(0.3, 0.8, 1.0)
+			return _UITheme.ACTION_CYAN
 		DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return Color(1.0, 0.85, 0.0)
+			return _UITheme.SCORE_GOLD
 		DiceFaceData.FaceType.EXPLODE:
-			return Color(1.0, 0.5, 0.0)
+			return _UITheme.EXPLOSION_ORANGE
 		DiceFaceData.FaceType.INSURANCE:
-			return Color(0.3, 1.0, 0.6)
+			return _UITheme.STATUS_INFO
 		DiceFaceData.FaceType.LUCK:
-			return Color(0.4, 0.9, 0.3)
+			return _UITheme.SUCCESS_GREEN
 		DiceFaceData.FaceType.HEART:
 			return _UITheme.ROSE_ACCENT
-	return Color(0.9, 0.9, 0.9)
+	return _UITheme.BRIGHT_TEXT
 
 
 func _lose_random_die() -> void:

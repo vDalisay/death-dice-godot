@@ -46,6 +46,7 @@ const KEEP_LOCK_SNAP_DURATION: float = 0.14
 const KEEP_OPACITY_TWEEN_DURATION: float = 0.12
 const NAME_POPUP_FADE_DURATION: float = 0.1
 const NAME_POPUP_GAP: float = 8.0
+const NAME_POPUP_EDGE_PADDING: float = 6.0
 const SHIELD_ABSORB_DURATION: float = 0.3
 const SHIELD_PULSE_DURATION: float = 2.0
 const REROLL_LIFT_OPACITY: float = 0.68
@@ -99,16 +100,16 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 }
 
 ## Visual state colors
-const FILL_DEFAULT: Color   = Color("#1A1A2E")
-const FILL_KEPT: Color      = Color("#0A2A0A")
-const FILL_STOPPED: Color   = Color("#2A0A0A")
-const FILL_AUTO_KEPT: Color = Color("#1A1A2E")
+const FILL_DEFAULT: Color   = _UITheme.DIE_FILL_DEFAULT
+const FILL_KEPT: Color      = _UITheme.DIE_FILL_KEPT
+const FILL_STOPPED: Color   = _UITheme.DIE_FILL_STOPPED
+const FILL_AUTO_KEPT: Color = _UITheme.DIE_FILL_AUTO_KEPT
 
-const BORDER_DEFAULT: Color   = Color("#444466")
-const BORDER_KEPT: Color      = Color("#00E676")
-const BORDER_STOPPED: Color   = Color("#FF1744")
-const BORDER_AUTO_KEPT: Color = Color("#FFD700")
-const BORDER_LOCKED: Color    = Color("#00E676")
+const BORDER_DEFAULT: Color   = _UITheme.DIE_BORDER_DEFAULT
+const BORDER_KEPT: Color      = _UITheme.DIE_BORDER_KEPT
+const BORDER_STOPPED: Color   = _UITheme.DIE_BORDER_STOPPED
+const BORDER_AUTO_KEPT: Color = _UITheme.DIE_BORDER_AUTO_KEPT
+const BORDER_LOCKED: Color    = _UITheme.DIE_BORDER_LOCKED
 
 # ---------------------------------------------------------------------------
 # State
@@ -138,6 +139,8 @@ var _popup_tween: Tween = null
 var _is_hovered: bool = false
 var _peak_speed_since_launch: float = 0.0
 var _last_motion_velocity: Vector2 = Vector2.ZERO
+var _popup_bounds: Rect2 = Rect2.ZERO
+var _has_popup_bounds: bool = false
 
 # ---------------------------------------------------------------------------
 # Visual nodes (created in _ready)
@@ -224,8 +227,8 @@ func _ready() -> void:
 	_name_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_name_popup.visible = false
 	var popup_style := StyleBoxFlat.new()
-	popup_style.bg_color = Color(0.05, 0.07, 0.12, 0.92)
-	popup_style.border_color = _UITheme.ACTION_CYAN
+	popup_style.bg_color = Color(_UITheme.SURFACE_DIGITAL, 0.95)
+	popup_style.border_color = _UITheme.FRAME_DEFAULT
 	popup_style.set_border_width_all(1)
 	popup_style.set_corner_radius_all(6)
 	popup_style.content_margin_left = 4.0
@@ -278,6 +281,12 @@ func setup(index: int, data: DiceData) -> void:
 	if _tier_label:
 		_tier_label.text = data.get_reroll_tier_label() if data and data.is_reroll_evolving() else ""
 	_apply_visual()
+
+
+func set_popup_bounds(bounds: Rect2) -> void:
+	_popup_bounds = bounds
+	_has_popup_bounds = bounds.size.x > 0.0 and bounds.size.y > 0.0
+	_update_name_popup_position()
 
 
 func show_face(face: DiceFaceData) -> void:
@@ -723,10 +732,22 @@ func _update_name_popup_position() -> void:
 	if _name_popup == null:
 		return
 	var half_height: float = DIE_SIZE * maxf(0.8, scale.y) * 0.5
-	_name_popup.global_position = global_position + Vector2(
-		-_name_popup.size.x * 0.5,
-		-half_height - NAME_POPUP_GAP - _name_popup.size.y
-	)
+	var popup_size: Vector2 = _name_popup.size
+	var popup_x: float = global_position.x - popup_size.x * 0.5
+	var preferred_above_y: float = global_position.y - half_height - NAME_POPUP_GAP - popup_size.y
+	var popup_y: float = preferred_above_y
+
+	if _has_popup_bounds:
+		var min_x: float = _popup_bounds.position.x + NAME_POPUP_EDGE_PADDING
+		var max_x: float = _popup_bounds.end.x - popup_size.x - NAME_POPUP_EDGE_PADDING
+		var min_y: float = _popup_bounds.position.y + NAME_POPUP_EDGE_PADDING
+		var max_y: float = _popup_bounds.end.y - popup_size.y - NAME_POPUP_EDGE_PADDING
+		popup_x = clampf(popup_x, min_x, max_x)
+		if popup_y < min_y:
+			popup_y = global_position.y + half_height + NAME_POPUP_GAP
+		popup_y = clampf(popup_y, min_y, max_y)
+
+	_name_popup.global_position = Vector2(popup_x, popup_y)
 
 
 ## Maps a DiceFaceData.FaceType to a display color for the popup face square.
@@ -753,7 +774,7 @@ static func face_type_color(ft: DiceFaceData.FaceType) -> Color:
 		DiceFaceData.FaceType.INSURANCE:
 			return _UITheme.ACTION_CYAN
 		DiceFaceData.FaceType.LUCK:
-			return Color(0.4, 0.9, 0.3)
+			return _UITheme.SUCCESS_GREEN
 		DiceFaceData.FaceType.HEART:
 			return _UITheme.ROSE_ACCENT
 	return _UITheme.MUTED_TEXT
@@ -833,7 +854,7 @@ func _apply_visual() -> void:
 			border_width = 3
 			glyph_color = _UITheme.SCORE_GOLD
 		elif current_face and current_face.type == DiceFaceData.FaceType.INSURANCE:
-			fill = Color("#0A2A2A")
+			fill = _UITheme.DIE_FILL_INSURANCE
 			border_color = _UITheme.ACTION_CYAN
 			border_width = 3
 			glyph_color = _UITheme.ACTION_CYAN
@@ -855,7 +876,7 @@ func _apply_visual() -> void:
 
 	# Special: CURSED_STOP
 	if current_face and current_face.type == DiceFaceData.FaceType.CURSED_STOP and is_stopped:
-		fill = Color("#1A0A2A")
+		fill = _UITheme.DIE_FILL_CURSED
 		border_color = _UITheme.NEON_PURPLE
 		glyph_color = _UITheme.NEON_PURPLE
 

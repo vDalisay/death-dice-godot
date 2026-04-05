@@ -189,7 +189,7 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 	var rarity_color: Color = DiceData.get_rarity_color(die.rarity)
 	card.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, 12, rarity_color, 3)
+		_UITheme.make_semantic_frame_panel(_UITheme.SURFACE_ASH, rarity_color, 12, 3)
 	)
 
 	var margin := MarginContainer.new()
@@ -250,7 +250,7 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 		var face_bg := PanelContainer.new()
 		face_bg.add_theme_stylebox_override(
 			"panel",
-			_UITheme.make_panel_stylebox(Color(0.15, 0.15, 0.2, 1.0), 4)
+			_UITheme.make_panel_stylebox(_UITheme.FACE_INSET_SURFACE, 4, _UITheme.FRAME_DEFAULT, 1)
 		)
 		face_bg.add_child(face_label)
 		grid.add_child(face_bg)
@@ -342,19 +342,19 @@ static func _rarity_name(rarity: DiceData.Rarity) -> String:
 static func _face_color(face: DiceFaceData) -> Color:
 	match face.type:
 		DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
-			return Color(1.0, 0.3, 0.3)
+			return _UITheme.STATUS_DANGER
 		DiceFaceData.FaceType.BLANK:
-			return Color(0.5, 0.5, 0.5)
+			return _UITheme.MUTED_TEXT
 		DiceFaceData.FaceType.SHIELD:
-			return Color(0.3, 0.8, 1.0)
+			return _UITheme.ACTION_CYAN
 		DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return Color(1.0, 0.85, 0.0)
+			return _UITheme.SCORE_GOLD
 		DiceFaceData.FaceType.EXPLODE:
-			return Color(1.0, 0.5, 0.0)
+			return _UITheme.EXPLOSION_ORANGE
 		DiceFaceData.FaceType.INSURANCE:
-			return Color(0.3, 1.0, 0.6)
+			return _UITheme.STATUS_INFO
 		DiceFaceData.FaceType.LUCK:
-			return Color(0.4, 0.9, 0.3)
+			return _UITheme.SUCCESS_GREEN
 		DiceFaceData.FaceType.HEART:
 			return _UITheme.ROSE_ACCENT
-	return Color(0.9, 0.9, 0.9)
+	return _UITheme.BRIGHT_TEXT
