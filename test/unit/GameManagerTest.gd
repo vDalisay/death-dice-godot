@@ -184,6 +184,31 @@ func test_set_run_mode_emits_signal() -> void:
 	await assert_signal(_gm).is_emitted("run_mode_changed", [_gm.RunMode.GAUNTLET])
 
 
+func test_begin_new_run_sets_seed_identity() -> void:
+	_gm.begin_new_run(_gm.RunMode.GAUNTLET, _gm.Archetype.CAUTION, true, " seed-123 ")
+	assert_int(_gm.run_mode).is_equal(_gm.RunMode.GAUNTLET)
+	assert_int(_gm.chosen_archetype).is_equal(_gm.Archetype.CAUTION)
+	assert_bool(_gm.is_seeded_run).is_true()
+	assert_str(_gm.run_seed_text).is_equal("seed-123")
+	assert_int(_gm.run_seed_version).is_greater(0)
+
+
+func test_restore_run_identity_restores_rng_stream_state() -> void:
+	_gm.restore_run_identity("resume-seed", true, 1)
+	var _first_value: int = _gm.rng_randi("map")
+	var stream_states: Dictionary = _gm.snapshot_rng_stream_states()
+	var expected_next_value: int = _gm.rng_randi("map")
+	_gm.restore_run_identity("resume-seed", true, 1, stream_states)
+	assert_int(_gm.rng_randi("map")).is_equal(expected_next_value)
+
+
+func test_clear_active_run_identity_clears_seed_flags() -> void:
+	_gm.begin_new_run(_gm.RunMode.CLASSIC, _gm.Archetype.CAUTION, true, "abc")
+	_gm.clear_active_run_identity()
+	assert_bool(_gm.is_seeded_run).is_false()
+	assert_str(_gm.run_seed_text).is_equal("")
+
+
 # ---------------------------------------------------------------------------
 # Gold
 # ---------------------------------------------------------------------------

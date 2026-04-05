@@ -44,10 +44,10 @@ func test_cross_tier_returns_valid_rarity() -> void:
 
 func test_order_independent() -> void:
 	## _roll_forge_result normalizes order, so (GREEN, GREY) == (GREY, GREEN).
-	seed(42)
+	GameManager.restore_run_identity("forge-order", false, 1)
 	var die_a: DiceData = ForgePanel._roll_forge_result(
 		DiceData.Rarity.GREEN, DiceData.Rarity.GREY)
-	seed(42)
+	GameManager.restore_run_identity("forge-order", false, 1)
 	var die_b: DiceData = ForgePanel._roll_forge_result(
 		DiceData.Rarity.GREY, DiceData.Rarity.GREEN)
 	assert_int(die_a.rarity).is_equal(die_b.rarity)
