@@ -16,6 +16,9 @@ const CARD_REVEAL_DURATION: float = 0.2
 const AFFORDABLE_CARD_ALPHA: float = 1.0
 const BLOCKED_CARD_ALPHA: float = 0.58
 const PURCHASE_FLASH_DURATION: float = 0.18
+const MODAL_HEIGHT_RATIO: float = 0.9
+const MODAL_MIN_HEIGHT: float = 560.0
+const MODAL_MIN_HEIGHT_FLOOR: float = 360.0
 
 const DICE_SLOTS: int = 4
 const MODIFIER_SLOTS: int = 2
@@ -38,22 +41,23 @@ var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn
 @onready var _gold_badge: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
 @onready var _gold_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge/GoldLabel
-@onready var _offer_summary_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/OfferSummaryLabel
-@onready var _dice_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection
-@onready var _dice_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceSectionHeader
-@onready var _dice_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceGrid
-@onready var _modifiers_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection
-@onready var _modifiers_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection/ModifiersSectionHeader
-@onready var _modifiers_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection/ModifiersGrid
-@onready var _bets_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection
-@onready var _bets_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsSectionHeader
-@onready var _bets_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsGrid
-@onready var _details_panel: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel
-@onready var _details_eyebrow_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsEyebrowLabel
-@onready var _details_title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel
-@onready var _details_keyword_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsKeywordLabel
-@onready var _details_description_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsDescriptionLabel
-@onready var _details_state_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsStateLabel
+@onready var _main_content_scroll: ScrollContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll
+@onready var _offer_summary_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/OfferSummaryLabel
+@onready var _dice_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection
+@onready var _dice_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection/DiceSectionHeader
+@onready var _dice_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection/DiceGrid
+@onready var _modifiers_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection
+@onready var _modifiers_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection/ModifiersSectionHeader
+@onready var _modifiers_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection/ModifiersGrid
+@onready var _bets_section: VBoxContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection
+@onready var _bets_section_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection/BetsSectionHeader
+@onready var _bets_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection/BetsGrid
+@onready var _details_panel: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel
+@onready var _details_eyebrow_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsEyebrowLabel
+@onready var _details_title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel
+@onready var _details_keyword_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsKeywordLabel
+@onready var _details_description_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsDescriptionLabel
+@onready var _details_state_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsStateLabel
 @onready var _pool_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/PoolLabel
 @onready var _refresh_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/RefreshButton
 @onready var _continue_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/ContinueButton
@@ -84,7 +88,13 @@ func _ready() -> void:
 	_continue_button.pressed.connect(_on_continue_pressed)
 	_refresh_button.pressed.connect(_on_refresh_pressed)
 	GameManager.gold_changed.connect(_on_gold_changed)
+	_apply_responsive_layout()
 	visible = false
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_apply_responsive_layout()
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +115,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 		_continue_button.text = "Continue to Stage %d" % (stage_just_cleared + 1)
 	_generate_items()
 	_refresh_display()
+	_main_content_scroll.scroll_vertical = 0
 	visible = true
 	_is_closing = false
 	_play_open_intro()
@@ -124,6 +135,7 @@ func open_from_resume(snapshot: Dictionary) -> void:
 	var selected_index: int = int(snapshot.get("selected_card_index", -1))
 	if selected_index >= 0 and selected_index < _all_items.size():
 		_select_item(selected_index)
+	_main_content_scroll.scroll_vertical = 0
 	visible = true
 	_is_closing = false
 	_play_open_intro()
@@ -207,6 +219,23 @@ func _apply_theme_styling() -> void:
 	_refresh_button.add_theme_font_size_override("font_size", 12)
 	_continue_button.add_theme_font_override("font", _UITheme.font_display())
 	_continue_button.add_theme_font_size_override("font_size", 12)
+
+
+func _apply_responsive_layout() -> void:
+	if _modal == null:
+		return
+	var viewport_height: float = get_viewport_rect().size.y
+	var target_height: float = maxf(MODAL_MIN_HEIGHT, viewport_height * MODAL_HEIGHT_RATIO)
+	target_height = minf(target_height, viewport_height - 24.0)
+	if target_height < MODAL_MIN_HEIGHT_FLOOR:
+		target_height = maxf(MODAL_MIN_HEIGHT_FLOOR, viewport_height - 12.0)
+	_modal.custom_minimum_size = Vector2(_modal.custom_minimum_size.x, target_height)
+	var compact_layout: bool = viewport_height < 860.0
+	var offer_columns: int = 3 if compact_layout else 4
+	_dice_grid.columns = offer_columns
+	_modifiers_grid.columns = offer_columns
+	_bets_grid.columns = offer_columns
+	_details_panel.custom_minimum_size.x = 280.0 if compact_layout else 320.0
 
 
 # ---------------------------------------------------------------------------

@@ -51,6 +51,17 @@ func test_roll_button_starts_enabled() -> void:
 	assert_str(GameManager.active_loop_contract_id).is_equal("safe_hands")
 
 
+func test_contract_overlay_is_visible_next_to_arena() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var contract_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay") as PanelContainer
+	var contract_text: Label = root.get_node("MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel") as Label
+	assert_object(contract_overlay).is_not_null()
+	assert_bool(contract_overlay.visible).is_true()
+	assert_str(contract_text.text).is_not_empty()
+
+
 func test_bank_button_starts_disabled() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)

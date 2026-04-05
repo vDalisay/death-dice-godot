@@ -63,6 +63,9 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 @onready var highlights_panel: HighlightsPanel = $HighlightsPanel
 @onready var forge_panel: ForgePanel = $ForgePanel
 @onready var stage_map_panel: StageMapPanel = $StageMapPanel
+@onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay
+@onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
+@onready var _contract_overlay_text_label: Label = $MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -163,11 +166,15 @@ func _ready() -> void:
 	_screen_shake.setup(_roll_content)
 	_screen_overlay = ScreenOverlayScript.new()
 	add_child(_screen_overlay)
+	_apply_contract_overlay_theme()
 	_add_button_micro_tween(roll_button)
 	_add_button_micro_tween(bank_button)
 	_add_button_micro_tween(new_run_button)
 	_add_button_micro_tween(career_button)
 	_add_button_micro_tween(codex_button)
+	GameManager.loop_contract_changed.connect(_on_loop_contract_overlay_changed)
+	GameManager.loop_contract_progress_changed.connect(_on_loop_contract_overlay_progress_changed)
+	_refresh_contract_overlay()
 	if GameManager.skip_archetype_picker:
 		_begin_loop_contract_flow(ContractContinuation.START_TURN)
 	elif SaveManager.has_active_run_snapshot():
@@ -1136,6 +1143,7 @@ func _sync_ui() -> void:
 	var turn_score: int = _calculate_turn_score()
 	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details, reroll_ev)
 	_sync_buttons()
+	_refresh_contract_overlay()
 
 	match turn_state:
 		TurnState.IDLE:
@@ -1146,6 +1154,51 @@ func _sync_ui() -> void:
 			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:
 			pass  # Already set in _on_bank_pressed
+
+
+func _apply_contract_overlay_theme() -> void:
+	if _contract_overlay == null:
+		return
+	_contract_overlay.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
+	)
+	_contract_overlay_check_label.add_theme_font_override("font", _UITheme.font_display())
+	_contract_overlay_check_label.add_theme_font_size_override("font_size", 14)
+	_contract_overlay_text_label.add_theme_font_override("font", _UITheme.font_mono())
+	_contract_overlay_text_label.add_theme_font_size_override("font_size", 12)
+	_contract_overlay_text_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
+
+
+func _refresh_contract_overlay() -> void:
+	if _contract_overlay == null:
+		return
+	if GameManager.active_loop_contract_id.is_empty() or not _roll_content.visible:
+		_contract_overlay.visible = false
+		return
+	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(GameManager.active_loop_contract_id)
+	if contract == null:
+		_contract_overlay.visible = false
+		return
+	_contract_overlay.visible = true
+	var completed: bool = bool(GameManager.active_loop_contract_progress.get("completed", false))
+	_contract_overlay_check_label.text = _UITheme.GLYPH_CHECK if completed else "[ ]"
+	_contract_overlay_check_label.modulate = _UITheme.SUCCESS_GREEN if completed else _UITheme.MUTED_TEXT
+	if _contract_progress_service == null:
+		_contract_overlay_text_label.text = contract.display_name
+		return
+	_contract_overlay_text_label.text = _contract_progress_service.format_progress_text(
+		GameManager.active_loop_contract_id,
+		GameManager.active_loop_contract_progress
+	)
+
+
+func _on_loop_contract_overlay_changed(_active_contract_id: String) -> void:
+	_refresh_contract_overlay()
+
+
+func _on_loop_contract_overlay_progress_changed(_progress: Dictionary) -> void:
+	_refresh_contract_overlay()
 
 func _on_run_ended() -> void:
 	# Capture prior bests BEFORE recording (so highlights compare against pre-run values).
@@ -2049,6 +2102,8 @@ func _build_resume_payload_snapshot() -> Dictionary:
 
 
 func _build_roll_phase_state() -> Dictionary:
+	if _resume_surface == RESUME_SURFACE_TURN:
+		return _build_turn_checkpoint_roll_phase_state()
 	return {
 		"turn_state": int(turn_state),
 		"turn_number": turn_number,
@@ -2067,6 +2122,40 @@ func _build_roll_phase_state() -> Dictionary:
 		"dice_keep": dice_keep.duplicate(),
 		"dice_keep_locked": dice_keep_locked.duplicate(),
 		"die_reroll_counts": _die_reroll_counts.duplicate(),
+	}
+
+
+func _build_turn_checkpoint_roll_phase_state() -> Dictionary:
+	var dice_count: int = GameManager.dice_pool.size()
+	var empty_results: Array = []
+	var stopped: Array = []
+	var keep: Array = []
+	var keep_locked: Array = []
+	var reroll_counts: Array = []
+	for _i: int in dice_count:
+		empty_results.append({})
+		stopped.append(false)
+		keep.append(false)
+		keep_locked.append(false)
+		reroll_counts.append(0)
+	return {
+		"turn_state": int(TurnState.IDLE),
+		"turn_number": turn_number,
+		"accumulated_stop_count": 0,
+		"accumulated_shield_count": 0,
+		"run_active": true,
+		"loop_complete_pending": _loop_complete_pending,
+		"bank_streak": bank_streak,
+		"reroll_count": 0,
+		"run_snapshot_recorded": _run_snapshot_recorded,
+		"triggered_combo_ids": {},
+		"stage_had_bust": _stage_had_bust,
+		"turn_entered_high_risk": false,
+		"current_results": empty_results,
+		"dice_stopped": stopped,
+		"dice_keep": keep,
+		"dice_keep_locked": keep_locked,
+		"die_reroll_counts": reroll_counts,
 	}
 
 
@@ -2170,18 +2259,35 @@ func _restore_turn_surface() -> void:
 	stage_map_panel.visible = false
 	if _streak_display != null:
 		_streak_display.visible = true
-	var has_results: bool = false
-	for face: DiceFaceData in current_results:
-		if face != null:
-			has_results = true
-			break
-	if has_results and dice_arena.has_method("restore_dice_state"):
-		dice_arena.call("restore_dice_state", GameManager.dice_pool, current_results, dice_stopped, dice_keep, dice_keep_locked)
-	else:
-		dice_arena.reset()
+	_apply_turn_checkpoint_after_resume()
+	dice_arena.reset()
 	_sync_all_dice()
 	_sync_ui()
 	_sync_buttons()
+
+
+func _apply_turn_checkpoint_after_resume() -> void:
+	turn_state = TurnState.IDLE
+	accumulated_stop_count = 0
+	accumulated_shield_count = 0
+	_reroll_count = 0
+	_turn_entered_high_risk = false
+	_triggered_combo_ids.clear()
+	hud.set_active_combos([])
+	_is_roll_animating = false
+	_roll_anim_nonce += 1
+	var dice_count: int = GameManager.dice_pool.size()
+	current_results.resize(dice_count)
+	current_results.fill(null)
+	dice_stopped.resize(dice_count)
+	dice_stopped.fill(false)
+	dice_keep.resize(dice_count)
+	dice_keep.fill(false)
+	dice_keep_locked.resize(dice_count)
+	dice_keep_locked.fill(false)
+	_die_reroll_counts.resize(dice_count)
+	_die_reroll_counts.fill(0)
+	GameManager.set_held_stop_count(0)
 
 
 func _restore_stage_map_surface() -> void:

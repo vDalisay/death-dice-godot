@@ -30,7 +30,7 @@ grow_vertical = 2
 
 [node name="Modal" type="PanelContainer" parent="CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(1280, 760)
+custom_minimum_size = Vector2(1080, 0)
 
 [node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Modal"]
 layout_mode = 2
@@ -68,102 +68,107 @@ vertical_alignment = 1
 [node name="HSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="MainContent" type="HBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
+[node name="MainContentScroll" type="ScrollContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="MainContent" type="HBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll"]
+layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="OfferColumn" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent"]
+[node name="OfferColumn" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 14
 
-[node name="OfferSummaryLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn"]
+[node name="OfferSummaryLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn"]
 layout_mode = 2
 text = "Browse offers. Select a card to inspect it."
 
-[node name="DiceSection" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn"]
+[node name="DiceSection" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="DiceSectionHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection"]
+[node name="DiceSectionHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection"]
 layout_mode = 2
 text = "AVAILABLE DICE"
 
-[node name="DiceGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection"]
+[node name="DiceGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection"]
 layout_mode = 2
 size_flags_vertical = 3
 columns = 4
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 16
 
-[node name="ModifiersSection" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn"]
+[node name="ModifiersSection" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ModifiersSectionHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection"]
+[node name="ModifiersSectionHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection"]
 layout_mode = 2
 text = "PASSIVE UPGRADES"
 
-[node name="ModifiersGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection"]
+[node name="ModifiersGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection"]
 layout_mode = 2
 columns = 4
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 16
 
-[node name="BetsSection" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn"]
+[node name="BetsSection" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="BetsSectionHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection"]
+[node name="BetsSectionHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection"]
 layout_mode = 2
 text = "SIDE BETS"
 
-[node name="BetsGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection"]
+[node name="BetsGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection"]
 layout_mode = 2
 columns = 4
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 16
 
-[node name="DetailsPanel" type="PanelContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent"]
+[node name="DetailsPanel" type="PanelContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 0)
 
-[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="DetailsContent" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer"]
+[node name="DetailsContent" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="DetailsEyebrowLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+[node name="DetailsEyebrowLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
 layout_mode = 2
 text = "DETAILS"
 
-[node name="DetailsTitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+[node name="DetailsTitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
 layout_mode = 2
 text = "Select an offer"
 autowrap_mode = 3
 
-[node name="DetailsKeywordLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+[node name="DetailsKeywordLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
 layout_mode = 2
 text = ""
 autowrap_mode = 3
 
-[node name="DetailsSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+[node name="DetailsSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
 layout_mode = 2
 
-[node name="DetailsDescriptionLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+[node name="DetailsDescriptionLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
 layout_mode = 2
 size_flags_vertical = 3
 text = ""
 autowrap_mode = 3
 
-[node name="DetailsStateLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+[node name="DetailsStateLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
 layout_mode = 2
 text = ""
 autowrap_mode = 3

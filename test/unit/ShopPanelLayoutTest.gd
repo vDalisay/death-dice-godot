@@ -16,14 +16,25 @@ func test_shop_uses_grouped_offer_sections_and_details_panel() -> void:
 	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
 	add_child(panel)
 	await await_idle_frame()
-	var dice_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceGrid") as GridContainer
-	var modifiers_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection/ModifiersGrid") as GridContainer
-	var bets_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsGrid") as GridContainer
-	var details_panel: PanelContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel") as PanelContainer
+	var dice_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection/DiceGrid") as GridContainer
+	var modifiers_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection/ModifiersGrid") as GridContainer
+	var bets_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection/BetsGrid") as GridContainer
+	var details_panel: PanelContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel") as PanelContainer
 	assert_object(dice_grid).is_not_null()
 	assert_object(modifiers_grid).is_not_null()
 	assert_object(bets_grid).is_not_null()
 	assert_object(details_panel).is_not_null()
+
+
+func test_shop_main_content_is_scrollable_and_modal_fits_viewport() -> void:
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+	var scroll: ScrollContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll") as ScrollContainer
+	var modal: PanelContainer = panel.get_node("CenterContainer/Modal") as PanelContainer
+	assert_object(scroll).is_not_null()
+	assert_int(scroll.vertical_scroll_mode).is_equal(1)
+	assert_float(modal.custom_minimum_size.y).is_less_equal(panel.get_viewport_rect().size.y)
 
 
 func test_open_shows_stage_title_and_continue_label() -> void:
@@ -47,9 +58,9 @@ func test_open_builds_card_nodes_with_buy_button() -> void:
 	add_child(panel)
 	await await_idle_frame()
 	panel.open(1, false)
-	var dice_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceGrid") as GridContainer
-	var modifiers_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/ModifiersSection/ModifiersGrid") as GridContainer
-	var bets_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsGrid") as GridContainer
+	var dice_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection/DiceGrid") as GridContainer
+	var modifiers_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/ModifiersSection/ModifiersGrid") as GridContainer
+	var bets_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection/BetsGrid") as GridContainer
 	var first_card: PanelContainer = null
 	for grid: GridContainer in [dice_grid, modifiers_grid, bets_grid]:
 		if grid.get_child_count() > 0:
@@ -58,7 +69,7 @@ func test_open_builds_card_nodes_with_buy_button() -> void:
 	assert_object(first_card).is_not_null()
 	var buy_button: Button = first_card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/BuyButton") as Button
 	assert_object(buy_button).is_not_null()
-	var details_title: Label = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel") as Label
+	var details_title: Label = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel") as Label
 	assert_str(details_title.text).is_not_empty()
 
 
@@ -69,8 +80,8 @@ func test_open_separates_bets_from_dice_offers() -> void:
 	add_child(panel)
 	await await_idle_frame()
 	panel.open(1, false)
-	var dice_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/DiceSection/DiceGrid") as GridContainer
-	var bets_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/BetsSection/BetsGrid") as GridContainer
+	var dice_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/DiceSection/DiceGrid") as GridContainer
+	var bets_grid: GridContainer = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/OfferColumn/BetsSection/BetsGrid") as GridContainer
 	assert_int(panel._bet_items.size()).is_greater_equal(1)
 	assert_int(bets_grid.get_child_count()).is_equal(panel._bet_items.size())
 	assert_int(dice_grid.get_child_count()).is_greater_equal(1)
@@ -120,7 +131,7 @@ func test_hover_selection_updates_details_panel() -> void:
 	assert_int(panel._card_panels.size()).is_greater_equal(2)
 	(panel._card_panels[1] as Control).mouse_entered.emit()
 	await await_idle_frame()
-	var details_title: Label = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel") as Label
+	var details_title: Label = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContentScroll/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel") as Label
 	assert_str(details_title.text).is_equal((panel._all_items[1] as ShopItemData).item_name)
 
 
