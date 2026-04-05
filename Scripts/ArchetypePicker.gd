@@ -2,7 +2,7 @@ class_name ArchetypePicker
 extends ColorRect
 ## Modal picker for run mode + archetype selection.
 
-signal selection_confirmed(run_mode: int, archetype: int)
+signal selection_confirmed(run_mode: int, archetype: int, seeded: bool, seed_text: String, continue_run: bool)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
@@ -29,13 +29,19 @@ const MODE_PULSE_SCALE: float = 1.06
 var _selected_mode: int = int(GameManager.RunMode.CLASSIC)
 var _mode_buttons: Array[Button] = []
 var _prestige_button: Button = null
+var _seed_toggle: CheckButton = null
+var _seed_input: LineEdit = null
+var _continue_button: Button = null
 var _transition_tween: Tween = null
 var _interaction_locked: bool = false
+var _can_continue: bool = false
 
 
 func _ready() -> void:
-	_apply_theme()
+	_add_seed_controls()
+	_add_continue_button()
 	_add_prestige_button()
+	_apply_theme()
 	_classic_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.CLASSIC)))
 	_gauntlet_button.pressed.connect(func() -> void: _set_mode(int(GameManager.RunMode.GAUNTLET)))
 	_mode_buttons = [_classic_button, _gauntlet_button]
@@ -44,9 +50,18 @@ func _ready() -> void:
 	_play_intro()
 
 
-func open(initial_mode: int) -> void:
+func open(initial_mode: int, can_continue: bool = false) -> void:
 	_selected_mode = initial_mode
+	_can_continue = can_continue
 	_interaction_locked = false
+	if _seed_toggle != null:
+		_seed_toggle.button_pressed = false
+	if _seed_input != null:
+		_seed_input.text = ""
+		_seed_input.editable = false
+	if _continue_button != null:
+		_continue_button.visible = _can_continue
+		_continue_button.disabled = not _can_continue
 	_set_mode(_selected_mode)
 	_rebuild_archetype_cards(true)
 	_play_intro()
@@ -70,6 +85,15 @@ func _apply_theme() -> void:
 	_mode_description.add_theme_font_override("font", _UITheme.font_mono())
 	_mode_description.add_theme_font_size_override("font_size", 14)
 	_mode_description.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	if _seed_toggle != null:
+		_seed_toggle.add_theme_font_override("font", _UITheme.font_display())
+		_seed_toggle.add_theme_font_size_override("font_size", 12)
+	if _seed_input != null:
+		_seed_input.add_theme_font_override("font", _UITheme.font_mono())
+		_seed_input.add_theme_font_size_override("font_size", 12)
+	if _continue_button != null:
+		_continue_button.add_theme_font_override("font", _UITheme.font_display())
+		_continue_button.add_theme_font_size_override("font_size", 14)
 	_archetype_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_archetype_row.add_theme_constant_override("separation", CARD_ROW_SPACING)
 	var mode_row: HBoxContainer = _classic_button.get_parent() as HBoxContainer
@@ -174,7 +198,19 @@ func _confirm_selection(archetype: int) -> void:
 	_interaction_locked = true
 	_set_interaction_enabled(false)
 	await _play_close_transition()
-	selection_confirmed.emit(_selected_mode, archetype)
+	var seeded: bool = _seed_toggle != null and _seed_toggle.button_pressed
+	var seed_text: String = _seed_input.text if _seed_input != null else ""
+	selection_confirmed.emit(_selected_mode, archetype, seeded, seed_text, false)
+	queue_free()
+
+
+func _on_continue_pressed() -> void:
+	if _interaction_locked or not _can_continue:
+		return
+	_interaction_locked = true
+	_set_interaction_enabled(false)
+	await _play_close_transition()
+	selection_confirmed.emit(_selected_mode, int(GameManager.chosen_archetype), false, "", true)
 	queue_free()
 
 func _prepare_cards_for_intro() -> void:
@@ -247,7 +283,43 @@ func _add_prestige_button() -> void:
 	_prestige_button.add_theme_font_size_override("font_size", 14)
 	_prestige_button.pressed.connect(_open_prestige_panel)
 	_content.add_child(_prestige_button)
-	_content.move_child(_prestige_button, 3)
+	_content.move_child(_prestige_button, 4)
+
+
+func _add_seed_controls() -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	_seed_toggle = CheckButton.new()
+	_seed_toggle.text = "Seeded Run"
+	_seed_toggle.toggled.connect(_on_seed_toggled)
+	row.add_child(_seed_toggle)
+	_seed_input = LineEdit.new()
+	_seed_input.placeholder_text = "Enter seed"
+	_seed_input.custom_minimum_size = Vector2(220, 34)
+	_seed_input.editable = false
+	row.add_child(_seed_input)
+	_content.add_child(row)
+	_content.move_child(row, 3)
+
+
+func _add_continue_button() -> void:
+	_continue_button = Button.new()
+	_continue_button.text = "Continue Run"
+	_continue_button.custom_minimum_size = Vector2(220, 42)
+	_continue_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_continue_button.visible = false
+	_continue_button.pressed.connect(_on_continue_pressed)
+	_content.add_child(_continue_button)
+	_content.move_child(_continue_button, 5)
+
+
+func _on_seed_toggled(enabled: bool) -> void:
+	if _seed_input == null:
+		return
+	_seed_input.editable = enabled
+	if not enabled:
+		_seed_input.text = ""
 
 
 func _open_prestige_panel() -> void:
@@ -265,8 +337,14 @@ func _on_prestige_panel_closed() -> void:
 func _set_interaction_enabled(enabled: bool) -> void:
 	for button: Button in _mode_buttons:
 		button.disabled = not enabled
+	if _seed_toggle != null:
+		_seed_toggle.disabled = not enabled
+	if _seed_input != null:
+		_seed_input.editable = enabled and _seed_toggle.button_pressed
 	if _prestige_button != null:
 		_prestige_button.disabled = not enabled
+	if _continue_button != null:
+		_continue_button.disabled = not enabled or not _can_continue
 	for child: Node in _archetype_row.get_children():
 		var card: PanelContainer = child as PanelContainer
 		if card == null or card.get_child_count() == 0:

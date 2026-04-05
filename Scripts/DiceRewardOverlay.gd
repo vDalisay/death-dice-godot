@@ -146,7 +146,7 @@ static func _calc_weights(luck: int) -> Array[float]:
 
 
 static func _roll_rarity(weights: Array[float]) -> DiceData.Rarity:
-	var roll: float = randf()
+	var roll: float = GameManager.rng_randf("reward")
 	var cumulative: float = 0.0
 	if roll < weights[0]:
 		return DiceData.Rarity.GREY
@@ -170,7 +170,10 @@ static func _pick_die_for_rarity(rarity: DiceData.Rarity) -> DiceData:
 			pool = BLUE_POOL
 		DiceData.Rarity.PURPLE:
 			pool = PURPLE_POOL
-	var method_name: String = pool[randi() % pool.size()]
+	var index: int = GameManager.rng_pick_index("reward", pool.size())
+	if index < 0:
+		return DiceData.make_standard_d6()
+	var method_name: String = pool[index]
 	var die: DiceData = Callable(DiceData, method_name).call() as DiceData
 	return die
 

@@ -3,6 +3,7 @@ extends Node
 
 const SAVE_PATH: String = "user://save_data.json"
 const RunSaveDataScript: GDScript = preload("res://Scripts/RunSaveData.gd")
+const ActiveRunSaveDataScript: GDScript = preload("res://Scripts/ActiveRunSaveData.gd")
 const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 
 # Mastery milestone definitions: runs_used -> unlock cosmetics
@@ -43,9 +44,11 @@ var prestige_unlocks: Array[String] = []
 var experience_currency: int = 0
 var stop_shard_currency: int = 0
 var permanent_upgrade_unlocks: Array[String] = []
+var active_run_snapshot: Resource = null
 
 func _ready() -> void:
 	_load()
+	GameManager.set_has_resumable_run(has_active_run_snapshot())
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -100,7 +103,45 @@ func make_run_snapshot() -> RunSaveData:
 	run.stop_shards_earned = GameManager.current_run_stop_shards
 	run.held_stops_at_end = GameManager.held_stop_count
 	run.active_loop_contract_id = GameManager.active_loop_contract_id
+	run.is_seeded_run = GameManager.is_seeded_run
+	run.run_seed_text = GameManager.run_seed_text if GameManager.is_seeded_run else ""
+	run.seed_version = GameManager.run_seed_version
 	return run
+
+
+func has_active_run_snapshot() -> bool:
+	return active_run_snapshot != null
+
+
+func get_active_run_snapshot() -> Resource:
+	return active_run_snapshot
+
+
+func build_active_run_snapshot(resume_surface: String, resume_payload: Dictionary, roll_phase_state: Dictionary) -> Resource:
+	var snapshot: Resource = ActiveRunSaveDataScript.new()
+	snapshot.save_version = 1
+	snapshot.created_unix_time = int(Time.get_unix_time_from_system())
+	snapshot.is_seeded_run = GameManager.is_seeded_run
+	snapshot.run_seed_text = GameManager.run_seed_text
+	snapshot.seed_version = GameManager.run_seed_version
+	snapshot.rng_stream_states = GameManager.snapshot_rng_stream_states()
+	snapshot.resume_surface = resume_surface
+	snapshot.resume_payload = resume_payload.duplicate(true)
+	snapshot.game_manager_state = GameManager.build_active_run_state()
+	snapshot.roll_phase_state = roll_phase_state.duplicate(true)
+	return snapshot
+
+
+func save_active_run_snapshot(snapshot: Resource) -> void:
+	active_run_snapshot = snapshot
+	_save()
+	GameManager.set_has_resumable_run(has_active_run_snapshot())
+
+
+func clear_active_run_snapshot() -> void:
+	active_run_snapshot = null
+	_save()
+	GameManager.set_has_resumable_run(false)
 
 
 func set_achievement_unlocked(key: String) -> bool:
@@ -400,6 +441,9 @@ func _save() -> void:
 	var runs_array: Array[Dictionary] = []
 	for run: RunSaveData in run_history:
 		runs_array.append(run.to_dict())
+	var active_run_data: Dictionary = {}
+	if active_run_snapshot != null:
+		active_run_data = active_run_snapshot.to_dict()
 	var data: Dictionary = {
 		"highscore": highscore,
 		"gauntlet_highscore": gauntlet_highscore,
@@ -421,6 +465,7 @@ func _save() -> void:
 		"experience_currency": experience_currency,
 		"stop_shard_currency": stop_shard_currency,
 		"permanent_upgrade_unlocks": permanent_upgrade_unlocks,
+		"active_run_snapshot": active_run_data,
 		"runs": runs_array,
 	}
 	var file: FileAccess = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -471,6 +516,11 @@ func _load() -> void:
 			var save: RunSaveData = RunSaveDataScript.new()
 			save.load_from_dict(entry as Dictionary)
 			run_history.append(save)
+	var active_snapshot_data: Dictionary = data.get("active_run_snapshot", {}) as Dictionary
+	if active_snapshot_data.is_empty():
+		active_run_snapshot = null
+	else:
+		active_run_snapshot = ActiveRunSaveDataScript.from_dict(active_snapshot_data)
 	highscore_changed.emit(highscore)
 	prestige_currency_changed.emit(prestige_currency)
 	experience_currency_changed.emit(experience_currency)

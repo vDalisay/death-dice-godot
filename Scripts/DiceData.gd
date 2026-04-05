@@ -69,7 +69,15 @@ func get_display_name() -> String:
 
 
 func roll() -> DiceFaceData:
-	return faces[randi() % faces.size()]
+	if faces.is_empty():
+		var fallback := DiceFaceData.new()
+		fallback.type = DiceFaceData.FaceType.BLANK
+		fallback.value = 0
+		return fallback
+	var index: int = GameManager.rng_pick_index("roll", faces.size())
+	if index < 0:
+		index = randi() % faces.size()
+	return faces[index]
 
 
 ## Returns true if this die has at least one STOP face (balance invariant).

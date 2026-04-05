@@ -126,6 +126,8 @@ func _create_backend() -> AchievementBackend:
 
 
 func unlock(key: String) -> bool:
+	if not _achievements_enabled_for_current_run():
+		return false
 	if not _definitions.has(key):
 		return false
 	if not SaveManager.set_achievement_unlocked(key):
@@ -171,3 +173,7 @@ func on_loop_advanced(new_loop: int) -> void:
 func on_run_recorded(run: RunSaveData) -> void:
 	if run != null:
 		unlock("first_run")
+
+
+func _achievements_enabled_for_current_run() -> bool:
+	return not GameManager.is_seeded_run

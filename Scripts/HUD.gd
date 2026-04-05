@@ -55,6 +55,7 @@ const JUICY_DANGER_SCORE_FLOOR: int = 12
 
 # -- Info row --
 @onready var stop_label: Label            = $InfoRow/RiskColumn/StopLabel
+@onready var _risk_column: VBoxContainer = $InfoRow/RiskColumn
 @onready var _risk_meta_label: Label = $InfoRow/RiskColumn/RiskMetaLabel
 @onready var _contract_label: Label = $InfoRow/RiskColumn/ContractLabel
 @onready var _risk_meter: PanelContainer = $InfoRow/RiskColumn/RiskMeter
@@ -97,11 +98,13 @@ var _last_bust_odds: float = 0.0
 var _held_stop_count: int = 0
 var _near_death_banks: int = 0
 var _contract_progress_service: RefCounted = null
+var _seed_label: Label = null
 
 
 func _ready() -> void:
 	_create_risk_pips()
 	_cache_modifier_badges()
+	_create_seed_label()
 	_apply_theme_styling()
 	_contract_progress_service = ContractProgressServiceScript.new()
 	_progress_bar_base_size = progress_bar.custom_minimum_size
@@ -115,6 +118,7 @@ func _ready() -> void:
 	GameManager.loop_contract_changed.connect(_on_loop_contract_changed)
 	GameManager.loop_contract_progress_changed.connect(_on_loop_contract_progress_changed)
 	GameManager.run_mode_changed.connect(_on_run_mode_changed)
+	GameManager.run_seed_changed.connect(_on_run_seed_changed)
 	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
@@ -128,6 +132,7 @@ func _ready() -> void:
 	_held_stop_count = GameManager.held_stop_count
 	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
+	_refresh_seed_display()
 	_refresh_modifier_display()
 	_refresh_contract_display()
 	set_active_combos([])
@@ -196,6 +201,10 @@ func _apply_theme_styling() -> void:
 	_contract_label.add_theme_font_override("font", _UITheme.font_mono())
 	_contract_label.add_theme_font_size_override("font_size", 11)
 	_contract_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	if _seed_label != null:
+		_seed_label.add_theme_font_override("font", _UITheme.font_mono())
+		_seed_label.add_theme_font_size_override("font_size", 11)
+		_seed_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	_risk_meter.add_theme_stylebox_override("panel",
 		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, _UITheme.PANEL_SURFACE, 0))
 	_risk_percent_label.add_theme_font_override("font", _UITheme.font_display())
@@ -219,6 +228,31 @@ func _create_risk_pips() -> void:
 		pip.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 		_risk_container.add_child(pip)
 		_risk_pips.append(pip)
+
+
+func _create_seed_label() -> void:
+	if _risk_column == null:
+		return
+	_seed_label = Label.new()
+	_seed_label.text = ""
+	_seed_label.visible = false
+	_risk_column.add_child(_seed_label)
+	_risk_column.move_child(_seed_label, 0)
+
+
+func _refresh_seed_display() -> void:
+	if _seed_label == null:
+		return
+	if GameManager.is_seeded_run and not GameManager.run_seed_text.is_empty():
+		_seed_label.text = "SEED: %s" % GameManager.run_seed_text
+		_seed_label.visible = true
+	else:
+		_seed_label.text = ""
+		_seed_label.visible = false
+
+
+func _on_run_seed_changed(_is_seeded: bool, _seed_text: String) -> void:
+	_refresh_seed_display()
 
 
 func _cache_modifier_badges() -> void:

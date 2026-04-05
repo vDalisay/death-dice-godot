@@ -15,6 +15,9 @@ extends Resource
 @export var stop_shards_earned: int = 0
 @export var held_stops_at_end: int = 0
 @export var active_loop_contract_id: String = ""
+@export var is_seeded_run: bool = false
+@export var run_seed_text: String = ""
+@export var seed_version: int = 1
 
 func to_dict() -> Dictionary:
 	return {
@@ -31,6 +34,9 @@ func to_dict() -> Dictionary:
 		"stop_shards_earned": stop_shards_earned,
 		"held_stops_at_end": held_stops_at_end,
 		"active_loop_contract_id": active_loop_contract_id,
+		"is_seeded_run": is_seeded_run,
+		"run_seed_text": run_seed_text,
+		"seed_version": seed_version,
 	}
 
 
@@ -50,3 +56,6 @@ func load_from_dict(data: Dictionary) -> void:
 	stop_shards_earned = data.get("stop_shards_earned", 0) as int
 	held_stops_at_end = data.get("held_stops_at_end", 0) as int
 	active_loop_contract_id = data.get("active_loop_contract_id", "") as String
+	is_seeded_run = bool(data.get("is_seeded_run", false))
+	run_seed_text = data.get("run_seed_text", "") as String
+	seed_version = data.get("seed_version", 1) as int

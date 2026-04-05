@@ -99,6 +99,39 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	_play_open_intro()
 
 
+func open_from_resume(snapshot: Dictionary) -> void:
+	_dd_used_this_shop = bool(snapshot.get("dd_used_this_shop", false))
+	_ib_used_this_shop = bool(snapshot.get("ib_used_this_shop", false))
+	_hb_used_this_shop = bool(snapshot.get("hb_used_this_shop", false))
+	_eo_used_this_shop = bool(snapshot.get("eo_used_this_shop", false))
+	_title_label.text = str(snapshot.get("title", "SHOP"))
+	_continue_button.text = str(snapshot.get("continue_text", "Continue"))
+	_dice_items = _deserialize_item_array(snapshot.get("dice_items", []) as Array)
+	_modifier_items = _deserialize_item_array(snapshot.get("modifier_items", []) as Array)
+	_build_item_cards()
+	_refresh_display()
+	var selected_index: int = int(snapshot.get("selected_card_index", -1))
+	if selected_index >= 0 and selected_index < _all_items.size():
+		_select_item(selected_index)
+	visible = true
+	_is_closing = false
+	_play_open_intro()
+
+
+func build_resume_snapshot() -> Dictionary:
+	return {
+		"title": _title_label.text,
+		"continue_text": _continue_button.text,
+		"dd_used_this_shop": _dd_used_this_shop,
+		"ib_used_this_shop": _ib_used_this_shop,
+		"hb_used_this_shop": _hb_used_this_shop,
+		"eo_used_this_shop": _eo_used_this_shop,
+		"selected_card_index": _selected_card_index,
+		"dice_items": _serialize_item_array(_dice_items),
+		"modifier_items": _serialize_item_array(_modifier_items),
+	}
+
+
 # ---------------------------------------------------------------------------
 # Visual styling
 # ---------------------------------------------------------------------------
@@ -183,7 +216,7 @@ func _generate_items() -> void:
 		dice_pool.append(ShopItemData.make_buy_heavy_die())
 		dice_pool.append(ShopItemData.make_buy_explosive_die())
 
-	dice_pool.shuffle()
+	GameManager.rng_shuffle_in_place("shop", dice_pool)
 	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
 	for i: int in pick_count:
 		_dice_items.append(dice_pool[i])
@@ -208,7 +241,7 @@ func _generate_items() -> void:
 			var sample: RunModifier = factory.call() as RunModifier
 			if not GameManager.has_modifier(sample.modifier_type):
 				available_mods.append(factory)
-		available_mods.shuffle()
+		GameManager.rng_shuffle_in_place("shop", available_mods)
 		var mod_count: int = mini(MODIFIER_SLOTS, available_mods.size())
 		for i: int in mod_count:
 			var mod: RunModifier = available_mods[i].call() as RunModifier
@@ -472,7 +505,10 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 func _upgrade_random_die() -> void:
 	if GameManager.dice_pool.is_empty():
 		return
-	var die: DiceData = GameManager.dice_pool[randi() % GameManager.dice_pool.size()]
+	var die_index: int = GameManager.rng_pick_index("shop", GameManager.dice_pool.size())
+	if die_index < 0:
+		return
+	var die: DiceData = GameManager.dice_pool[die_index]
 	die.upgrade_weakest_face()
 
 
@@ -578,7 +614,10 @@ func _cleanse_random_cursed_die() -> void:
 				break
 	if cursed_dice.is_empty():
 		return
-	var die: DiceData = cursed_dice[randi() % cursed_dice.size()]
+	var die_index: int = GameManager.rng_pick_index("shop", cursed_dice.size())
+	if die_index < 0:
+		return
+	var die: DiceData = cursed_dice[die_index]
 	for face: DiceFaceData in die.faces:
 		if face.type == DiceFaceData.FaceType.CURSED_STOP:
 			face.type = DiceFaceData.FaceType.STOP
@@ -743,3 +782,124 @@ func _on_even_odd_bet_resolved(gold_before: int) -> void:
 		_eo_used_this_shop = true
 	_generate_items()
 	_refresh_display()
+
+
+func _serialize_item_array(items: Array[ShopItemData]) -> Array[Dictionary]:
+	var serialized: Array[Dictionary] = []
+	for item: ShopItemData in items:
+		serialized.append(_serialize_item(item))
+	return serialized
+
+
+func _deserialize_item_array(items: Array) -> Array[ShopItemData]:
+	var deserialized: Array[ShopItemData] = []
+	for item_data: Variant in items:
+		if not (item_data is Dictionary):
+			continue
+		var item: ShopItemData = _deserialize_item(item_data as Dictionary)
+		if item != null:
+			deserialized.append(item)
+	return deserialized
+
+
+func _serialize_item(item: ShopItemData) -> Dictionary:
+	var modifier_type: int = -1
+	if item.modifier != null:
+		modifier_type = int(item.modifier.modifier_type)
+	return {
+		"item_type": int(item.item_type),
+		"item_name": item.item_name,
+		"description": item.description,
+		"cost": item.cost,
+		"modifier_type": modifier_type,
+	}
+
+
+func _deserialize_item(data: Dictionary) -> ShopItemData:
+	var item_type: int = int(data.get("item_type", -1))
+	if item_type < 0:
+		return null
+	var item: ShopItemData = _make_item_from_type(item_type)
+	if item == null:
+		return null
+	item.item_name = str(data.get("item_name", item.item_name))
+	item.description = str(data.get("description", item.description))
+	item.cost = int(data.get("cost", item.cost))
+	if item.item_type == ShopItemData.ItemType.BUY_MODIFIER:
+		var mod_type: int = int(data.get("modifier_type", -1))
+		item.modifier = _make_modifier_from_type(mod_type)
+	return item
+
+
+func _make_item_from_type(item_type: int) -> ShopItemData:
+	match item_type:
+		int(ShopItemData.ItemType.BUY_STANDARD_DIE):
+			return ShopItemData.make_buy_standard_die()
+		int(ShopItemData.ItemType.BUY_LUCKY_DIE):
+			return ShopItemData.make_buy_lucky_die()
+		int(ShopItemData.ItemType.BUY_GAMBLER_DIE):
+			return ShopItemData.make_buy_runner_die()
+		int(ShopItemData.ItemType.BUY_GOLDEN_DIE):
+			return ShopItemData.make_buy_golden_die()
+		int(ShopItemData.ItemType.BUY_INSURANCE_DIE):
+			return ShopItemData.make_buy_insurance_die()
+		int(ShopItemData.ItemType.BUY_HEAVY_DIE):
+			return ShopItemData.make_buy_heavy_die()
+		int(ShopItemData.ItemType.BUY_EXPLOSIVE_DIE):
+			return ShopItemData.make_buy_explosive_die()
+		int(ShopItemData.ItemType.BUY_BLANK_CANVAS_DIE):
+			return ShopItemData.make_buy_blank_canvas_die()
+		int(ShopItemData.ItemType.BUY_PINK_DIE):
+			return ShopItemData.make_buy_pink_die()
+		int(ShopItemData.ItemType.BUY_SIMPLE_DIE):
+			return ShopItemData.make_buy_simple_die()
+		int(ShopItemData.ItemType.UPGRADE_DIE):
+			return ShopItemData.make_upgrade_die()
+		int(ShopItemData.ItemType.BUY_MODIFIER):
+			return ShopItemData.make_buy_modifier(RunModifier.make_gamblers_rush())
+		int(ShopItemData.ItemType.CLEANSE_CURSE):
+			return ShopItemData.make_cleanse_curse()
+		int(ShopItemData.ItemType.DOUBLE_DOWN):
+			return ShopItemData.make_double_down()
+		int(ShopItemData.ItemType.BUY_FORTUNE_DIE):
+			return ShopItemData.make_buy_fortune_die()
+		int(ShopItemData.ItemType.BUY_HEART_DIE):
+			return ShopItemData.make_buy_heart_die()
+		int(ShopItemData.ItemType.INSURANCE_BET):
+			return ShopItemData.make_insurance_bet()
+		int(ShopItemData.ItemType.HEAT_BET):
+			return ShopItemData.make_heat_bet()
+		int(ShopItemData.ItemType.EVEN_ODD_BET):
+			return ShopItemData.make_even_odd_bet()
+	return null
+
+
+func _make_modifier_from_type(modifier_type: int) -> RunModifier:
+	match modifier_type:
+		int(RunModifier.ModifierType.GAMBLERS_RUSH):
+			return RunModifier.make_gamblers_rush()
+		int(RunModifier.ModifierType.EXPLOSOPHILE):
+			return RunModifier.make_explosophile()
+		int(RunModifier.ModifierType.IRON_BANK):
+			return RunModifier.make_iron_bank()
+		int(RunModifier.ModifierType.GLASS_CANNON):
+			return RunModifier.make_glass_cannon()
+		int(RunModifier.ModifierType.SHIELD_WALL):
+			return RunModifier.make_shield_wall()
+		int(RunModifier.ModifierType.MISER):
+			return RunModifier.make_miser()
+		int(RunModifier.ModifierType.DOUBLE_DOWN):
+			return RunModifier.make_double_down()
+		int(RunModifier.ModifierType.SCAVENGER):
+			return RunModifier.make_scavenger()
+		int(RunModifier.ModifierType.RECYCLER):
+			return RunModifier.make_recycler()
+		int(RunModifier.ModifierType.LAST_STAND):
+			return RunModifier.make_last_stand()
+		int(RunModifier.ModifierType.CHAIN_LIGHTNING):
+			return RunModifier.make_chain_lightning()
+		int(RunModifier.ModifierType.HIGH_ROLLER):
+			return RunModifier.make_high_roller()
+		int(RunModifier.ModifierType.OVERCHARGE):
+			return RunModifier.make_overcharge()
+	return RunModifier.make_gamblers_rush()

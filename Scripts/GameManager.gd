@@ -4,6 +4,7 @@ extends Node
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
+const RunSeedServiceScript: GDScript = preload("res://Scripts/RunSeedService.gd")
 
 const MAX_LIVES: int = 3
 const STARTING_DICE_COUNT: int = 5
@@ -70,6 +71,8 @@ signal loop_contract_changed(active_contract_id: String)
 signal loop_contract_progress_changed(progress: Dictionary)
 signal run_exp_changed(new_total: int)
 signal run_stop_shards_changed(new_total: int)
+signal run_seed_changed(is_seeded: bool, seed_text: String)
+signal resumable_run_changed(has_resumable: bool)
 
 var total_score: int = 0
 var lives: int = MAX_LIVES
@@ -85,6 +88,10 @@ var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
 var best_turn_score: int = 0
 var run_busts: int = 0
+var is_seeded_run: bool = false
+var run_seed_text: String = ""
+var run_seed_version: int = 1
+var has_resumable_run: bool = false
 var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
 var run_mode: RunMode = RunMode.CLASSIC
@@ -133,10 +140,90 @@ var _revealed_loop_numbers: Array[int] = []
 var _last_call_heal_used_this_stage: bool = false
 var active_special_stage_id: String = ""
 var _special_stage_first_reroll_used: bool = false
+var _run_seed_locked: bool = false
+var _run_seed_service: RefCounted = RunSeedServiceScript.new()
 
 
 func set_archetype(archetype: Archetype) -> void:
 	chosen_archetype = archetype
+
+
+func begin_new_run(mode: int, archetype: Archetype, seeded: bool, seed_text: String = "") -> void:
+	set_run_mode(mode)
+	set_archetype(archetype)
+	_prepare_new_run_identity(seed_text, seeded)
+	reset_run()
+
+
+func restore_run_identity(seed_text: String, seeded: bool, seed_version: int, stream_states: Dictionary = {}) -> void:
+	var normalized_seed: String = RunSeedServiceScript.normalize_seed_text(seed_text)
+	if normalized_seed.is_empty():
+		normalized_seed = RunSeedServiceScript.make_random_seed_text()
+	is_seeded_run = seeded
+	run_seed_text = normalized_seed
+	run_seed_version = maxi(1, seed_version)
+	_run_seed_locked = true
+	_ensure_seed_service_initialized()
+	_run_seed_service.configure(run_seed_text, run_seed_version)
+	if not stream_states.is_empty():
+		_run_seed_service.restore_stream_states(stream_states)
+	run_seed_changed.emit(is_seeded_run, run_seed_text)
+
+
+func clear_active_run_identity() -> void:
+	is_seeded_run = false
+	run_seed_text = ""
+	run_seed_version = RunSeedServiceScript.SEED_VERSION
+	_run_seed_locked = false
+	_run_seed_service.configure(RunSeedServiceScript.make_random_seed_text(), run_seed_version)
+	run_seed_changed.emit(is_seeded_run, run_seed_text)
+
+
+func set_has_resumable_run(value: bool) -> void:
+	if has_resumable_run == value:
+		return
+	has_resumable_run = value
+	resumable_run_changed.emit(has_resumable_run)
+
+
+func snapshot_rng_stream_states() -> Dictionary:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.snapshot_stream_states()
+
+
+func rng_randf(stream_name: String) -> float:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.randf_stream(stream_name)
+
+
+func rng_randi(stream_name: String) -> int:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.randi_stream(stream_name)
+
+
+func rng_randi_range(stream_name: String, min_value: int, max_value: int) -> int:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.randi_range_stream(stream_name, min_value, max_value)
+
+
+func rng_randf_range(stream_name: String, min_value: float, max_value: float) -> float:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.randf_range_stream(stream_name, min_value, max_value)
+
+
+func rng_pick_index(stream_name: String, size: int) -> int:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.pick_index(stream_name, size)
+
+
+func rng_shuffle_in_place(stream_name: String, values: Array) -> void:
+	_ensure_seed_service_initialized()
+	_run_seed_service.shuffle_in_place(stream_name, values)
+
+
+func rng_shuffle_copy(stream_name: String, values: Array) -> Array:
+	_ensure_seed_service_initialized()
+	return _run_seed_service.shuffle_copy(stream_name, values)
 
 
 func add_momentum(amount: int = 1) -> void:
@@ -264,11 +351,13 @@ func register_turn_score(turn_score: int) -> bool:
 
 
 func _ready() -> void:
+	_ensure_seed_service_initialized()
 	_build_starting_pool()
 	generate_stage_map()
 
 
 func generate_stage_map() -> void:
+	_ensure_seed_service_initialized()
 	stage_map = StageMapDataScript.generate(current_loop)
 	current_row = 0
 	previous_col = -1
@@ -462,6 +551,7 @@ func lose_life() -> void:
 # ---------------------------------------------------------------------------
 
 func reset_run() -> void:
+	_ensure_seed_service_initialized()
 	clear_special_stage()
 	current_stage = 1
 	current_loop = 1
@@ -486,6 +576,7 @@ func reset_run() -> void:
 	reset_momentum()
 	active_modifiers.clear()
 	clear_active_loop_contract()
+	set_has_resumable_run(false)
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
 	_clear_side_bets()
@@ -758,3 +849,266 @@ func resolve_even_odd_bet(even_count: int, odd_count: int) -> int:
 		add_gold(wager * 2)
 		return wager
 	return -wager
+
+
+# ---------------------------------------------------------------------------
+# Active run save/load helpers
+# ---------------------------------------------------------------------------
+
+func build_active_run_state() -> Dictionary:
+	var map_data: Dictionary = {}
+	if stage_map != null and stage_map.has_method("to_dict"):
+		map_data = stage_map.call("to_dict") as Dictionary
+	return {
+		"total_score": total_score,
+		"lives": lives,
+		"current_stage": current_stage,
+		"current_loop": current_loop,
+		"current_row": current_row,
+		"previous_col": previous_col,
+		"gold": gold,
+		"stage_target_score": stage_target_score,
+		"current_stage_variant": current_stage_variant,
+		"total_stages_cleared": total_stages_cleared,
+		"best_turn_score": best_turn_score,
+		"run_busts": run_busts,
+		"run_mode": int(run_mode),
+		"chosen_archetype": int(chosen_archetype),
+		"luck": luck,
+		"current_run_exp": current_run_exp,
+		"current_run_stop_shards": current_run_stop_shards,
+		"held_stop_count": held_stop_count,
+		"active_loop_contract_id": active_loop_contract_id,
+		"active_loop_contract_progress": active_loop_contract_progress.duplicate(true),
+		"offered_loop_contract_ids": offered_loop_contract_ids.duplicate(),
+		"near_death_banks_this_stage": near_death_banks_this_stage,
+		"near_death_banks_this_run": near_death_banks_this_run,
+		"event_free_bust": event_free_bust,
+		"event_target_multiplier": event_target_multiplier,
+		"momentum": momentum,
+		"shop_gold_spent": _shop_gold_spent,
+		"miser_bonus_pending": _miser_bonus_pending,
+		"insurance_payout": insurance_payout,
+		"heat_bet_target_stops": heat_bet_target_stops,
+		"heat_bet_payout": heat_bet_payout,
+		"even_odd_bet_is_even": even_odd_bet_is_even,
+		"even_odd_bet_wager": even_odd_bet_wager,
+		"prestige_starting_gold_bonus": prestige_starting_gold_bonus,
+		"prestige_shop_tier_active": prestige_shop_tier_active,
+		"prestige_reward_reroll_available": prestige_reward_reroll_available,
+		"prestige_reroute_uses": prestige_reroute_uses,
+		"revealed_loop_numbers": _revealed_loop_numbers.duplicate(),
+		"last_call_heal_used_this_stage": _last_call_heal_used_this_stage,
+		"active_special_stage_id": active_special_stage_id,
+		"special_stage_first_reroll_used": _special_stage_first_reroll_used,
+		"dice_pool": _serialize_dice_pool(),
+		"active_modifiers": _serialize_modifiers(),
+		"stage_map": map_data,
+	}
+
+
+func apply_active_run_state(data: Dictionary) -> void:
+	total_score = int(data.get("total_score", 0))
+	lives = int(data.get("lives", MAX_LIVES))
+	current_stage = int(data.get("current_stage", 1))
+	current_loop = int(data.get("current_loop", 1))
+	current_row = int(data.get("current_row", 0))
+	previous_col = int(data.get("previous_col", -1))
+	gold = int(data.get("gold", 0))
+	stage_target_score = int(data.get("stage_target_score", BASE_STAGE_TARGET))
+	current_stage_variant = SpecialStageCatalog.sanitize(int(data.get("current_stage_variant", SpecialStageCatalog.Variant.NONE)))
+	total_stages_cleared = int(data.get("total_stages_cleared", 0))
+	best_turn_score = int(data.get("best_turn_score", 0))
+	run_busts = int(data.get("run_busts", 0))
+	run_mode = int(data.get("run_mode", int(RunMode.CLASSIC))) as RunMode
+	chosen_archetype = int(data.get("chosen_archetype", int(Archetype.CAUTION))) as Archetype
+	luck = int(data.get("luck", 0))
+	current_run_exp = int(data.get("current_run_exp", 0))
+	current_run_stop_shards = int(data.get("current_run_stop_shards", 0))
+	held_stop_count = int(data.get("held_stop_count", 0))
+	active_loop_contract_id = str(data.get("active_loop_contract_id", ""))
+	active_loop_contract_progress = data.get("active_loop_contract_progress", {}) as Dictionary
+	offered_loop_contract_ids.clear()
+	for contract_id: Variant in data.get("offered_loop_contract_ids", []) as Array:
+		offered_loop_contract_ids.append(str(contract_id))
+	near_death_banks_this_stage = int(data.get("near_death_banks_this_stage", 0))
+	near_death_banks_this_run = int(data.get("near_death_banks_this_run", 0))
+	event_free_bust = bool(data.get("event_free_bust", false))
+	event_target_multiplier = float(data.get("event_target_multiplier", 1.0))
+	momentum = int(data.get("momentum", 0))
+	_shop_gold_spent = int(data.get("shop_gold_spent", 0))
+	_miser_bonus_pending = bool(data.get("miser_bonus_pending", false))
+	insurance_payout = int(data.get("insurance_payout", 0))
+	heat_bet_target_stops = int(data.get("heat_bet_target_stops", -1))
+	heat_bet_payout = int(data.get("heat_bet_payout", 0))
+	even_odd_bet_is_even = bool(data.get("even_odd_bet_is_even", true))
+	even_odd_bet_wager = int(data.get("even_odd_bet_wager", 0))
+	prestige_starting_gold_bonus = int(data.get("prestige_starting_gold_bonus", 0))
+	prestige_shop_tier_active = bool(data.get("prestige_shop_tier_active", false))
+	prestige_reward_reroll_available = bool(data.get("prestige_reward_reroll_available", false))
+	prestige_reroute_uses = int(data.get("prestige_reroute_uses", 0))
+	_revealed_loop_numbers.clear()
+	for loop_number: Variant in data.get("revealed_loop_numbers", []) as Array:
+		_revealed_loop_numbers.append(int(loop_number))
+	_last_call_heal_used_this_stage = bool(data.get("last_call_heal_used_this_stage", false))
+	active_special_stage_id = str(data.get("active_special_stage_id", ""))
+	_special_stage_first_reroll_used = bool(data.get("special_stage_first_reroll_used", false))
+	dice_pool = _deserialize_dice_pool(data.get("dice_pool", []) as Array)
+	active_modifiers = _deserialize_modifiers(data.get("active_modifiers", []) as Array)
+	var stage_map_data: Dictionary = data.get("stage_map", {}) as Dictionary
+	if not stage_map_data.is_empty():
+		stage_map = StageMapDataScript.from_dict(stage_map_data)
+	elif stage_map == null:
+		generate_stage_map()
+
+	score_changed.emit(total_score)
+	lives_changed.emit(lives)
+	gold_changed.emit(gold)
+	luck_changed.emit(luck)
+	momentum_changed.emit(momentum)
+	stage_variant_changed.emit(current_stage_variant)
+	held_stops_changed.emit(held_stop_count)
+	run_mode_changed.emit(run_mode)
+	run_exp_changed.emit(current_run_exp)
+	run_stop_shards_changed.emit(current_run_stop_shards)
+	stage_advanced.emit(current_stage)
+	loop_advanced.emit(current_loop)
+	loop_contract_changed.emit(active_loop_contract_id)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func _prepare_new_run_identity(seed_text: String, seeded: bool) -> void:
+	if _run_seed_locked:
+		clear_active_run_identity()
+	var normalized_seed: String = RunSeedServiceScript.normalize_seed_text(seed_text)
+	if normalized_seed.is_empty():
+		normalized_seed = RunSeedServiceScript.make_random_seed_text()
+	is_seeded_run = seeded
+	run_seed_text = normalized_seed
+	run_seed_version = RunSeedServiceScript.SEED_VERSION
+	_run_seed_locked = true
+	_ensure_seed_service_initialized()
+	_run_seed_service.configure(run_seed_text, run_seed_version)
+	run_seed_changed.emit(is_seeded_run, run_seed_text)
+
+
+func _ensure_seed_service_initialized() -> void:
+	if _run_seed_service == null:
+		_run_seed_service = RunSeedServiceScript.new()
+	if run_seed_version <= 0:
+		run_seed_version = RunSeedServiceScript.SEED_VERSION
+	if run_seed_text.is_empty():
+		run_seed_text = RunSeedServiceScript.make_random_seed_text()
+		_run_seed_locked = true
+	if _run_seed_service.root_seed_text != run_seed_text or _run_seed_service.seed_version != run_seed_version:
+		_run_seed_service.configure(run_seed_text, run_seed_version)
+
+
+func _serialize_dice_pool() -> Array[Dictionary]:
+	var serialized: Array[Dictionary] = []
+	for die: DiceData in dice_pool:
+		serialized.append(_serialize_die(die))
+	return serialized
+
+
+func _deserialize_dice_pool(raw_data: Array) -> Array[DiceData]:
+	var deserialized: Array[DiceData] = []
+	for die_data: Variant in raw_data:
+		if die_data is Dictionary:
+			deserialized.append(_deserialize_die(die_data as Dictionary))
+	return deserialized
+
+
+func _serialize_die(die: DiceData) -> Dictionary:
+	var faces_data: Array[Dictionary] = []
+	for face: DiceFaceData in die.faces:
+		faces_data.append({
+			"type": int(face.type),
+			"value": face.value,
+		})
+	return {
+		"dice_name": die.dice_name,
+		"faces": faces_data,
+		"custom_color": die.custom_color.to_html(true),
+		"rarity": int(die.rarity),
+		"reroll_family_id": die.reroll_family_id,
+		"reroll_tier": die.reroll_tier,
+		"reroll_upgrade_thresholds": die.reroll_upgrade_thresholds.duplicate(),
+		"reroll_affinity_locked": die.reroll_affinity_locked,
+	}
+
+
+func _deserialize_die(data: Dictionary) -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = str(data.get("dice_name", "Standard D6"))
+	die.custom_color = Color(str(data.get("custom_color", Color.TRANSPARENT.to_html(true))))
+	die.rarity = int(data.get("rarity", int(DiceData.Rarity.GREY))) as DiceData.Rarity
+	die.reroll_family_id = str(data.get("reroll_family_id", ""))
+	die.reroll_tier = int(data.get("reroll_tier", 0))
+	die.reroll_upgrade_thresholds.clear()
+	for threshold: Variant in data.get("reroll_upgrade_thresholds", []) as Array:
+		die.reroll_upgrade_thresholds.append(int(threshold))
+	die.reroll_affinity_locked = bool(data.get("reroll_affinity_locked", false))
+	die.faces.clear()
+	for face_data: Variant in data.get("faces", []) as Array:
+		if not (face_data is Dictionary):
+			continue
+		var face := DiceFaceData.new()
+		face.type = int((face_data as Dictionary).get("type", int(DiceFaceData.FaceType.BLANK))) as DiceFaceData.FaceType
+		face.value = int((face_data as Dictionary).get("value", 0))
+		die.faces.append(face)
+	if die.faces.is_empty():
+		return DiceData.make_standard_d6()
+	return die
+
+
+func _serialize_modifiers() -> Array[Dictionary]:
+	var serialized: Array[Dictionary] = []
+	for modifier: RunModifier in active_modifiers:
+		serialized.append({
+			"type": int(modifier.modifier_type),
+		})
+	return serialized
+
+
+func _deserialize_modifiers(raw_data: Array) -> Array[RunModifier]:
+	var deserialized: Array[RunModifier] = []
+	for modifier_data: Variant in raw_data:
+		if not (modifier_data is Dictionary):
+			continue
+		var modifier_type: int = int((modifier_data as Dictionary).get("type", -1))
+		var modifier: RunModifier = _make_modifier_from_type(modifier_type)
+		if modifier != null:
+			deserialized.append(modifier)
+	return deserialized
+
+
+func _make_modifier_from_type(modifier_type: int) -> RunModifier:
+	match modifier_type:
+		int(RunModifier.ModifierType.GAMBLERS_RUSH):
+			return RunModifier.make_gamblers_rush()
+		int(RunModifier.ModifierType.EXPLOSOPHILE):
+			return RunModifier.make_explosophile()
+		int(RunModifier.ModifierType.IRON_BANK):
+			return RunModifier.make_iron_bank()
+		int(RunModifier.ModifierType.GLASS_CANNON):
+			return RunModifier.make_glass_cannon()
+		int(RunModifier.ModifierType.SHIELD_WALL):
+			return RunModifier.make_shield_wall()
+		int(RunModifier.ModifierType.MISER):
+			return RunModifier.make_miser()
+		int(RunModifier.ModifierType.DOUBLE_DOWN):
+			return RunModifier.make_double_down()
+		int(RunModifier.ModifierType.SCAVENGER):
+			return RunModifier.make_scavenger()
+		int(RunModifier.ModifierType.RECYCLER):
+			return RunModifier.make_recycler()
+		int(RunModifier.ModifierType.LAST_STAND):
+			return RunModifier.make_last_stand()
+		int(RunModifier.ModifierType.CHAIN_LIGHTNING):
+			return RunModifier.make_chain_lightning()
+		int(RunModifier.ModifierType.HIGH_ROLLER):
+			return RunModifier.make_high_roller()
+		int(RunModifier.ModifierType.OVERCHARGE):
+			return RunModifier.make_overcharge()
+	return null
