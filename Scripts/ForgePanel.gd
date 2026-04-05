@@ -329,7 +329,7 @@ static func _roll_forge_result(r1: DiceData.Rarity, r2: DiceData.Rarity) -> Dice
 
 ## Pick the result rarity tier from the probability table.
 static func _pick_result_rarity(r1: DiceData.Rarity, r2: DiceData.Rarity) -> DiceData.Rarity:
-	var roll: float = randf()
+	var roll: float = GameManager.rng_randf("forge")
 
 	# Same-tier pairs: guaranteed upgrade.
 	if r1 == r2:
@@ -396,4 +396,7 @@ static func _random_die_of_rarity(rarity: DiceData.Rarity) -> DiceData:
 			candidates.append(die)
 	if candidates.is_empty():
 		return DiceData.make_standard_d6()
-	return candidates[randi() % candidates.size()]
+	var index: int = GameManager.rng_pick_index("forge", candidates.size())
+	if index < 0:
+		return candidates[0]
+	return candidates[index]

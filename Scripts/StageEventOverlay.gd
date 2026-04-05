@@ -100,13 +100,50 @@ func open() -> void:
 	_pending_status_color = Color.WHITE
 	_title_label.text = "RANDOM EVENT"
 	_flavor_label.text = "Choose your fate..."
-	_clear_choice_cards()
-	_remove_continue_button()
+	_prepare_choice_surface()
 	var blessing_pool: Array[Dictionary] = _build_blessing_pool()
 	var curse_pool: Array[Dictionary] = _build_curse_pool()
-	_blessing = blessing_pool[randi() % blessing_pool.size()].duplicate()
-	_curse = curse_pool[randi() % curse_pool.size()].duplicate()
+	var blessing_index: int = GameManager.rng_pick_index("event", blessing_pool.size())
+	var curse_index: int = GameManager.rng_pick_index("event", curse_pool.size())
+	if blessing_index < 0:
+		blessing_index = 0
+	if curse_index < 0:
+		curse_index = 0
+	_blessing = blessing_pool[blessing_index].duplicate()
+	_curse = curse_pool[curse_index].duplicate()
+	_build_choice_cards()
+	_play_intro_animation()
 
+
+func open_from_resume(snapshot: Dictionary) -> void:
+	_resolved = false
+	_pending_summary = ""
+	_pending_status_color = Color.WHITE
+	_title_label.text = "RANDOM EVENT"
+	_flavor_label.text = "Choose your fate..."
+	_prepare_choice_surface()
+	_blessing = (snapshot.get("blessing", {}) as Dictionary).duplicate(true)
+	_curse = (snapshot.get("curse", {}) as Dictionary).duplicate(true)
+	if _blessing.is_empty() or _curse.is_empty():
+		open()
+		return
+	_build_choice_cards()
+	_play_intro_animation()
+
+
+func build_resume_snapshot() -> Dictionary:
+	return {
+		"blessing": _blessing.duplicate(true),
+		"curse": _curse.duplicate(true),
+	}
+
+
+func _prepare_choice_surface() -> void:
+	_clear_choice_cards()
+	_remove_continue_button()
+
+
+func _build_choice_cards() -> void:
 	# Build two choice cards.
 	var blessing_card: PanelContainer = _build_choice_card(_blessing, true)
 	var curse_card: PanelContainer = _build_choice_card(_curse, false)
@@ -115,6 +152,8 @@ func open() -> void:
 	_choice_cards.append(blessing_card)
 	_choice_cards.append(curse_card)
 
+
+func _play_intro_animation() -> void:
 	# Entrance animation.
 	color = Color(0, 0, 0, 0)
 	_card_panel.modulate.a = 0.0
@@ -363,7 +402,10 @@ func _gain_random_dice(count: int) -> Array[DiceData]:
 	]
 	var gained_dice: Array[DiceData] = []
 	for _i: int in count:
-		var method: String = factory_methods[randi() % factory_methods.size()]
+		var method_index: int = GameManager.rng_pick_index("event", factory_methods.size())
+		if method_index < 0:
+			method_index = 0
+		var method: String = factory_methods[method_index]
 		var die: DiceData = Callable(DiceData, method).call() as DiceData
 		GameManager.add_dice(die)
 		gained_dice.append(die)
@@ -563,21 +605,29 @@ static func _face_color(face: DiceFaceData) -> Color:
 func _lose_random_die() -> void:
 	if GameManager.dice_pool.size() <= 1:
 		return  # Never leave the player with 0 dice.
-	var idx: int = randi() % GameManager.dice_pool.size()
+	var idx: int = GameManager.rng_pick_index("event", GameManager.dice_pool.size())
+	if idx < 0:
+		return
 	GameManager.dice_pool.remove_at(idx)
 
 
 func _add_cursed_stop_to_random_die() -> void:
 	if GameManager.dice_pool.is_empty():
 		return
-	var die: DiceData = GameManager.dice_pool[randi() % GameManager.dice_pool.size()]
+	var die_index: int = GameManager.rng_pick_index("event", GameManager.dice_pool.size())
+	if die_index < 0:
+		return
+	var die: DiceData = GameManager.dice_pool[die_index]
 	var candidates: Array[int] = []
 	for i: int in die.faces.size():
 		if die.faces[i].type != DiceFaceData.FaceType.CURSED_STOP and die.faces[i].type != DiceFaceData.FaceType.STOP:
 			candidates.append(i)
 	if candidates.is_empty():
 		return
-	var target: int = candidates[randi() % candidates.size()]
+	var target_index: int = GameManager.rng_pick_index("event", candidates.size())
+	if target_index < 0:
+		return
+	var target: int = candidates[target_index]
 	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
 	die.faces[target].value = 0
 

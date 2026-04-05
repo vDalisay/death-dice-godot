@@ -79,6 +79,7 @@ const GLYPH_EXPLODE: String = "✦"
 const GLYPH_FIRE: String    = "▲"
 const GLYPH_DIE: String     = "⬡"
 const GLYPH_CURSED: String  = "☠"
+const GLYPH_COPY: String    = "⧉"
 
 # ---------------------------------------------------------------------------
 # Font Loaders  (cached on first access)

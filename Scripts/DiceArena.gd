@@ -323,6 +323,46 @@ func reset() -> void:
 	_apply_boundary_glow()
 
 
+func restore_dice_state(
+	pool: Array[DiceData],
+	results: Array[DiceFaceData],
+	stopped: Array[bool],
+	kept: Array[bool],
+	keep_locked: Array[bool]
+) -> void:
+	_clear_dice()
+	_settle_check_active = false
+	if pool.is_empty():
+		return
+	var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, pool.size())
+	for i: int in pool.size():
+		var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
+		add_child(die)
+		die.setup(i, pool[i])
+		_dice.append(die)
+		die.toggled_keep.connect(_on_die_toggled)
+		die.shift_toggled_keep.connect(_on_die_shift_toggled)
+		die.collision_rerolled.connect(_on_die_collision_rerolled)
+		die.position = spawn_positions[i]
+		var face: DiceFaceData = null
+		if i < results.size() and results[i] != null:
+			face = results[i]
+		elif not pool[i].faces.is_empty():
+			face = pool[i].faces[0]
+		else:
+			face = DiceFaceData.new()
+			face.type = DiceFaceData.FaceType.BLANK
+			face.value = 0
+		die.current_face = face
+		die.show_face(face)
+		die.is_stopped = i < stopped.size() and stopped[i]
+		die.is_kept = i < kept.size() and kept[i]
+		die.is_keep_locked = i < keep_locked.size() and keep_locked[i]
+		die.freeze = true
+		die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+		die._apply_visual()
+
+
 ## Immediately settle all dice (skip physics). Used by tests.
 func force_settle_all() -> void:
 	for die: PhysicsDie in _dice:

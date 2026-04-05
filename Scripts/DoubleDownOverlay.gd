@@ -96,7 +96,7 @@ func _start_roll() -> void:
 	_even_button.disabled = true
 	_odd_button.disabled = true
 	_prompt_label.text = "Rolling..."
-	_final_roll = (randi() % 6) + 1
+	_final_roll = GameManager.rng_randi_range("shop", 1, 6)
 	_animate_roll()
 
 
@@ -110,7 +110,12 @@ func _roll_step(elapsed: float) -> void:
 		return
 	var progress: float = elapsed / ROLL_DURATION
 	var interval: float = lerpf(START_INTERVAL, MIN_INTERVAL, progress * progress)
-	var display_face: int = _final_roll if progress > 0.85 else DIE_FACES[randi() % DIE_FACES.size()]
+	var display_face: int = _final_roll
+	if progress <= 0.85:
+		var display_index: int = GameManager.rng_pick_index("shop", DIE_FACES.size())
+		if display_index < 0:
+			display_index = 0
+		display_face = DIE_FACES[display_index]
 	_die_label.text = str(display_face)
 	SFXManager.play_roll()
 	get_tree().create_timer(interval).timeout.connect(_roll_step.bind(elapsed + interval))

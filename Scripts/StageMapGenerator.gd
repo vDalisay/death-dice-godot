@@ -29,7 +29,7 @@ static func generate(_loop: int) -> Resource:
 		if row_index == StageMapDataScript.ROWS_PER_LOOP - FINAL_ROW_INDEX_FROM_END:
 			row_sizes.append(1)
 		else:
-			row_sizes.append(randi_range(StageMapDataScript.MIN_NODES_PER_ROW, StageMapDataScript.MAX_NODES_PER_ROW))
+			row_sizes.append(_rng_randi_range(StageMapDataScript.MIN_NODES_PER_ROW, StageMapDataScript.MAX_NODES_PER_ROW))
 
 	var total_nodes: int = 0
 	for size_value: int in row_sizes:
@@ -65,9 +65,9 @@ static func generate(_loop: int) -> Resource:
 			var node: MapNodeData = current_row[node_index] as MapNodeData
 			node.connections.clear()
 			var candidates: Array[int] = adjacent_candidates(node_index, current_count, next_count)
-			candidates.shuffle()
+			_rng_shuffle(candidates)
 			var max_connections: int = mini(MAX_CONNECTIONS_PER_NODE, candidates.size())
-			var connection_count: int = MIN_CONNECTIONS_PER_NODE if max_connections <= 1 else randi_range(MIN_CONNECTIONS_PER_NODE, max_connections)
+			var connection_count: int = MIN_CONNECTIONS_PER_NODE if max_connections <= 1 else _rng_randi_range(MIN_CONNECTIONS_PER_NODE, max_connections)
 			for candidate_index: int in connection_count:
 				node.connections.append(candidates[candidate_index])
 				reachable[candidates[candidate_index]] = true
@@ -156,7 +156,7 @@ static func allocate_node_types_for_loop(total_nodes: int, loop_number: int) -> 
 	for _i: int in rest_count:
 		types.append(MapNodeData.NodeType.REST)
 
-	types.shuffle()
+	_rng_shuffle(types)
 
 	if types[types.size() - 1] != MapNodeData.NodeType.NORMAL_STAGE:
 		for i: int in types.size():
@@ -182,7 +182,7 @@ static func assign_special_stage_variants(map: StageMapData, loop_number: int) -
 	if map == null:
 		return
 	var available_variants: Array[int] = SpecialStageCatalogScript.get_mvp_shortlist()
-	available_variants.shuffle()
+	_rng_shuffle(available_variants)
 	var eligible_rows: Array[int] = []
 	for row_index: int in range(SPECIAL_STAGE_MIN_ROW_INDEX, maxi(map.get_row_count() - 1, 0)):
 		var row_nodes: Array[MapNodeData] = map.get_row(row_index)
@@ -190,7 +190,7 @@ static func assign_special_stage_variants(map: StageMapData, loop_number: int) -
 			if node != null and node.type == MapNodeData.NodeType.NORMAL_STAGE and not node.has_special_stage_variant():
 				eligible_rows.append(row_index)
 				break
-	eligible_rows.shuffle()
+	_rng_shuffle(eligible_rows)
 	var assign_count: int = mini(desired_special_stage_count(loop_number), mini(available_variants.size(), eligible_rows.size()))
 	for assignment_index: int in assign_count:
 		var row_index: int = eligible_rows[assignment_index]
@@ -200,7 +200,7 @@ static func assign_special_stage_variants(map: StageMapData, loop_number: int) -
 				candidates.append(node)
 		if candidates.is_empty():
 			continue
-		candidates.shuffle()
+		_rng_shuffle(candidates)
 		candidates[0].stage_variant = int(available_variants[assignment_index])
 
 
@@ -212,14 +212,14 @@ static func allocate_special_rule_ids(types: Array[MapNodeData.NodeType], loop_n
 	if pool.is_empty():
 		return rule_ids
 	var rotating_pool: Array[String] = pool.duplicate()
-	rotating_pool.shuffle()
+	_rng_shuffle(rotating_pool)
 	var pool_index: int = 0
 	for i: int in types.size():
 		if types[i] != MapNodeData.SPECIAL_STAGE_TYPE:
 			continue
 		if pool_index >= rotating_pool.size():
 			rotating_pool = pool.duplicate()
-			rotating_pool.shuffle()
+			_rng_shuffle(rotating_pool)
 			pool_index = 0
 		rule_ids[i] = rotating_pool[pool_index]
 		pool_index += 1
@@ -238,7 +238,7 @@ static func _inject_special_stage_types(types: Array[MapNodeData.NodeType], loop
 	for i: int in maxi(types.size() - 1, 0):
 		if types[i] == MapNodeData.NodeType.NORMAL_STAGE:
 			candidate_indices.append(i)
-	candidate_indices.shuffle()
+	_rng_shuffle(candidate_indices)
 	var inserted: int = 0
 	for index: int in candidate_indices:
 		if inserted >= special_count:
@@ -256,3 +256,16 @@ static func _get_special_stage_count(loop_number: int, total_nodes: int) -> int:
 	if loop_number >= 3:
 		return 2
 	return 1
+
+
+static func _rng_randi_range(min_value: int, max_value: int) -> int:
+	if GameManager != null and GameManager.has_method("rng_randi_range"):
+		return GameManager.rng_randi_range("map", min_value, max_value)
+	return randi_range(min_value, max_value)
+
+
+static func _rng_shuffle(values: Array) -> void:
+	if GameManager != null and GameManager.has_method("rng_shuffle_in_place"):
+		GameManager.rng_shuffle_in_place("map", values)
+		return
+	values.shuffle()

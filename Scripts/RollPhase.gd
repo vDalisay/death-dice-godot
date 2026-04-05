@@ -37,6 +37,12 @@ const BUTTON_TWEEN_DURATION: float = 0.08
 const MULTIPLIER_BURST_DURATION: float = 0.42
 const MULTIPLIER_BURST_X_RATIO: float = 0.14
 const MULTIPLIER_BURST_Y_JITTER: float = 18.0
+const RESUME_SURFACE_TURN: String = "turn"
+const RESUME_SURFACE_STAGE_MAP: String = "stage_map"
+const RESUME_SURFACE_SHOP: String = "shop"
+const RESUME_SURFACE_EVENT: String = "event"
+const RESUME_SURFACE_FORGE: String = "forge"
+const RESUME_SURFACE_REST: String = "rest"
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 enum RollBustOutcome { SAFE, IMMUNE_SAVE, INSURANCE_SAVE, EVENT_SAVE, BUST }
@@ -94,6 +100,10 @@ var _defer_stage_clear_overlay: bool = false
 var _pending_stage_clear_overlay: bool = false
 var _stage_had_bust: bool = false
 var _turn_entered_high_risk: bool = false
+var _resume_surface: String = RESUME_SURFACE_TURN
+var _resume_payload: Dictionary = {}
+var _active_event_overlay: ColorRect = null
+var _active_rest_overlay: ColorRect = null
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -160,15 +170,21 @@ func _ready() -> void:
 	_add_button_micro_tween(codex_button)
 	if GameManager.skip_archetype_picker:
 		_begin_loop_contract_flow(ContractContinuation.START_TURN)
+	elif SaveManager.has_active_run_snapshot():
+		_show_archetype_picker(true)
 	elif SaveManager.run_history.is_empty():
-		# First run ever — skip archetype picker, use default Caution.
-		GameManager.set_archetype(GameManager.Archetype.CAUTION)
-		GameManager.reset_run()
-		_run_snapshot_recorded = false
-		_run_active = true
-		_begin_loop_contract_flow(ContractContinuation.START_TURN)
+		# First run ever defaults to Caution in Classic mode.
+		_start_new_fresh_run(int(GameManager.RunMode.CLASSIC), int(GameManager.Archetype.CAUTION), false, "")
 	else:
-		_show_archetype_picker()
+		_show_archetype_picker(false)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_persist_active_run_snapshot()
+		get_tree().quit()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_persist_active_run_snapshot()
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +194,8 @@ func _ready() -> void:
 func _start_new_turn() -> void:
 	turn_state = TurnState.IDLE
 	turn_number += 1
+	_resume_surface = RESUME_SURFACE_TURN
+	_resume_payload.clear()
 	accumulated_stop_count = 0
 	accumulated_shield_count = 0
 	_turn_entered_high_risk = false
@@ -200,6 +218,7 @@ func _start_new_turn() -> void:
 	dice_keep_locked.fill(false)
 	dice_arena.reset()
 	_sync_ui()
+	_persist_active_run_snapshot()
 
 # ---------------------------------------------------------------------------
 # Input handlers
@@ -895,7 +914,10 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			if not dice_keep[i] and not dice_keep_locked[i] and not dice_stopped[i]:
 				candidates.append(i)
 		if not candidates.is_empty():
-			var extra_i: int = candidates[randi() % candidates.size()]
+			var extra_index: int = GameManager.rng_pick_index("roll", candidates.size())
+			if extra_index < 0:
+				extra_index = 0
+			var extra_i: int = candidates[extra_index]
 			current_results[extra_i] = GameManager.dice_pool[extra_i].roll()
 			var extra_face: DiceFaceData = current_results[extra_i]
 			var extra_die: PhysicsDie = dice_arena.get_die(extra_i)
@@ -1186,10 +1208,16 @@ func _trigger_pending_stage_clear() -> void:
 
 func _open_shop(is_loop_complete: bool = false) -> void:
 	_loop_complete_pending = is_loop_complete
+	_resume_surface = RESUME_SURFACE_SHOP
+	_resume_payload = {
+		"stage": GameManager.current_stage,
+		"is_loop_complete": is_loop_complete,
+	}
 	_roll_content.visible = false
 	if _streak_display != null:
 		_streak_display.visible = false
 	shop_panel.open(GameManager.current_stage, is_loop_complete)
+	_persist_active_run_snapshot()
 
 func _on_shop_closed() -> void:
 	shop_panel.visible = false
@@ -1203,7 +1231,7 @@ func _on_new_run_pressed() -> void:
 	codex_button.visible = false
 	shop_panel.visible = false
 	_roll_content.visible = true
-	_show_archetype_picker()
+	_show_archetype_picker(SaveManager.has_active_run_snapshot())
 
 
 func _on_career_pressed() -> void:
@@ -1609,12 +1637,15 @@ func _on_reward_chosen(die: DiceData) -> void:
 
 
 func _maybe_open_forge(is_loop: bool) -> void:
-	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE and randf() < ForgePanel.FORGE_CHANCE:
+	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE and GameManager.rng_randf("misc") < ForgePanel.FORGE_CHANCE:
 		_loop_complete_pending = is_loop
+		_resume_surface = RESUME_SURFACE_FORGE
+		_resume_payload.clear()
 		_roll_content.visible = false
 		if _streak_display != null:
 			_streak_display.visible = false
 		forge_panel.open()
+		_persist_active_run_snapshot()
 	else:
 		_open_shop(is_loop)
 
@@ -1626,13 +1657,19 @@ func _on_forge_closed() -> void:
 
 
 func _show_stage_event() -> void:
+	_resume_surface = RESUME_SURFACE_EVENT
+	_resume_payload.clear()
 	var event_overlay: ColorRect = StageEventScene.instantiate() as ColorRect
+	_active_event_overlay = event_overlay
 	add_child(event_overlay)
 	event_overlay.call("open")
 	event_overlay.connect("event_resolved", _on_stage_event_resolved.bind(event_overlay))
+	_persist_active_run_snapshot()
 
 
 func _on_stage_event_resolved(summary: String, status_color: Color, event_overlay: ColorRect) -> void:
+	if _active_event_overlay == event_overlay:
+		_active_event_overlay = null
 	_queue_free_if_valid(event_overlay)
 	if summary != "":
 		hud.show_status(summary, status_color)
@@ -1648,6 +1685,8 @@ const REST_GOLD_BONUS: int = 10
 
 func _open_stage_map() -> void:
 	GameManager.reset_luck()
+	_resume_surface = RESUME_SURFACE_STAGE_MAP
+	_resume_payload.clear()
 	if GameManager.stage_map == null:
 		GameManager.generate_stage_map()
 	# Check if we've completed all rows (loop complete).
@@ -1663,6 +1702,7 @@ func _open_stage_map() -> void:
 		GameManager.previous_col,
 		GameManager.prestige_reroute_uses
 	)
+	_persist_active_run_snapshot()
 
 
 func _on_map_node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool) -> void:
@@ -1714,18 +1754,27 @@ func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: Stri
 
 func _open_shop_from_map() -> void:
 	_loop_complete_pending = false
+	_resume_surface = RESUME_SURFACE_SHOP
+	_resume_payload = {
+		"stage": GameManager.current_stage,
+		"is_loop_complete": false,
+	}
 	_roll_content.visible = false
 	if _streak_display != null:
 		_streak_display.visible = false
 	shop_panel.open(GameManager.current_stage, false)
+	_persist_active_run_snapshot()
 
 
 func _open_forge_from_map() -> void:
 	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE:
+		_resume_surface = RESUME_SURFACE_FORGE
+		_resume_payload.clear()
 		_roll_content.visible = false
 		if _streak_display != null:
 			_streak_display.visible = false
 		forge_panel.open()
+		_persist_active_run_snapshot()
 	else:
 		# Not enough dice for forge — open map for next node.
 		hud.show_status("Not enough dice to forge (need %d)." % ForgePanel.MIN_DICE_FOR_FORGE, Color(1.0, 0.6, 0.0))
@@ -1742,13 +1791,24 @@ func _execute_rest_node() -> void:
 
 
 func _show_rest_overlay(lives_before: int, lives_after: int) -> void:
+	_resume_surface = RESUME_SURFACE_REST
+	_resume_payload = {
+		"heal_lives": REST_HEAL_LIVES,
+		"gold_bonus": REST_GOLD_BONUS,
+		"lives_before": lives_before,
+		"lives_after": lives_after,
+	}
 	var overlay: ColorRect = RestOverlayScene.instantiate() as ColorRect
+	_active_rest_overlay = overlay
 	add_child(overlay)
 	overlay.call("open", REST_HEAL_LIVES, REST_GOLD_BONUS, lives_before, lives_after)
 	overlay.connect("continue_requested", _on_rest_overlay_continue.bind(overlay))
+	_persist_active_run_snapshot()
 
 
 func _on_rest_overlay_continue(overlay: ColorRect) -> void:
+	if _active_rest_overlay == overlay:
+		_active_rest_overlay = null
 	_queue_free_if_valid(overlay)
 	_open_stage_map()
 
@@ -1771,19 +1831,25 @@ func _complete_loop() -> void:
 const CURSE_CHANCE: float = 0.2
 
 func _maybe_apply_curse() -> void:
-	if randf() >= CURSE_CHANCE:
+	if GameManager.rng_randf("misc") >= CURSE_CHANCE:
 		return
 	if GameManager.dice_pool.is_empty():
 		return
 	# Pick a random die and replace one non-CURSED_STOP face with CURSED_STOP.
-	var die: DiceData = GameManager.dice_pool[randi() % GameManager.dice_pool.size()]
+	var die_index: int = GameManager.rng_pick_index("misc", GameManager.dice_pool.size())
+	if die_index < 0:
+		return
+	var die: DiceData = GameManager.dice_pool[die_index]
 	var candidates: Array[int] = []
 	for i: int in die.faces.size():
 		if die.faces[i].type != DiceFaceData.FaceType.CURSED_STOP:
 			candidates.append(i)
 	if candidates.is_empty():
 		return
-	var target: int = candidates[randi() % candidates.size()]
+	var target_index: int = GameManager.rng_pick_index("misc", candidates.size())
+	if target_index < 0:
+		return
+	var target: int = candidates[target_index]
 	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
 	die.faces[target].value = 0
 	hud.show_status("CURSED! %s gained a ☠STOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
@@ -1792,23 +1858,49 @@ func _maybe_apply_curse() -> void:
 # Archetype picker
 # ---------------------------------------------------------------------------
 
-func _show_archetype_picker() -> void:
+func _show_archetype_picker(can_continue: bool = false) -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
 	var picker: ColorRect = ArchetypePickerScene.instantiate() as ColorRect
 	add_child(picker)
-	picker.call("open", int(GameManager.run_mode))
+	picker.call("open", int(GameManager.run_mode), can_continue)
 	picker.connect("selection_confirmed", _on_archetype_selected)
 
 
-func _on_archetype_selected(run_mode: int, archetype: int) -> void:
-	GameManager.set_run_mode(run_mode)
-	GameManager.set_archetype(archetype as GameManager.Archetype)
-	GameManager.reset_run()
+func _on_archetype_selected(run_mode: int, archetype: int, seeded: bool, seed_text: String, continue_run: bool) -> void:
+	if continue_run:
+		_resume_active_run()
+		return
+	_start_new_fresh_run(run_mode, archetype, seeded, seed_text)
+
+
+func _start_new_fresh_run(run_mode: int, archetype: int, seeded: bool, seed_text: String) -> void:
+	GameManager.begin_new_run(run_mode, archetype as GameManager.Archetype, seeded, seed_text)
+	SaveManager.clear_active_run_snapshot()
 	_run_snapshot_recorded = false
 	_run_active = true
 	_begin_loop_contract_flow(ContractContinuation.START_TURN)
+
+
+func _resume_active_run() -> void:
+	var snapshot: Resource = SaveManager.get_active_run_snapshot()
+	if snapshot == null:
+		_start_new_fresh_run(int(GameManager.run_mode), int(GameManager.chosen_archetype), false, "")
+		return
+	GameManager.restore_run_identity(
+		snapshot.run_seed_text,
+		snapshot.is_seeded_run,
+		snapshot.seed_version,
+		snapshot.rng_stream_states
+	)
+	GameManager.apply_active_run_state(snapshot.game_manager_state)
+	_restore_roll_phase_state(snapshot.roll_phase_state)
+	_run_snapshot_recorded = false
+	SaveManager.clear_active_run_snapshot()
+	_resume_surface = snapshot.resume_surface
+	_resume_payload = snapshot.resume_payload.duplicate(true)
+	_restore_resume_surface()
 
 
 func _begin_loop_contract_flow(continuation: int) -> void:
@@ -1925,10 +2017,269 @@ func _apply_contract_reward(contract: LoopContractDataType) -> void:
 		GameManager.add_run_stop_shards(contract.reward_stop_shards)
 
 
+func _persist_active_run_snapshot() -> void:
+	if _run_snapshot_recorded:
+		SaveManager.clear_active_run_snapshot()
+		return
+	if _is_picker_open() or GameManager.dice_pool.is_empty() or GameManager.lives <= 0:
+		return
+	var resume_payload: Dictionary = _build_resume_payload_snapshot()
+	var roll_phase_state: Dictionary = _build_roll_phase_state()
+	var snapshot: Resource = SaveManager.build_active_run_snapshot(_resume_surface, resume_payload, roll_phase_state)
+	SaveManager.save_active_run_snapshot(snapshot)
+
+
+func _is_picker_open() -> bool:
+	for child: Node in get_children():
+		if child is ArchetypePicker:
+			return true
+	return false
+
+
+func _build_resume_payload_snapshot() -> Dictionary:
+	var payload: Dictionary = _resume_payload.duplicate(true)
+	match _resume_surface:
+		RESUME_SURFACE_SHOP:
+			if shop_panel.visible and shop_panel.has_method("build_resume_snapshot"):
+				payload["shop_state"] = shop_panel.call("build_resume_snapshot") as Dictionary
+		RESUME_SURFACE_EVENT:
+			if _active_event_overlay != null and is_instance_valid(_active_event_overlay) and _active_event_overlay.has_method("build_resume_snapshot"):
+				payload["event_state"] = _active_event_overlay.call("build_resume_snapshot") as Dictionary
+	return payload
+
+
+func _build_roll_phase_state() -> Dictionary:
+	return {
+		"turn_state": int(turn_state),
+		"turn_number": turn_number,
+		"accumulated_stop_count": accumulated_stop_count,
+		"accumulated_shield_count": accumulated_shield_count,
+		"run_active": _run_active,
+		"loop_complete_pending": _loop_complete_pending,
+		"bank_streak": bank_streak,
+		"reroll_count": _reroll_count,
+		"run_snapshot_recorded": _run_snapshot_recorded,
+		"triggered_combo_ids": _triggered_combo_ids.duplicate(true),
+		"stage_had_bust": _stage_had_bust,
+		"turn_entered_high_risk": _turn_entered_high_risk,
+		"current_results": _serialize_face_array(current_results),
+		"dice_stopped": dice_stopped.duplicate(),
+		"dice_keep": dice_keep.duplicate(),
+		"dice_keep_locked": dice_keep_locked.duplicate(),
+		"die_reroll_counts": _die_reroll_counts.duplicate(),
+	}
+
+
+func _restore_roll_phase_state(data: Dictionary) -> void:
+	turn_state = int(data.get("turn_state", int(TurnState.IDLE))) as TurnState
+	turn_number = int(data.get("turn_number", 0))
+	accumulated_stop_count = int(data.get("accumulated_stop_count", 0))
+	accumulated_shield_count = int(data.get("accumulated_shield_count", 0))
+	_run_active = bool(data.get("run_active", true))
+	_loop_complete_pending = bool(data.get("loop_complete_pending", false))
+	bank_streak = int(data.get("bank_streak", 0))
+	_reroll_count = int(data.get("reroll_count", 0))
+	_run_snapshot_recorded = bool(data.get("run_snapshot_recorded", false))
+	_triggered_combo_ids = data.get("triggered_combo_ids", {}) as Dictionary
+	_stage_had_bust = bool(data.get("stage_had_bust", false))
+	_turn_entered_high_risk = bool(data.get("turn_entered_high_risk", false))
+	current_results = _deserialize_face_array(data.get("current_results", []) as Array)
+	dice_stopped.clear()
+	for value: Variant in data.get("dice_stopped", []) as Array:
+		dice_stopped.append(bool(value))
+	dice_keep.clear()
+	for value: Variant in data.get("dice_keep", []) as Array:
+		dice_keep.append(bool(value))
+	dice_keep_locked.clear()
+	for value: Variant in data.get("dice_keep_locked", []) as Array:
+		dice_keep_locked.append(bool(value))
+	_die_reroll_counts.clear()
+	for value: Variant in data.get("die_reroll_counts", []) as Array:
+		_die_reroll_counts.append(int(value))
+
+	var expected_count: int = GameManager.dice_pool.size()
+	if current_results.size() != expected_count:
+		current_results.resize(expected_count)
+	if dice_stopped.size() != expected_count:
+		dice_stopped.resize(expected_count)
+	if dice_keep.size() != expected_count:
+		dice_keep.resize(expected_count)
+	if dice_keep_locked.size() != expected_count:
+		dice_keep_locked.resize(expected_count)
+	if _die_reroll_counts.size() != expected_count:
+		_die_reroll_counts.resize(expected_count)
+
+	_is_roll_animating = false
+	_roll_anim_nonce += 1
+	_update_combo_hud()
+	_update_streak_display()
+	GameManager.set_held_stop_count(_count_intentionally_held_stops())
+
+
+func _serialize_face_array(faces: Array[DiceFaceData]) -> Array:
+	var serialized: Array = []
+	for face: DiceFaceData in faces:
+		if face == null:
+			serialized.append({})
+			continue
+		serialized.append({
+			"type": int(face.type),
+			"value": int(face.value),
+		})
+	return serialized
+
+
+func _deserialize_face_array(data: Array) -> Array[DiceFaceData]:
+	var faces: Array[DiceFaceData] = []
+	for entry: Variant in data:
+		if not (entry is Dictionary):
+			faces.append(null)
+			continue
+		var entry_dict: Dictionary = entry as Dictionary
+		if entry_dict.is_empty():
+			faces.append(null)
+			continue
+		var face := DiceFaceData.new()
+		face.type = int(entry_dict.get("type", int(DiceFaceData.FaceType.BLANK))) as DiceFaceData.FaceType
+		face.value = int(entry_dict.get("value", 0))
+		faces.append(face)
+	return faces
+
+
+func _restore_resume_surface() -> void:
+	match _resume_surface:
+		RESUME_SURFACE_SHOP:
+			_restore_shop_surface()
+		RESUME_SURFACE_EVENT:
+			_restore_event_surface()
+		RESUME_SURFACE_FORGE:
+			_restore_forge_surface()
+		RESUME_SURFACE_REST:
+			_restore_rest_surface()
+		RESUME_SURFACE_STAGE_MAP:
+			_restore_stage_map_surface()
+		_:
+			_restore_turn_surface()
+
+
+func _restore_turn_surface() -> void:
+	_run_active = true
+	_roll_content.visible = true
+	shop_panel.visible = false
+	forge_panel.visible = false
+	stage_map_panel.visible = false
+	if _streak_display != null:
+		_streak_display.visible = true
+	var has_results: bool = false
+	for face: DiceFaceData in current_results:
+		if face != null:
+			has_results = true
+			break
+	if has_results and dice_arena.has_method("restore_dice_state"):
+		dice_arena.call("restore_dice_state", GameManager.dice_pool, current_results, dice_stopped, dice_keep, dice_keep_locked)
+	else:
+		dice_arena.reset()
+	_sync_all_dice()
+	_sync_ui()
+	_sync_buttons()
+
+
+func _restore_stage_map_surface() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	if GameManager.stage_map == null:
+		GameManager.generate_stage_map()
+	stage_map_panel.open(
+		GameManager.stage_map,
+		GameManager.current_row,
+		GameManager.previous_col,
+		GameManager.prestige_reroute_uses
+	)
+
+
+func _restore_shop_surface() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	stage_map_panel.visible = false
+	forge_panel.visible = false
+	var shop_state: Dictionary = _resume_payload.get("shop_state", {}) as Dictionary
+	if not shop_state.is_empty() and shop_panel.has_method("open_from_resume"):
+		shop_panel.call("open_from_resume", shop_state)
+		return
+	var stage_value: int = int(_resume_payload.get("stage", GameManager.current_stage))
+	var is_loop_complete: bool = bool(_resume_payload.get("is_loop_complete", false))
+	shop_panel.open(stage_value, is_loop_complete)
+
+
+func _restore_event_surface() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	stage_map_panel.visible = false
+	forge_panel.visible = false
+	var event_overlay: ColorRect = StageEventScene.instantiate() as ColorRect
+	_active_event_overlay = event_overlay
+	add_child(event_overlay)
+	var event_state: Dictionary = _resume_payload.get("event_state", {}) as Dictionary
+	if event_state.is_empty():
+		event_overlay.call("open")
+	else:
+		event_overlay.call("open_from_resume", event_state)
+	event_overlay.connect("event_resolved", _on_stage_event_resolved.bind(event_overlay))
+
+
+func _restore_forge_surface() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	stage_map_panel.visible = false
+	shop_panel.visible = false
+	forge_panel.open()
+
+
+func _restore_rest_surface() -> void:
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	_roll_content.visible = false
+	if _streak_display != null:
+		_streak_display.visible = false
+	stage_map_panel.visible = false
+	shop_panel.visible = false
+	forge_panel.visible = false
+	var overlay: ColorRect = RestOverlayScene.instantiate() as ColorRect
+	_active_rest_overlay = overlay
+	add_child(overlay)
+	overlay.call(
+		"open",
+		int(_resume_payload.get("heal_lives", REST_HEAL_LIVES)),
+		int(_resume_payload.get("gold_bonus", REST_GOLD_BONUS)),
+		int(_resume_payload.get("lives_before", GameManager.lives)),
+		int(_resume_payload.get("lives_after", GameManager.lives))
+	)
+	overlay.connect("continue_requested", _on_rest_overlay_continue.bind(overlay))
+
+
 func _record_run_snapshot_if_needed() -> void:
 	if _run_snapshot_recorded:
 		return
 	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
 	SaveManager.record_run(snapshot)
+	SaveManager.clear_active_run_snapshot()
+	GameManager.clear_active_run_identity()
 	AchievementManager.on_run_recorded(snapshot)
 	_run_snapshot_recorded = true
