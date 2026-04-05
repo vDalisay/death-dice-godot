@@ -1,6 +1,8 @@
 extends GdUnitTestSuite
 ## Unit tests for StageMapData and MapNodeData.
 
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
+
 
 # ---------------------------------------------------------------------------
 # MapNodeData basics
@@ -40,6 +42,7 @@ func test_map_node_serialization_roundtrip() -> void:
 	node.connections = [0, 2]
 	node.visited = true
 	node.column = 1
+	node.stage_variant = SpecialStageCatalog.Variant.HOT_TABLE
 	var data: Dictionary = node.to_dict()
 	var restored: MapNodeData = MapNodeData.from_dict(data)
 	assert_int(restored.type).is_equal(MapNodeData.SPECIAL_STAGE_TYPE)
@@ -49,6 +52,16 @@ func test_map_node_serialization_roundtrip() -> void:
 	assert_int(restored.connections[1]).is_equal(2)
 	assert_bool(restored.visited).is_true()
 	assert_int(restored.column).is_equal(1)
+	assert_int(restored.stage_variant).is_equal(SpecialStageCatalog.Variant.HOT_TABLE)
+
+
+func test_special_stage_node_uses_variant_metadata() -> void:
+	var node: MapNodeData = MapNodeData.new()
+	node.stage_variant = SpecialStageCatalog.Variant.CLEAN_ROOM
+	assert_bool(node.has_special_stage_variant()).is_true()
+	assert_str(node.get_display_name()).is_equal("Clean Room")
+	assert_str(node.get_map_label()).is_equal("Clean")
+	assert_str(node.get_hover_text()).contains("Clean Room")
 
 
 func test_special_stage_node_uses_registry_display_data() -> void:
@@ -199,6 +212,19 @@ func test_map_serialization_roundtrip() -> void:
 			var rest: MapNodeData = restored.get_node_at(r, c)
 			assert_int(rest.type).is_equal(orig.type)
 			assert_int(rest.connections.size()).is_equal(orig.connections.size())
+			assert_int(rest.stage_variant).is_equal(orig.stage_variant)
+
+
+func test_count_special_stage_nodes_tracks_variant_counts() -> void:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_node([0], false, 0, SpecialStageCatalog.Variant.NONE)],
+		[_make_node([0], false, 0, SpecialStageCatalog.Variant.CLEAN_ROOM), _make_node([0], false, 1, SpecialStageCatalog.Variant.HOT_TABLE)],
+		[_make_node([], false, 0, SpecialStageCatalog.Variant.NONE)],
+	]
+	assert_int(map.count_special_stage_nodes()).is_equal(2)
+	assert_int(map.count_stage_variant(SpecialStageCatalog.Variant.CLEAN_ROOM)).is_equal(1)
+	assert_int(map.count_stage_variant(SpecialStageCatalog.Variant.HOT_TABLE)).is_equal(1)
 
 
 # ---------------------------------------------------------------------------
@@ -238,3 +264,13 @@ func test_connections_are_proportionally_adjacent() -> void:
 				var valid: Array[int] = StageMapData._adjacent_candidates(c, cur_count, next_count)
 				for conn: int in node.connections:
 					assert_bool(valid.has(conn)).is_true()
+
+
+func _make_node(connections: Array[int], visited: bool, column: int, stage_variant: int) -> MapNodeData:
+	var node := MapNodeData.new()
+	node.type = MapNodeData.NodeType.NORMAL_STAGE
+	node.connections = connections.duplicate()
+	node.visited = visited
+	node.column = column
+	node.stage_variant = stage_variant
+	return node

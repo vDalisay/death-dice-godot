@@ -19,6 +19,8 @@ const PRESTIGE_COSMETIC_UNLOCKS: Dictionary = {
 
 signal highscore_changed(new_highscore: int)
 signal prestige_currency_changed(new_total: int)
+signal experience_currency_changed(new_total: int)
+signal stop_shard_currency_changed(new_total: int)
 
 var highscore: int = 0
 var gauntlet_highscore: int = 0
@@ -38,6 +40,9 @@ var purchased_cosmetics: Dictionary = {}  # die_name -> Array[cosmetic_id]
 var equipped_cosmetics: Dictionary = {}  # die_name -> cosmetic_id (or "" for none)
 var prestige_currency: int = 0
 var prestige_unlocks: Array[String] = []
+var experience_currency: int = 0
+var stop_shard_currency: int = 0
+var permanent_upgrade_unlocks: Array[String] = []
 
 func _ready() -> void:
 	_load()
@@ -72,6 +77,10 @@ func record_run(run: RunSaveData) -> void:
 	run.prestige_skulls_earned = skulls_earned
 	if skulls_earned > 0:
 		add_prestige_currency(skulls_earned)
+	if run.exp_earned > 0:
+		_apply_experience_currency_delta(run.exp_earned, false)
+	if run.stop_shards_earned > 0:
+		_apply_stop_shard_currency_delta(run.stop_shards_earned, false)
 	_save()
 
 func make_run_snapshot() -> RunSaveData:
@@ -87,6 +96,10 @@ func make_run_snapshot() -> RunSaveData:
 	for die: DiceData in GameManager.dice_pool:
 		names.append(die.dice_name)
 	run.final_dice_names = names
+	run.exp_earned = GameManager.current_run_exp
+	run.stop_shards_earned = GameManager.current_run_stop_shards
+	run.held_stops_at_end = GameManager.held_stop_count
+	run.active_loop_contract_id = GameManager.active_loop_contract_id
 	return run
 
 
@@ -279,6 +292,50 @@ func add_prestige_currency(amount: int) -> void:
 	prestige_currency_changed.emit(prestige_currency)
 
 
+func add_experience_currency(amount: int) -> void:
+	_apply_experience_currency_delta(amount, true)
+
+
+func spend_experience_currency(amount: int) -> bool:
+	if amount <= 0:
+		return false
+	if experience_currency < amount:
+		return false
+	_apply_experience_currency_delta(-amount, true)
+	return true
+
+
+func add_stop_shard_currency(amount: int) -> void:
+	_apply_stop_shard_currency_delta(amount, true)
+
+
+func spend_stop_shard_currency(amount: int) -> bool:
+	if amount <= 0:
+		return false
+	if stop_shard_currency < amount:
+		return false
+	_apply_stop_shard_currency_delta(-amount, true)
+	return true
+
+
+func has_permanent_upgrade(upgrade_id: String) -> bool:
+	return upgrade_id in permanent_upgrade_unlocks
+
+
+func purchase_permanent_upgrade(upgrade_id: String, exp_cost: int, shard_cost: int) -> bool:
+	if upgrade_id.is_empty() or has_permanent_upgrade(upgrade_id):
+		return false
+	if exp_cost < 0 or shard_cost < 0:
+		return false
+	if experience_currency < exp_cost or stop_shard_currency < shard_cost:
+		return false
+	_apply_experience_currency_delta(-exp_cost, false)
+	_apply_stop_shard_currency_delta(-shard_cost, false)
+	permanent_upgrade_unlocks.append(upgrade_id)
+	_save()
+	return true
+
+
 func spend_prestige_currency(amount: int) -> bool:
 	if amount <= 0:
 		return false
@@ -319,6 +376,24 @@ func _calculate_prestige_earnings(loops_completed: int, busts: int) -> int:
 	return skulls
 
 
+func _apply_experience_currency_delta(amount: int, should_save: bool) -> void:
+	if amount == 0:
+		return
+	experience_currency = maxi(0, experience_currency + amount)
+	experience_currency_changed.emit(experience_currency)
+	if should_save:
+		_save()
+
+
+func _apply_stop_shard_currency_delta(amount: int, should_save: bool) -> void:
+	if amount == 0:
+		return
+	stop_shard_currency = maxi(0, stop_shard_currency + amount)
+	stop_shard_currency_changed.emit(stop_shard_currency)
+	if should_save:
+		_save()
+
+
 
 
 func _save() -> void:
@@ -343,6 +418,9 @@ func _save() -> void:
 		"equipped_cosmetics": equipped_cosmetics,
 		"prestige_currency": prestige_currency,
 		"prestige_unlocks": prestige_unlocks,
+		"experience_currency": experience_currency,
+		"stop_shard_currency": stop_shard_currency,
+		"permanent_upgrade_unlocks": permanent_upgrade_unlocks,
 		"runs": runs_array,
 	}
 	var file: FileAccess = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -378,26 +456,22 @@ func _load() -> void:
 	purchased_cosmetics = data.get("purchased_cosmetics", {}) as Dictionary
 	equipped_cosmetics = data.get("equipped_cosmetics", {}) as Dictionary
 	prestige_currency = data.get("prestige_currency", 0) as int
+	experience_currency = data.get("experience_currency", 0) as int
+	stop_shard_currency = data.get("stop_shard_currency", 0) as int
 	prestige_unlocks.clear()
 	for unlock: Variant in data.get("prestige_unlocks", []) as Array:
 		prestige_unlocks.append(unlock as String)
+	permanent_upgrade_unlocks.clear()
+	for unlock: Variant in data.get("permanent_upgrade_unlocks", []) as Array:
+		permanent_upgrade_unlocks.append(unlock as String)
 	var runs: Array = data.get("runs", []) as Array
 	run_history.clear()
 	for entry: Variant in runs:
 		if entry is Dictionary:
 			var save: RunSaveData = RunSaveDataScript.new()
-			var final_names: Array[String] = []
-			for die_name: Variant in (entry as Dictionary).get("final_dice_names", []) as Array:
-				final_names.append(die_name as String)
-			save.score = (entry as Dictionary).get("score", 0) as int
-			save.timestamp = (entry as Dictionary).get("timestamp", "") as String
-			save.stages_cleared = (entry as Dictionary).get("stages_cleared", 0) as int
-			save.loops_completed = (entry as Dictionary).get("loops_completed", 0) as int
-			save.busts = (entry as Dictionary).get("busts", 0) as int
-			save.best_turn_score = (entry as Dictionary).get("best_turn_score", 0) as int
-			save.final_dice_names = final_names
-			save.run_mode = (entry as Dictionary).get("run_mode", int(GameManager.RunMode.CLASSIC)) as int
-			save.prestige_skulls_earned = (entry as Dictionary).get("prestige_skulls_earned", 0) as int
+			save.load_from_dict(entry as Dictionary)
 			run_history.append(save)
 	highscore_changed.emit(highscore)
 	prestige_currency_changed.emit(prestige_currency)
+	experience_currency_changed.emit(experience_currency)
+	stop_shard_currency_changed.emit(stop_shard_currency)

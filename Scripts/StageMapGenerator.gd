@@ -2,7 +2,9 @@ class_name StageMapGenerator
 extends RefCounted
 ## Generates StageMapData while keeping generation algorithms out of the data Resource.
 
-const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+const StageMapDataScript := preload("res://Scripts/StageMapData.gd")
+const MapNodeDataScript := preload("res://Scripts/MapNodeData.gd")
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const NORMAL_STAGE_RATIO: float = 0.5
@@ -13,6 +15,9 @@ const REST_RATIO: float = 0.10
 const FINAL_ROW_INDEX_FROM_END: int = 1
 const MIN_CONNECTIONS_PER_NODE: int = 1
 const MAX_CONNECTIONS_PER_NODE: int = 2
+const SPECIAL_STAGE_MIN_ROW_INDEX: int = 1
+const SPECIAL_STAGE_LOOP_ONE_COUNT: int = 2
+const SPECIAL_STAGE_LOOP_TWO_PLUS_COUNT: int = 3
 
 
 static func generate(_loop: int) -> Resource:
@@ -37,13 +42,15 @@ static func generate(_loop: int) -> Resource:
 	for row_index: int in StageMapDataScript.ROWS_PER_LOOP:
 		var row: Array[MapNodeData] = []
 		for col_index: int in row_sizes[row_index]:
-			var node: MapNodeData = MapNodeData.new()
+			var node: MapNodeData = MapNodeDataScript.new() as MapNodeData
 			node.type = node_types[type_index]
 			node.special_rule_id = special_rule_ids[type_index]
 			node.column = col_index
 			type_index += 1
 			row.append(node)
 		map.rows.append(row)
+
+	assign_special_stage_variants(map as StageMapData, _loop)
 
 	for row_index: int in StageMapDataScript.ROWS_PER_LOOP - 1:
 		var current_row: Array = map.rows[row_index]
@@ -163,6 +170,38 @@ static func allocate_node_types_for_loop(total_nodes: int, loop_number: int) -> 
 	_inject_special_stage_types(types, loop_number)
 
 	return types
+
+
+static func desired_special_stage_count(loop_number: int) -> int:
+	if loop_number <= 1:
+		return SPECIAL_STAGE_LOOP_ONE_COUNT
+	return SPECIAL_STAGE_LOOP_TWO_PLUS_COUNT
+
+
+static func assign_special_stage_variants(map: StageMapData, loop_number: int) -> void:
+	if map == null:
+		return
+	var available_variants: Array[int] = SpecialStageCatalog.get_mvp_shortlist()
+	available_variants.shuffle()
+	var eligible_rows: Array[int] = []
+	for row_index: int in range(SPECIAL_STAGE_MIN_ROW_INDEX, maxi(map.get_row_count() - 1, 0)):
+		var row_nodes: Array[MapNodeData] = map.get_row(row_index)
+		for node: MapNodeData in row_nodes:
+			if node != null and node.type == MapNodeData.NodeType.NORMAL_STAGE and not node.has_special_stage_variant():
+				eligible_rows.append(row_index)
+				break
+	eligible_rows.shuffle()
+	var assign_count: int = mini(desired_special_stage_count(loop_number), mini(available_variants.size(), eligible_rows.size()))
+	for assignment_index: int in assign_count:
+		var row_index: int = eligible_rows[assignment_index]
+		var candidates: Array[MapNodeData] = []
+		for node: MapNodeData in map.get_row(row_index):
+			if node != null and node.type == MapNodeData.NodeType.NORMAL_STAGE and not node.has_special_stage_variant():
+				candidates.append(node)
+		if candidates.is_empty():
+			continue
+		candidates.shuffle()
+		candidates[0].stage_variant = int(available_variants[assignment_index])
 
 
 static func allocate_special_rule_ids(types: Array[MapNodeData.NodeType], loop_number: int) -> Array[String]:

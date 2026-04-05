@@ -2,6 +2,7 @@ extends GdUnitTestSuite
 ## Unit tests for StageMapPanel scene structure and open state.
 
 const StageMapScene: PackedScene = preload("res://Scenes/StageMap.tscn")
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 
 
 func test_stage_map_scene_has_required_nodes() -> void:
@@ -120,6 +121,30 @@ func test_future_row_connections_stay_dim_until_that_row_is_current() -> void:
 	assert_int(active_from_current).is_equal(0)
 
 
+func test_special_stage_nodes_show_variant_label_and_hover_copy() -> void:
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_special_variant_map()
+	panel.call("open", map, 0, -1)
+	for _i: int in 4:
+		await await_idle_frame()
+	var node_buttons: Array = panel.get("_node_buttons") as Array
+	var special_button: Button = ((node_buttons[0] as Array)[0] as Button)
+	assert_str(special_button.tooltip_text).contains("Clean Room")
+	assert_str(special_button.tooltip_text).contains("target")
+	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
+	var hint_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel") as Label
+	special_button.emit_signal("mouse_entered")
+	await await_idle_frame()
+	assert_str(selected_title.text).is_equal("Clean Room")
+	assert_str(hint_label.text).contains("reachable now")
+	assert_str(hint_label.text).contains("Clean Room")
+	special_button.emit_signal("mouse_exited")
+	await await_idle_frame()
+	assert_str(hint_label.text).contains("Stage 1 / 7")
+
+
 func _build_stale_progression_map() -> StageMapData:
 	var map := StageMapData.new()
 	map.rows = [
@@ -139,6 +164,16 @@ func _build_active_path_map() -> StageMapData:
 	map.rows = [
 		[_make_node([0, 1], true, 0)],
 		[_make_node([0], false, 0), _make_node([0], false, 1)],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
+func _build_special_variant_map() -> StageMapData:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_node([0], false, 0, SpecialStageCatalog.Variant.CLEAN_ROOM), _make_node([0], false, 1)],
+		[_make_node([0], false, 0)],
 		[_make_node([], false, 0)],
 	]
 	return map
@@ -168,12 +203,13 @@ func _count_lines_from_row_with_color(lines: Array, row_buttons: Array, color: C
 	return count
 
 
-func _make_node(connections: Array[int], visited: bool = false, column: int = 0) -> MapNodeData:
+func _make_node(connections: Array[int], visited: bool = false, column: int = 0, stage_variant: int = SpecialStageCatalog.Variant.NONE) -> MapNodeData:
 	var node := MapNodeData.new()
 	node.type = MapNodeData.NodeType.NORMAL_STAGE
 	node.connections = connections.duplicate()
 	node.visited = visited
 	node.column = column
+	node.stage_variant = stage_variant
 	return node
 
 

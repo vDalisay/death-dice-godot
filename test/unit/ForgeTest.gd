@@ -79,3 +79,13 @@ func test_pick_result_rarity_grey_green_distribution() -> void:
 	# Green should be the most common result.
 	assert_bool(counts[DiceData.Rarity.GREEN] > counts[DiceData.Rarity.BLUE]).is_true()
 	assert_bool(counts[DiceData.Rarity.GREEN] > counts[DiceData.Rarity.GREY]).is_true()
+
+
+func test_reroll_affinity_inputs_lock_forge_result() -> void:
+	var base_result: DiceData = DiceData.make_heavy_d6()
+	var die_a: DiceData = DiceData.make_reroll_chaser_d6(1)
+	var die_b: DiceData = DiceData.make_standard_d6()
+	var result_die: DiceData = ForgePanel._apply_reroll_affinity(base_result, die_a, die_b)
+	assert_bool(result_die.is_reroll_evolving()).is_true()
+	assert_bool(result_die.reroll_affinity_locked).is_true()
+	assert_int(result_die.reroll_tier).is_equal(1)

@@ -17,7 +17,7 @@ const MAX_NON_COMBAT_PER_TYPE: int = 2
 # ---------------------------------------------------------------------------
 
 static func generate(_loop: int) -> StageMapData:
-	return _get_stage_map_generator_script().generate(_loop) as StageMapData
+	return StageMapGenerator.generate(_loop) as StageMapData
 
 
 ## Returns valid connection targets in the next row for a node at (col) in a
@@ -25,21 +25,17 @@ static func generate(_loop: int) -> StageMapData:
 ## Uses proportional mapping: node at position p in current row maps to the
 ## same proportional position in the next row, ±1 column.
 static func _adjacent_candidates(col: int, cur_count: int, next_count: int) -> Array[int]:
-	return _get_stage_map_generator_script().adjacent_candidates(col, cur_count, next_count)
+	return StageMapGenerator.adjacent_candidates(col, cur_count, next_count)
 
 
 ## Find the nearest parent node (by proportional column distance) that could
 ## plausibly connect to target_col in the next row.
 static func _nearest_parent(target_col: int, cur_count: int, next_count: int) -> int:
-	return _get_stage_map_generator_script().nearest_parent(target_col, cur_count, next_count)
+	return StageMapGenerator.nearest_parent(target_col, cur_count, next_count)
 
 
 static func _allocate_node_types(total: int) -> Array[MapNodeData.NodeType]:
-	return _get_stage_map_generator_script().allocate_node_types(total)
-
-
-static func _get_stage_map_generator_script() -> GDScript:
-	return load("res://Scripts/StageMapGenerator.gd") as GDScript
+	return StageMapGenerator.allocate_node_types(total)
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +80,26 @@ func count_type(node_type: MapNodeData.NodeType) -> int:
 		for node: Variant in row:
 			var n: MapNodeData = node as MapNodeData
 			if n.type == node_type:
+				count += 1
+	return count
+
+
+func count_special_stage_nodes() -> int:
+	var count: int = 0
+	for row: Array in rows:
+		for node: Variant in row:
+			var n: MapNodeData = node as MapNodeData
+			if n != null and n.has_special_stage_variant():
+				count += 1
+	return count
+
+
+func count_stage_variant(stage_variant: int) -> int:
+	var count: int = 0
+	for row: Array in rows:
+		for node: Variant in row:
+			var n: MapNodeData = node as MapNodeData
+			if n != null and n.stage_variant == stage_variant:
 				count += 1
 	return count
 

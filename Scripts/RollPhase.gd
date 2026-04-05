@@ -25,6 +25,11 @@ const CHAIN_SHAKE_DURATION: float = 0.1
 const SCORE_ANIM_SPEEDUP_THRESHOLD: int = 6
 const SCORE_ANIM_SPEEDUP_PER_DIE: float = 0.06
 const SCORE_ANIM_BASE_INTERVAL_FLOOR: float = 0.05
+const HIGH_RISK_ODDS_THRESHOLD: float = 0.55
+const NEAR_DEATH_GOLD_BONUS: int = 8
+const META_LEDGER_EXP_REWARD: int = 2
+const META_HIGH_RISK_EXP_REWARD: int = 1
+const META_NEAR_DEATH_SHARD_REWARD: int = 1
 
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
@@ -35,6 +40,7 @@ const MULTIPLIER_BURST_Y_JITTER: float = 18.0
 
 enum TurnState { IDLE, ACTIVE, BUST, BANKED }
 enum RollBustOutcome { SAFE, IMMUNE_SAVE, INSURANCE_SAVE, EVENT_SAVE, BUST }
+enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 
 @onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
@@ -60,6 +66,7 @@ var current_results: Array[DiceFaceData] = []
 var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
+var _die_reroll_counts: Array[int] = []
 
 ## Running total of STOP faces rolled this turn. Only increases; resets on
 ## bank, bust, or new turn. Used for the accumulated bust check.
@@ -81,9 +88,12 @@ var _turn_score_service: RefCounted = null
 var _bust_resolver: RefCounted = null
 var _risk_estimator: RefCounted = null
 var _roll_resolution_service: RefCounted = null
+var _contract_progress_service: RefCounted = null
 var _stage_flow: RefCounted = null
 var _defer_stage_clear_overlay: bool = false
 var _pending_stage_clear_overlay: bool = false
+var _stage_had_bust: bool = false
+var _turn_entered_high_risk: bool = false
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -93,21 +103,25 @@ const AchievementToastScene: PackedScene = preload("res://Scenes/AchievementToas
 const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
 const RestOverlayScene: PackedScene = preload("res://Scenes/RestOverlay.tscn")
 const ArchetypePickerScene: PackedScene = preload("res://Scenes/ArchetypePicker.tscn")
+const ContractSelectionPanelScene: PackedScene = preload("res://Scenes/ContractSelectionPanel.tscn")
 const ScreenShakeScript: GDScript = preload("res://Scripts/ScreenShake.gd")
 const ScreenOverlayScript: GDScript = preload("res://Scripts/ScreenOverlay.gd")
 const TurnScoreServiceScript: GDScript = preload("res://Scripts/TurnScoreService.gd")
 const BustFlowResolverScript: GDScript = preload("res://Scripts/BustFlowResolver.gd")
 const BustRiskEstimatorScript: GDScript = preload("res://Scripts/BustRiskEstimator.gd")
 const RollResolutionServiceScript: GDScript = preload("res://Scripts/RollResolutionService.gd")
+const ContractProgressServiceScript: GDScript = preload("res://Scripts/ContractProgressService.gd")
 const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoordinator.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 
 func _ready() -> void:
 	_turn_score_service = TurnScoreServiceScript.new()
 	_bust_resolver = BustFlowResolverScript.new()
 	_risk_estimator = BustRiskEstimatorScript.new()
 	_roll_resolution_service = RollResolutionServiceScript.new()
+	_contract_progress_service = ContractProgressServiceScript.new()
 	_stage_flow = StageFlowCoordinatorScript.new()
 	theme = _UITheme.build_theme()
 	roll_button.pressed.connect(_on_roll_pressed)
@@ -144,14 +158,14 @@ func _ready() -> void:
 	_add_button_micro_tween(career_button)
 	_add_button_micro_tween(codex_button)
 	if GameManager.skip_archetype_picker:
-		_start_new_turn()
+		_begin_loop_contract_flow(ContractContinuation.START_TURN)
 	elif SaveManager.run_history.is_empty():
 		# First run ever — skip archetype picker, use default Caution.
 		GameManager.set_archetype(GameManager.Archetype.CAUTION)
 		GameManager.reset_run()
 		_run_snapshot_recorded = false
 		_run_active = true
-		_start_new_turn()
+		_begin_loop_contract_flow(ContractContinuation.START_TURN)
 	else:
 		_show_archetype_picker()
 
@@ -165,6 +179,8 @@ func _start_new_turn() -> void:
 	turn_number += 1
 	accumulated_stop_count = 0
 	accumulated_shield_count = 0
+	_turn_entered_high_risk = false
+	GameManager.set_held_stop_count(0)
 	GameManager.begin_special_stage_turn()
 	hud.reset_score_feedback_visuals(true)
 	_reroll_count = 0
@@ -173,6 +189,8 @@ func _start_new_turn() -> void:
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
+	_die_reroll_counts.resize(count)
+	_die_reroll_counts.fill(0)
 	dice_stopped.resize(count)
 	dice_stopped.fill(false)
 	dice_keep.resize(count)
@@ -206,6 +224,40 @@ func _on_bank_pressed() -> void:
 	var shield_count: int = _count_shields()
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var heart_relief: int = _apply_banked_heart_relief()
+	var bank_threshold: int = _get_bust_threshold()
+	var bank_effective_stops: int = _get_effective_stop_count()
+	GameManager.set_held_stop_count(_count_intentionally_held_stops())
+	var is_near_death_bank: bool = bank_threshold > 1 and bank_effective_stops == bank_threshold - 1
+	var meta_exp_reward: int = 0
+	var meta_shard_reward: int = 0
+	var archetype_rewards: Dictionary = {
+		"gold": 0,
+		"exp": 0,
+		"stop_shards": 0,
+		"heal": 0,
+	}
+	if is_near_death_bank:
+		GameManager.register_near_death_bank(bank_effective_stops, bank_threshold)
+		GameManager.add_gold(NEAR_DEATH_GOLD_BONUS)
+		if SaveManager.has_permanent_upgrade("shard_magnet"):
+			meta_shard_reward += META_NEAR_DEATH_SHARD_REWARD
+	archetype_rewards = GameManager.get_archetype_bank_rewards(bank_effective_stops, is_near_death_bank)
+	if int(archetype_rewards.get("gold", 0)) > 0:
+		GameManager.add_gold(int(archetype_rewards.get("gold", 0)))
+	if int(archetype_rewards.get("exp", 0)) > 0:
+		GameManager.add_run_exp(int(archetype_rewards.get("exp", 0)))
+	if int(archetype_rewards.get("stop_shards", 0)) > 0:
+		GameManager.add_run_stop_shards(int(archetype_rewards.get("stop_shards", 0)))
+	if int(archetype_rewards.get("heal", 0)) > 0:
+		GameManager.heal_lives(int(archetype_rewards.get("heal", 0)))
+	if SaveManager.has_permanent_upgrade("reroll_ledger") and _reroll_count >= 2:
+		meta_exp_reward += META_LEDGER_EXP_REWARD
+	if SaveManager.has_permanent_upgrade("close_call_study") and _turn_entered_high_risk:
+		meta_exp_reward += META_HIGH_RISK_EXP_REWARD
+	if meta_exp_reward > 0:
+		GameManager.add_run_exp(meta_exp_reward)
+	if meta_shard_reward > 0:
+		GameManager.add_run_stop_shards(meta_shard_reward)
 	var base_banked: int = _calculate_turn_score()
 	# Iron Bank: +50% score if no rerolls.
 	if GameManager.has_modifier(RunModifier.ModifierType.IRON_BANK) and _reroll_count == 0:
@@ -289,9 +341,41 @@ func _on_bank_pressed() -> void:
 		hud.show_status("JACKPOT! +%dg bonus!" % jackpot_gold, Color(1.0, 0.85, 0.0))
 	var mult: int = _get_turn_multiplier()
 	var status_parts: Array[String] = []
+	var contract_status: String = ""
+	var evolution_status: String = ""
 	var mult_text: String = " (x%d!)" % mult if mult > 1 else ""
+	var contract_context: Dictionary = {
+		"effective_stops": bank_effective_stops,
+		"threshold": bank_threshold,
+		"reroll_count": _reroll_count,
+		"even_count": even_count,
+		"odd_count": odd_count,
+		"shield_count": accumulated_shield_count,
+		"raw_stops": accumulated_stop_count,
+		"entered_high_risk": _turn_entered_high_risk,
+	}
+	contract_status = _update_active_contract_on_bank(contract_context)
+	evolution_status = _apply_reroll_evolutions()
 	if heart_relief > 0:
 		status_parts.append("HEARTS -%d STOP" % heart_relief)
+	if is_near_death_bank:
+		status_parts.append("NEAR DEATH +%dg" % NEAR_DEATH_GOLD_BONUS)
+	if int(archetype_rewards.get("gold", 0)) > 0:
+		status_parts.append("ARCHETYPE +%dg" % int(archetype_rewards.get("gold", 0)))
+	if int(archetype_rewards.get("exp", 0)) > 0:
+		status_parts.append("CAPSTONE +%d EXP" % int(archetype_rewards.get("exp", 0)))
+	if int(archetype_rewards.get("stop_shards", 0)) > 0:
+		status_parts.append("CAPSTONE +%d SHARD" % int(archetype_rewards.get("stop_shards", 0)))
+	if int(archetype_rewards.get("heal", 0)) > 0:
+		status_parts.append("LAST CALL +%d LIFE" % int(archetype_rewards.get("heal", 0)))
+	if meta_exp_reward > 0:
+		status_parts.append("LAB +%d EXP" % meta_exp_reward)
+	if meta_shard_reward > 0:
+		status_parts.append("LAB +%d SHARD" % meta_shard_reward)
+	for special_part: String in special_preview.get("status_parts", []) as Array[String]:
+		status_parts.append(special_part)
+	for special_part: String in special_clear_rewards.get("status_parts", []) as Array[String]:
+		status_parts.append(special_part)
 	for special_part: String in special_preview.get("status_parts", []) as Array[String]:
 		status_parts.append(special_part)
 	for special_part: String in special_clear_rewards.get("status_parts", []) as Array[String]:
@@ -300,6 +384,10 @@ func _on_bank_pressed() -> void:
 		status_parts.append("ON FIRE x%.1f" % streak_mult)
 	if momentum_mult > 1.0:
 		status_parts.append("MOMENTUM x%.2f" % momentum_mult)
+	if contract_status != "":
+		status_parts.append(contract_status)
+	if evolution_status != "":
+		status_parts.append(evolution_status)
 	status_parts.append("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score])
 	if not is_jackpot:
 		hud.show_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
@@ -404,6 +492,7 @@ func _reroll_selected_dice() -> void:
 		# Stopped dice are rerolled too (Cubitos-style: pick them up and retry)
 		if dice_stopped[i]:
 			dice_stopped[i] = false
+		_die_reroll_counts[i] += 1
 		rerolled.append(i)
 	if rerolled.is_empty():
 		# No dice to reroll — all are kept/locked, so auto-bank.
@@ -532,6 +621,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	for i: int in GameManager.dice_pool.size():
 		if i not in rolled_indices:
 			_sync_arena_die_state(i)
+	GameManager.set_held_stop_count(_count_intentionally_held_stops())
 	_sync_ui()
 
 	# Status messages based on roll outcome.
@@ -582,6 +672,20 @@ func _all_dice_resolved() -> bool:
 			return false
 	return true
 
+
+func _get_effective_stop_count() -> int:
+	return _bust_resolver.effective_stops(accumulated_stop_count, _count_shields())
+
+
+func _count_intentionally_held_stops() -> int:
+	var total: int = 0
+	for i: int in GameManager.dice_pool.size():
+		if not dice_stopped[i]:
+			continue
+		if dice_keep[i] or dice_keep_locked[i]:
+			total += 1
+	return total
+
 func _calculate_turn_score() -> int:
 	return _turn_score_service.calculate_turn_score(
 		current_results,
@@ -591,6 +695,23 @@ func _calculate_turn_score() -> int:
 		GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE),
 		GameManager.has_modifier(RunModifier.ModifierType.CHAIN_LIGHTNING)
 	)
+
+
+func _apply_reroll_evolutions() -> String:
+	var evolved_names: Array[String] = []
+	for i: int in GameManager.dice_pool.size():
+		if i >= _die_reroll_counts.size():
+			continue
+		var die: DiceData = GameManager.dice_pool[i]
+		if die == null or not die.is_reroll_evolving():
+			continue
+		if die.apply_reroll_progress(_die_reroll_counts[i]):
+			SaveManager.discover_die(die.dice_name)
+			evolved_names.append(die.get_display_name())
+	if evolved_names.is_empty():
+		return ""
+	_sync_all_dice()
+	return "EVOLVED %s" % ", ".join(evolved_names)
 
 
 func _get_roll_resolution_service() -> RefCounted:
@@ -690,9 +811,12 @@ func _consume_insurance_face(die_index: int) -> void:
 
 func _apply_bust_outcome(effective_stops: int) -> void:
 	turn_state = TurnState.BUST
+	_stage_had_bust = true
 	bank_streak = 0
 	_update_streak_display()
 	hud.reset_score_feedback_visuals(true)
+	GameManager.set_held_stop_count(0)
+	_update_active_contract_on_bust()
 	GameManager.lose_life()
 	var insurance_payout: int = GameManager.resolve_insurance_bet()
 	AchievementManager.on_bust()
@@ -897,12 +1021,18 @@ func _estimate_bust_odds(effective_stops: int, threshold: int) -> float:
 	)
 
 
-func _build_risk_details(effective_stops: int, shield_count: int, threshold: int, bust_odds: float) -> String:
+func _build_risk_details(
+	effective_stops: int,
+	shield_count: int,
+	threshold: int,
+	bust_odds: float,
+	reroll_ev: float
+) -> String:
 	if _risk_estimator == null:
 		_risk_estimator = BustRiskEstimatorScript.new()
 	var rerollable_count: int = _get_rerollable_count()
 	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
-	return _risk_estimator.build_risk_details(
+	var details: String = _risk_estimator.build_risk_details(
 		effective_stops,
 		shield_count,
 		threshold,
@@ -911,6 +1041,46 @@ func _build_risk_details(effective_stops: int, shield_count: int, threshold: int
 		rerollable_count,
 		_reroll_count
 	)
+	details += "\nHeld stops: %d | Near-death banks this stage: %d | Reroll EV: %s%.1f" % [
+		GameManager.held_stop_count,
+		GameManager.near_death_banks_this_stage,
+		"+" if reroll_ev >= 0.0 else "",
+		reroll_ev,
+	]
+	return details
+
+
+func _estimate_reroll_ev(effective_stops: int, threshold: int) -> float:
+	var next_roll_chance: float = _estimate_next_reroll_bust_chance(effective_stops, threshold)
+	var expected_gain: float = 0.0
+	for i: int in GameManager.dice_pool.size():
+		if i >= dice_keep.size() or i >= dice_keep_locked.size():
+			continue
+		if dice_keep[i] or dice_keep_locked[i]:
+			continue
+		var die_data: DiceData = GameManager.dice_pool[i]
+		if die_data == null or die_data.faces.is_empty():
+			continue
+		expected_gain += _estimate_die_expected_value(die_data)
+	var survival_chance: float = 1.0 - next_roll_chance
+	return expected_gain * survival_chance - float(_calculate_turn_score()) * next_roll_chance
+
+
+func _estimate_die_expected_value(die_data: DiceData) -> float:
+	if die_data == null or die_data.faces.is_empty():
+		return 0.0
+	var total_value: float = 0.0
+	for face: DiceFaceData in die_data.faces:
+		if face == null:
+			continue
+		match face.type:
+			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
+				total_value += float(face.value)
+			DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+				total_value += float(maxi(1, face.value))
+			DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.LUCK, DiceFaceData.FaceType.HEART:
+				total_value += float(maxi(1, face.value)) * 0.6
+	return total_value / float(die_data.faces.size())
 
 ## Sync the i-th PhysicsDie's visual flags to match RollPhase tracking state.
 func _sync_arena_die_state(index: int) -> void:
@@ -936,9 +1106,12 @@ func _sync_ui() -> void:
 	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var threshold: int = _get_bust_threshold()
 	var bust_odds: float = _estimate_bust_odds(effective_stops, threshold)
-	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds)
+	var reroll_ev: float = _estimate_reroll_ev(effective_stops, threshold)
+	if turn_state == TurnState.ACTIVE and _is_high_risk_turn(effective_stops, threshold, bust_odds):
+		_turn_entered_high_risk = true
+	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds, reroll_ev)
 	var turn_score: int = _calculate_turn_score()
-	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details)
+	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details, reroll_ev)
 	_sync_buttons()
 
 	match turn_state:
@@ -981,6 +1154,7 @@ func _on_stage_cleared() -> void:
 
 func _perform_stage_clear() -> void:
 	AchievementManager.on_stage_cleared()
+	var contract_status: String = _update_active_contract_on_stage_clear()
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
@@ -989,6 +1163,8 @@ func _perform_stage_clear() -> void:
 	GameManager.add_gold(bonus)
 	SFXManager.play_stage_clear()
 	var is_loop: bool = GameManager.is_final_stage()
+	if contract_status != "":
+		hud.show_status(contract_status, Color(1.0, 0.88, 0.3))
 	if is_loop:
 		hud.show_status(
 			"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop, GameManager.current_loop + 1],
@@ -1488,18 +1664,23 @@ func _open_stage_map() -> void:
 	)
 
 
-func _on_map_node_selected(row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool) -> void:
+func _on_map_node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool) -> void:
 	if used_reroute:
 		GameManager.use_reroute_token()
 		hud.show_status("REROUTE SPENT! Path broken for this pick.", Color(1.0, 0.72, 0.35))
-	var selected_node: MapNodeData = GameManager.stage_map.get_node_at(row, col)
+	var selected_node: MapNodeData = node
+	if selected_node == null and GameManager.stage_map != null:
+		selected_node = GameManager.stage_map.get_node_at(row, col)
 	_stage_flow.advance_row(col)
 	stage_map_panel.visible = false
+	var node_type: MapNodeData.NodeType = MapNodeData.NodeType.NORMAL_STAGE
+	if node != null:
+		node_type = node.type
 	match node_type:
 		MapNodeData.NodeType.NORMAL_STAGE:
-			_start_stage_from_map("")
+			_start_stage_from_map(selected_node)
 		MapNodeData.SPECIAL_STAGE_TYPE:
-			_start_stage_from_map(selected_node.special_rule_id if selected_node != null else "")
+			_start_stage_from_map(selected_node, selected_node.special_rule_id if selected_node != null else "")
 		MapNodeData.NodeType.SHOP:
 			_open_shop_from_map()
 		MapNodeData.NodeType.FORGE:
@@ -1510,14 +1691,17 @@ func _on_map_node_selected(row: int, col: int, node_type: MapNodeData.NodeType, 
 			_show_stage_event()
 
 
-func _start_stage_from_map(special_rule_id: String = "") -> void:
-	_stage_flow.begin_stage_from_map()
+func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: String = "") -> void:
+	_stage_flow.begin_stage_from_map(stage_node)
+	_reset_stage_contract_trackers()
 	if special_rule_id != "":
 		GameManager.enter_special_stage(special_rule_id)
 		hud.show_status(
 			"SPECIAL STAGE: %s" % GameManager.get_active_special_stage_summary(),
 			GameManager.get_active_special_stage_color()
 		)
+	elif GameManager.has_current_stage_variant():
+		hud.show_status(GameManager.get_current_stage_variant_hover_text(), Color(0.55, 0.9, 1.0))
 	_roll_content.visible = true
 	_update_streak_display()
 	_run_active = true
@@ -1570,13 +1754,13 @@ func _on_rest_overlay_continue(overlay: ColorRect) -> void:
 
 func _complete_loop() -> void:
 	_stage_flow.complete_loop()
+	_reset_stage_contract_trackers()
 	AchievementManager.on_loop_advanced(GameManager.current_loop)
 	_maybe_apply_curse()
 	hud.show_status(
 		"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop - 1, GameManager.current_loop],
 		Color(1.0, 0.85, 0.0))
-	# Open the new loop's map.
-	_open_stage_map()
+	_begin_loop_contract_flow(ContractContinuation.OPEN_STAGE_MAP)
 
 
 # ---------------------------------------------------------------------------
@@ -1623,10 +1807,121 @@ func _on_archetype_selected(run_mode: int, archetype: int) -> void:
 	GameManager.reset_run()
 	_run_snapshot_recorded = false
 	_run_active = true
-	turn_number = 0
-	bank_streak = 0
-	_update_streak_display()
-	_start_new_turn()
+	_begin_loop_contract_flow(ContractContinuation.START_TURN)
+
+
+func _begin_loop_contract_flow(continuation: int) -> void:
+	var offer_count: int = 4 if SaveManager.has_permanent_upgrade("contract_scout") else 3
+	var offers: Array[LoopContractData] = LoopContractCatalogScript.get_offers_for_loop(GameManager.current_loop, offer_count)
+	if offers.is_empty():
+		_continue_after_contract_selection(continuation)
+		return
+	var offered_ids: Array[String] = []
+	for offer: LoopContractData in offers:
+		offered_ids.append(offer.contract_id)
+	GameManager.set_offered_loop_contract_ids(offered_ids)
+	if GameManager.skip_archetype_picker:
+		_apply_selected_loop_contract(offers[0].contract_id, continuation)
+		return
+	_run_active = false
+	roll_button.disabled = true
+	bank_button.disabled = true
+	var panel: ColorRect = ContractSelectionPanelScene.instantiate() as ColorRect
+	add_child(panel)
+	panel.call("open", GameManager.current_loop, offers)
+	panel.connect("contract_selected", _on_loop_contract_selected.bind(continuation))
+
+
+func _on_loop_contract_selected(contract_id: String, continuation: int) -> void:
+	_apply_selected_loop_contract(contract_id, continuation)
+
+
+func _apply_selected_loop_contract(contract_id: String, continuation: int) -> void:
+	GameManager.activate_loop_contract(contract_id)
+	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(contract_id)
+	if contract != null:
+		hud.show_status("Loop Contract: %s" % contract.display_name, Color(0.35, 0.92, 1.0))
+	_continue_after_contract_selection(continuation)
+
+
+func _continue_after_contract_selection(continuation: int) -> void:
+	_run_active = true
+	if continuation == ContractContinuation.START_TURN:
+		turn_number = 0
+		bank_streak = 0
+		_reset_stage_contract_trackers()
+		_update_streak_display()
+		_start_new_turn()
+	else:
+		_open_stage_map()
+
+
+func _reset_stage_contract_trackers() -> void:
+	_stage_had_bust = false
+	_turn_entered_high_risk = false
+
+
+func _is_high_risk_turn(effective_stops: int, threshold: int, bust_odds: float) -> bool:
+	return effective_stops >= threshold - 1 or bust_odds >= HIGH_RISK_ODDS_THRESHOLD
+
+
+func _update_active_contract_on_bank(context: Dictionary) -> String:
+	var contract_id: String = GameManager.active_loop_contract_id
+	if contract_id.is_empty() or _contract_progress_service == null:
+		return ""
+	var old_progress: Dictionary = GameManager.active_loop_contract_progress.duplicate(true)
+	var new_progress: Dictionary = _contract_progress_service.on_bank(contract_id, old_progress, context)
+	return _commit_active_contract_progress(contract_id, old_progress, new_progress)
+
+
+func _update_active_contract_on_bust() -> void:
+	var contract_id: String = GameManager.active_loop_contract_id
+	if contract_id.is_empty() or _contract_progress_service == null:
+		return
+	var progress: Dictionary = _contract_progress_service.on_bust(
+		contract_id,
+		GameManager.active_loop_contract_progress,
+		{"stage_had_bust": _stage_had_bust}
+	)
+	if not progress.is_empty():
+		GameManager.update_loop_contract_progress(progress)
+
+
+func _update_active_contract_on_stage_clear() -> String:
+	var contract_id: String = GameManager.active_loop_contract_id
+	if contract_id.is_empty() or _contract_progress_service == null:
+		return ""
+	var old_progress: Dictionary = GameManager.active_loop_contract_progress.duplicate(true)
+	var new_progress: Dictionary = _contract_progress_service.on_stage_clear(
+		contract_id,
+		old_progress,
+		{"stage_had_bust": _stage_had_bust}
+	)
+	return _commit_active_contract_progress(contract_id, old_progress, new_progress)
+
+
+func _commit_active_contract_progress(contract_id: String, old_progress: Dictionary, new_progress: Dictionary) -> String:
+	if new_progress.is_empty():
+		return ""
+	GameManager.update_loop_contract_progress(new_progress)
+	var was_completed: bool = bool(old_progress.get("completed", false))
+	var is_completed: bool = bool(new_progress.get("completed", false))
+	if was_completed or not is_completed:
+		return ""
+	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(contract_id)
+	if contract == null:
+		return ""
+	_apply_contract_reward(contract)
+	return "CONTRACT COMPLETE: %s" % contract.display_name
+
+
+func _apply_contract_reward(contract: LoopContractData) -> void:
+	if contract.reward_gold > 0:
+		GameManager.add_gold(contract.reward_gold)
+	if contract.reward_exp > 0:
+		GameManager.add_run_exp(contract.reward_exp)
+	if contract.reward_stop_shards > 0:
+		GameManager.add_run_stop_shards(contract.reward_stop_shards)
 
 
 func _record_run_snapshot_if_needed() -> void:

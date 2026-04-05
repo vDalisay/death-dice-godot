@@ -28,6 +28,10 @@ const RARITY_PURPLE_COLOR: Color = Color("#7C3AED")
 @export var faces: Array[DiceFaceData] = []
 @export var custom_color: Color = Color.TRANSPARENT
 @export var rarity: Rarity = Rarity.GREY
+@export var reroll_family_id: String = ""
+@export var reroll_tier: int = 0
+@export var reroll_upgrade_thresholds: Array[int] = []
+@export var reroll_affinity_locked: bool = false
 
 
 static func get_rarity_color(tier: Rarity) -> Color:
@@ -47,6 +51,23 @@ func get_rarity_color_value() -> Color:
 	return DiceData.get_rarity_color(rarity)
 
 
+func is_reroll_evolving() -> bool:
+	return not reroll_family_id.is_empty()
+
+
+func get_reroll_tier_label() -> String:
+	if not is_reroll_evolving():
+		return ""
+	var lock_suffix: String = "*" if reroll_affinity_locked else ""
+	return "R%d%s" % [reroll_tier + 1, lock_suffix]
+
+
+func get_display_name() -> String:
+	if not is_reroll_evolving():
+		return dice_name
+	return "%s [%s]" % [dice_name, get_reroll_tier_label()]
+
+
 func roll() -> DiceFaceData:
 	return faces[randi() % faces.size()]
 
@@ -63,6 +84,44 @@ func has_stop_face() -> bool:
 ## Will not remove the last STOP face (balance invariant).
 func upgrade_weakest_face() -> bool:
 	return _upgrade_service.upgrade_weakest_face(self)
+
+
+func apply_reroll_progress(reroll_count: int) -> bool:
+	if not is_reroll_evolving() or reroll_upgrade_thresholds.is_empty():
+		return false
+	var target_tier: int = reroll_tier
+	while target_tier < reroll_upgrade_thresholds.size() and reroll_count >= reroll_upgrade_thresholds[target_tier]:
+		target_tier += 1
+	if target_tier <= reroll_tier:
+		return false
+	evolve_to_reroll_tier(target_tier)
+	return true
+
+
+func evolve_to_reroll_tier(target_tier: int) -> void:
+	if not is_reroll_evolving():
+		return
+	var template: DiceData = DiceData.make_reroll_chaser_d6(target_tier)
+	if template == null:
+		return
+	var keep_locked: bool = reroll_affinity_locked
+	_copy_from(template)
+	reroll_affinity_locked = keep_locked or template.reroll_affinity_locked
+
+
+func _copy_from(source_die: DiceData) -> void:
+	dice_name = source_die.dice_name
+	custom_color = source_die.custom_color
+	rarity = source_die.rarity
+	reroll_family_id = source_die.reroll_family_id
+	reroll_tier = source_die.reroll_tier
+	reroll_upgrade_thresholds = source_die.reroll_upgrade_thresholds.duplicate()
+	faces.clear()
+	for face: DiceFaceData in source_die.faces:
+		var copied_face := DiceFaceData.new()
+		copied_face.type = face.type
+		copied_face.value = face.value
+		faces.append(copied_face)
 
 
 func _face_power(face: DiceFaceData) -> int:
@@ -330,6 +389,9 @@ static func make_blank_canvas_d6() -> DiceData:
 static func get_all_known_dice() -> Array[DiceData]:
 	var all: Array[DiceData] = [
 		make_standard_d6(),
+		make_reroll_chaser_d6(),
+		make_reroll_chaser_d6(1),
+		make_reroll_chaser_d6(2),
 		make_shield_d6(),
 		make_heart_d6(),
 		make_blank_canvas_d6(),
@@ -362,6 +424,59 @@ static func make_simple_d6() -> DiceData:
 	for config: Array in configs:
 		var face := DiceFaceData.new()
 		face.type  = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+	return die
+
+
+static func make_reroll_chaser_d6(tier: int = 0) -> DiceData:
+	var die := DiceData.new()
+	die.reroll_family_id = "reroll_chaser"
+	die.reroll_upgrade_thresholds = [1, 3]
+	var configs: Array = []
+	match clampi(tier, 0, 2):
+		0:
+			die.dice_name = "Spark Chaser D6"
+			die.rarity = Rarity.GREY
+			die.custom_color = Color("#4FB3FF")
+			die.reroll_tier = 0
+			configs = [
+				[DiceFaceData.FaceType.NUMBER, 1],
+				[DiceFaceData.FaceType.NUMBER, 2],
+				[DiceFaceData.FaceType.NUMBER, 2],
+				[DiceFaceData.FaceType.AUTO_KEEP, 1],
+				[DiceFaceData.FaceType.BLANK, 0],
+				[DiceFaceData.FaceType.STOP, 0],
+			]
+		1:
+			die.dice_name = "Surge Chaser D6"
+			die.rarity = Rarity.GREEN
+			die.custom_color = Color("#2ED0C2")
+			die.reroll_tier = 1
+			configs = [
+				[DiceFaceData.FaceType.NUMBER, 2],
+				[DiceFaceData.FaceType.NUMBER, 2],
+				[DiceFaceData.FaceType.NUMBER, 3],
+				[DiceFaceData.FaceType.AUTO_KEEP, 2],
+				[DiceFaceData.FaceType.EXPLODE, 1],
+				[DiceFaceData.FaceType.STOP, 0],
+			]
+		_:
+			die.dice_name = "Tempest Chaser D6"
+			die.rarity = Rarity.BLUE
+			die.custom_color = Color("#FF8A3D")
+			die.reroll_tier = 2
+			configs = [
+				[DiceFaceData.FaceType.NUMBER, 3],
+				[DiceFaceData.FaceType.NUMBER, 3],
+				[DiceFaceData.FaceType.NUMBER, 4],
+				[DiceFaceData.FaceType.AUTO_KEEP, 3],
+				[DiceFaceData.FaceType.EXPLODE, 2],
+				[DiceFaceData.FaceType.STOP, 0],
+			]
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type = config[0]
 		face.value = config[1]
 		die.faces.append(face)
 	return die

@@ -90,8 +90,12 @@ func _rebuild_reward_cards(luck: int) -> void:
 
 	var weights: Array[float] = _calc_weights(luck)
 	for i: int in 3:
-		var rarity: DiceData.Rarity = _roll_rarity(weights)
-		var die: DiceData = _pick_die_for_rarity(rarity)
+		var die: DiceData = null
+		if i == 0:
+			die = DiceData.make_reroll_chaser_d6(mini(2, maxi(0, GameManager.current_loop - 1)))
+		else:
+			var rarity: DiceData.Rarity = _roll_rarity(weights)
+			die = _pick_die_for_rarity(rarity)
 		_dice_options.append(die)
 		var card: PanelContainer = _build_card(die, i)
 		_card_row.add_child(card)
@@ -208,12 +212,21 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 
 	# Die name
 	var name_label := Label.new()
-	name_label.text = die.dice_name
+	name_label.text = die.get_display_name()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_override("font", _UITheme.font_stats())
 	name_label.add_theme_font_size_override("font_size", 16)
 	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 	vbox.add_child(name_label)
+
+	if die.is_reroll_evolving():
+		var tier_label := Label.new()
+		tier_label.text = "Evolves from rerolls"
+		tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tier_label.add_theme_font_override("font", _UITheme.font_mono())
+		tier_label.add_theme_font_size_override("font_size", 11)
+		tier_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+		vbox.add_child(tier_label)
 
 	# Face grid
 	var grid := GridContainer.new()

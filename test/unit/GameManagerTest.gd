@@ -1,6 +1,8 @@
 extends GdUnitTestSuite
 ## Unit tests for GameManager autoload.
 
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
+
 var _gm: Node
 var _saved_prestige_unlocks: Array[String] = []
 
@@ -23,6 +25,7 @@ func test_initial_state() -> void:
 	assert_int(_gm.lives).is_equal(3)
 	assert_int(_gm.stage_target_score).is_equal(30)
 	assert_int(_gm.current_stage).is_equal(1)
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
 	assert_int(_gm.gold).is_equal(0)
 	assert_int(_gm.run_mode).is_equal(_gm.RunMode.CLASSIC)
 
@@ -95,7 +98,12 @@ func test_reset_run_restores_defaults() -> void:
 	_gm.add_score(300)
 	_gm.lose_life()
 	_gm.current_stage = 3
+	_gm.set_current_stage_variant(SpecialStageCatalog.Variant.HOT_TABLE)
 	_gm.gold = 100
+	_gm.current_run_exp = 5
+	_gm.current_run_stop_shards = 2
+	_gm.set_held_stop_count(3)
+	_gm.activate_loop_contract("dead_close")
 	_gm.reset_run()
 	assert_int(_gm.total_score).is_equal(0)
 	assert_int(_gm.lives).is_equal(3)
@@ -103,6 +111,11 @@ func test_reset_run_restores_defaults() -> void:
 	assert_int(_gm.gold).is_equal(0)
 	assert_int(_gm.stage_target_score).is_equal(30)
 	assert_int(_gm.dice_pool.size()).is_equal(6)
+	assert_int(_gm.current_run_exp).is_equal(0)
+	assert_int(_gm.current_run_stop_shards).is_equal(0)
+	assert_int(_gm.held_stop_count).is_equal(0)
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
+	assert_str(_gm.active_loop_contract_id).is_equal("")
 
 
 func test_reset_run_emits_signals() -> void:
@@ -113,6 +126,8 @@ func test_reset_run_emits_signals() -> void:
 	await assert_signal(_gm).is_emitted("score_changed", [0])
 	await assert_signal(_gm).is_emitted("lives_changed", [3])
 	await assert_signal(_gm).is_emitted("gold_changed", [0])
+	await assert_signal(_gm).is_emitted("run_exp_changed", [0])
+	await assert_signal(_gm).is_emitted("run_stop_shards_changed", [0])
 	await assert_signal(_gm).is_emitted("stage_advanced", [1])
 
 
@@ -182,6 +197,41 @@ func test_add_gold_emits_signal() -> void:
 	monitor_signals(_gm, false)
 	_gm.add_gold(25)
 	await assert_signal(_gm).is_emitted("gold_changed", [25])
+
+
+func test_activate_loop_contract_updates_state() -> void:
+	monitor_signals(_gm, false)
+	_gm.activate_loop_contract("dead_close")
+	assert_str(_gm.active_loop_contract_id).is_equal("dead_close")
+	await assert_signal(_gm).is_emitted("loop_contract_changed", ["dead_close"])
+
+
+func test_register_near_death_bank_increments_counters() -> void:
+	monitor_signals(_gm, false)
+	_gm.register_near_death_bank(3, 4)
+	assert_int(_gm.near_death_banks_this_stage).is_equal(1)
+	assert_int(_gm.near_death_banks_this_run).is_equal(1)
+	await assert_signal(_gm).is_emitted("near_death_banked", [3, 4])
+
+
+func test_stop_collector_bank_rewards_scale_with_effective_stops() -> void:
+	_gm.current_loop = 3
+	_gm.set_archetype(_gm.Archetype.STOP_COLLECTOR)
+	var rewards: Dictionary = _gm.get_archetype_bank_rewards(2, false)
+	assert_int(int(rewards.get("gold", 0))).is_equal(4)
+	assert_int(int(rewards.get("exp", 0))).is_equal(1)
+
+
+func test_last_call_heals_once_per_stage() -> void:
+	_gm.set_archetype(_gm.Archetype.LAST_CALL)
+	_gm.lives = 2
+	var first_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
+	var second_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
+	assert_int(int(first_rewards.get("heal", 0))).is_equal(1)
+	assert_int(int(second_rewards.get("heal", 0))).is_equal(0)
+	_gm.advance_stage()
+	var next_stage_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
+	assert_int(int(next_stage_rewards.get("heal", 0))).is_equal(1)
 
 
 func test_spend_gold_succeeds() -> void:
@@ -371,13 +421,23 @@ func test_begin_stage_from_map_updates_stage_and_score() -> void:
 	_gm.current_stage = 1
 	_gm.total_stages_cleared = 0
 	_gm.total_score = 77
+	var node := MapNodeData.new()
+	node.stage_variant = SpecialStageCatalog.Variant.PRECISION_HALL
 	monitor_signals(_gm, false)
-	_gm.begin_stage_from_map()
+	_gm.begin_stage_from_map(node)
 	assert_int(_gm.current_stage).is_equal(2)
 	assert_int(_gm.total_stages_cleared).is_equal(1)
 	assert_int(_gm.total_score).is_equal(0)
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.PRECISION_HALL)
 	await assert_signal(_gm).is_emitted("score_changed", [0])
+	await assert_signal(_gm).is_emitted("stage_variant_changed", [SpecialStageCatalog.Variant.PRECISION_HALL])
 	await assert_signal(_gm).is_emitted("stage_advanced", [2])
+
+
+func test_begin_stage_from_map_without_node_clears_variant() -> void:
+	_gm.set_current_stage_variant(SpecialStageCatalog.Variant.HOT_TABLE)
+	_gm.begin_stage_from_map()
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
 
 
 func test_register_turn_score_updates_only_when_higher() -> void:

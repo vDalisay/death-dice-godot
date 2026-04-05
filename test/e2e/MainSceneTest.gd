@@ -48,6 +48,7 @@ func test_roll_button_starts_enabled() -> void:
 	var root: RollPhase = _get_root(runner)
 	assert_bool(root.roll_button.disabled).is_false()
 	assert_str(root.roll_button.text).is_equal("Roll All")
+	assert_str(GameManager.active_loop_contract_id).is_equal("safe_hands")
 
 
 func test_bank_button_starts_disabled() -> void:
@@ -210,3 +211,28 @@ func test_stage_clear_overlay_waits_for_final_bank_count() -> void:
 	await await_millis(1300)
 	await runner.simulate_frames(2)
 	assert_object(root.find_child("StageClearedOverlay", true, false)).is_not_null()
+
+
+func test_near_death_bank_awards_bonus_gold() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	GameManager.stage_target_score = 999
+	GameManager.gold = 0
+	GameManager.total_score = 0
+	root.turn_state = RollPhase.TurnState.ACTIVE
+	root.turn_number = 4
+	root.accumulated_stop_count = 3
+	root.accumulated_shield_count = 0
+	var scoring_face := DiceFaceData.new()
+	scoring_face.type = DiceFaceData.FaceType.NUMBER
+	scoring_face.value = 2
+	for i: int in GameManager.dice_pool.size():
+		root.current_results[i] = scoring_face
+		root.dice_stopped[i] = false
+		root.dice_keep[i] = true
+		root.dice_keep_locked[i] = false
+	root.bank_button.pressed.emit()
+	await runner.simulate_frames(2)
+	assert_int(GameManager.near_death_banks_this_run).is_equal(1)
+	assert_int(GameManager.gold - GameManager.total_score).is_equal(RollPhase.NEAR_DEATH_GOLD_BONUS)

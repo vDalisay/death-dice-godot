@@ -94,6 +94,48 @@ func test_blank_slate_archetype_pool() -> void:
 	GameManager.reset_run()
 
 
+func test_stop_collector_archetype_pool() -> void:
+	GameManager.chosen_archetype = GameManager.Archetype.STOP_COLLECTOR
+	GameManager.reset_run()
+	assert_int(GameManager.dice_pool.size()).is_equal(6)
+	var standard_count: int = 0
+	var gambler_count: int = 0
+	var shield_count: int = 0
+	for die: DiceData in GameManager.dice_pool:
+		if die.dice_name == "Standard D6":
+			standard_count += 1
+		elif die.dice_name == "Gambler D6":
+			gambler_count += 1
+		elif die.dice_name == "Shield D6":
+			shield_count += 1
+	assert_int(standard_count).is_equal(4)
+	assert_int(gambler_count).is_equal(1)
+	assert_int(shield_count).is_equal(1)
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.reset_run()
+
+
+func test_last_call_archetype_pool() -> void:
+	GameManager.chosen_archetype = GameManager.Archetype.LAST_CALL
+	GameManager.reset_run()
+	assert_int(GameManager.dice_pool.size()).is_equal(6)
+	var gambler_count: int = 0
+	var heavy_count: int = 0
+	var shield_count: int = 0
+	for die: DiceData in GameManager.dice_pool:
+		if die.dice_name == "Gambler D6":
+			gambler_count += 1
+		elif die.dice_name == "Heavy D6":
+			heavy_count += 1
+		elif die.dice_name == "Shield D6":
+			shield_count += 1
+	assert_int(gambler_count).is_equal(3)
+	assert_int(heavy_count).is_equal(2)
+	assert_int(shield_count).is_equal(1)
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.reset_run()
+
+
 func test_risk_it_doubles_gold() -> void:
 	GameManager.chosen_archetype = GameManager.Archetype.RISK_IT
 	GameManager.reset_run()
@@ -335,6 +377,14 @@ func test_risk_it_unlock_requires_1_loop() -> void:
 
 func test_blank_slate_unlock_requires_3_loops() -> void:
 	assert_int(GameManager.ARCHETYPE_UNLOCK_LOOPS[GameManager.Archetype.BLANK_SLATE]).is_equal(3)
+
+
+func test_stop_collector_unlock_requires_2_loops() -> void:
+	assert_int(GameManager.ARCHETYPE_UNLOCK_LOOPS[GameManager.Archetype.STOP_COLLECTOR]).is_equal(2)
+
+
+func test_last_call_unlock_requires_4_loops() -> void:
+	assert_int(GameManager.ARCHETYPE_UNLOCK_LOOPS[GameManager.Archetype.LAST_CALL]).is_equal(4)
 
 
 # ---------------------------------------------------------------------------

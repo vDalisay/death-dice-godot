@@ -2,6 +2,7 @@ extends Node
 ## Global score and run state. Registered as autoload "GameManager".
 
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const MAX_LIVES: int = 3
@@ -15,20 +16,25 @@ const LOOP_BONUS_GOLD_STEP: int = 10
 const MAX_MODIFIERS: int = 3
 const MISER_SPEND_THRESHOLD: int = 15
 const MISER_BONUS_GOLD: int = 20
+const ARCHETYPE_CAPSTONE_LOOP: int = 3
 
-enum Archetype { CAUTION, RISK_IT, BLANK_SLATE, FORTUNE_FOOL }
+enum Archetype { CAUTION, RISK_IT, BLANK_SLATE, FORTUNE_FOOL, STOP_COLLECTOR, LAST_CALL }
 enum RunMode { CLASSIC, GAUNTLET }
 const ARCHETYPE_NAMES: Dictionary = {
 	Archetype.CAUTION: "Caution",
 	Archetype.RISK_IT: "Risk It",
 	Archetype.BLANK_SLATE: "Blank Slate",
 	Archetype.FORTUNE_FOOL: "Fortune's Fool",
+	Archetype.STOP_COLLECTOR: "Stop Collector",
+	Archetype.LAST_CALL: "Last Call",
 }
 const ARCHETYPE_DESCRIPTIONS: Dictionary = {
 	Archetype.CAUTION: "5 Standard dice + 1 Shield die, bust immunity to turn 3.",
 	Archetype.RISK_IT: "5 Gambler dice, 2x gold per turn.",
 	Archetype.BLANK_SLATE: "8 Blank Canvas dice, shop gold doubled.",
 	Archetype.FORTUNE_FOOL: "10 Fortune dice, LUCK x2, but start with only 15 gold.",
+	Archetype.STOP_COLLECTOR: "4 Standard + Gambler + Shield. Banked stops pay gold. Capstone: loop 3+ banks at 2+ stops earn EXP.",
+	Archetype.LAST_CALL: "3 Gambler + 2 Heavy + 1 Shield. Near-death banks heal once per stage. Capstone: loop 3+ near-death banks earn a Shard.",
 }
 ## Loops required to unlock each archetype (0 = always available).
 const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
@@ -36,6 +42,8 @@ const ARCHETYPE_UNLOCK_LOOPS: Dictionary = {
 	Archetype.RISK_IT: 1,
 	Archetype.BLANK_SLATE: 3,
 	Archetype.FORTUNE_FOOL: 0,
+	Archetype.STOP_COLLECTOR: 2,
+	Archetype.LAST_CALL: 4,
 }
 const RUN_MODE_NAMES: Dictionary = {
 	RunMode.CLASSIC: "Classic",
@@ -55,6 +63,13 @@ signal loop_advanced(new_loop: int)
 signal luck_changed(new_luck: int)
 signal momentum_changed(new_momentum: int)
 signal run_mode_changed(new_mode: int)
+signal stage_variant_changed(new_variant: int)
+signal held_stops_changed(new_total: int)
+signal near_death_banked(effective_stops: int, threshold: int)
+signal loop_contract_changed(active_contract_id: String)
+signal loop_contract_progress_changed(progress: Dictionary)
+signal run_exp_changed(new_total: int)
+signal run_stop_shards_changed(new_total: int)
 
 var total_score: int = 0
 var lives: int = MAX_LIVES
@@ -65,6 +80,7 @@ var previous_col: int = -1
 var stage_map: Resource = null
 var gold: int = 0
 var stage_target_score: int = BASE_STAGE_TARGET
+var current_stage_variant: int = SpecialStageCatalog.Variant.NONE
 var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
 var best_turn_score: int = 0
@@ -73,6 +89,14 @@ var active_modifiers: Array[RunModifier] = []
 var chosen_archetype: Archetype = Archetype.CAUTION
 var run_mode: RunMode = RunMode.CLASSIC
 var luck: int = 0
+var current_run_exp: int = 0
+var current_run_stop_shards: int = 0
+var held_stop_count: int = 0
+var active_loop_contract_id: String = ""
+var active_loop_contract_progress: Dictionary = {}
+var offered_loop_contract_ids: Array[String] = []
+var near_death_banks_this_stage: int = 0
+var near_death_banks_this_run: int = 0
 ## Event flags — temporary effects that reset each loop.
 var event_free_bust: bool = false
 var event_target_multiplier: float = 1.0
@@ -106,6 +130,7 @@ var prestige_shop_tier_active: bool = false
 var prestige_reward_reroll_available: bool = false
 var prestige_reroute_uses: int = 0
 var _revealed_loop_numbers: Array[int] = []
+var _last_call_heal_used_this_stage: bool = false
 var active_special_stage_id: String = ""
 var _special_stage_first_reroll_used: bool = false
 
@@ -122,6 +147,55 @@ func add_momentum(amount: int = 1) -> void:
 func reset_momentum() -> void:
 	momentum = 0
 	momentum_changed.emit(momentum)
+
+
+func add_run_exp(amount: int) -> void:
+	if amount <= 0:
+		return
+	current_run_exp += amount
+	run_exp_changed.emit(current_run_exp)
+
+
+func add_run_stop_shards(amount: int) -> void:
+	if amount <= 0:
+		return
+	current_run_stop_shards += amount
+	run_stop_shards_changed.emit(current_run_stop_shards)
+
+
+func set_held_stop_count(count: int) -> void:
+	held_stop_count = maxi(0, count)
+	held_stops_changed.emit(held_stop_count)
+
+
+func set_offered_loop_contract_ids(contract_ids: Array[String]) -> void:
+	offered_loop_contract_ids = contract_ids.duplicate()
+
+
+func activate_loop_contract(contract_id: String) -> void:
+	active_loop_contract_id = contract_id
+	active_loop_contract_progress = {}
+	loop_contract_changed.emit(active_loop_contract_id)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func clear_active_loop_contract() -> void:
+	active_loop_contract_id = ""
+	active_loop_contract_progress = {}
+	offered_loop_contract_ids.clear()
+	loop_contract_changed.emit(active_loop_contract_id)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func update_loop_contract_progress(progress: Dictionary) -> void:
+	active_loop_contract_progress = progress.duplicate(true)
+	loop_contract_progress_changed.emit(active_loop_contract_progress.duplicate(true))
+
+
+func register_near_death_bank(effective_stops: int, threshold: int) -> void:
+	near_death_banks_this_stage += 1
+	near_death_banks_this_run += 1
+	near_death_banked.emit(effective_stops, threshold)
 
 
 func set_event_free_bust(enabled: bool) -> void:
@@ -150,8 +224,30 @@ func heal_lives(amount: int) -> void:
 	lives_changed.emit(lives)
 
 
-func begin_stage_from_map() -> void:
+func set_current_stage_variant(stage_variant: int) -> void:
+	current_stage_variant = SpecialStageCatalog.sanitize(stage_variant)
+	stage_variant_changed.emit(current_stage_variant)
+
+
+func has_current_stage_variant() -> bool:
+	return current_stage_variant != SpecialStageCatalog.Variant.NONE
+
+
+func get_current_stage_variant_name() -> String:
+	return SpecialStageCatalog.get_display_name(current_stage_variant)
+
+
+func get_current_stage_variant_hover_text() -> String:
+	return SpecialStageCatalog.get_hover_text(current_stage_variant)
+
+
+func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
+	var stage_variant: int = SpecialStageCatalog.Variant.NONE
+	if stage_node != null:
+		stage_variant = stage_node.stage_variant
+	set_current_stage_variant(stage_variant)
 	clear_special_stage()
+
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
@@ -198,6 +294,17 @@ func _build_starting_pool() -> void:
 		Archetype.FORTUNE_FOOL:
 			for i: int in 10:
 				dice_pool.append(DiceData.make_fortune_d6())
+		Archetype.STOP_COLLECTOR:
+			for i: int in 4:
+				dice_pool.append(DiceData.make_standard_d6())
+			dice_pool.append(DiceData.make_gambler_d6())
+			dice_pool.append(DiceData.make_shield_d6())
+		Archetype.LAST_CALL:
+			for i: int in 3:
+				dice_pool.append(DiceData.make_gambler_d6())
+			for i: int in 2:
+				dice_pool.append(DiceData.make_heavy_d6())
+			dice_pool.append(DiceData.make_shield_d6())
 
 
 func add_dice(die: DiceData) -> void:
@@ -279,10 +386,13 @@ func get_run_mode_name() -> String:
 
 
 func advance_stage() -> void:
+	set_current_stage_variant(SpecialStageCatalog.Variant.NONE)
 	clear_special_stage()
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
+	near_death_banks_this_stage = 0
+	_last_call_heal_used_this_stage = false
 	reset_momentum()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
@@ -300,8 +410,12 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
+	set_current_stage_variant(SpecialStageCatalog.Variant.NONE)
+	near_death_banks_this_stage = 0
+	_last_call_heal_used_this_stage = false
 	reset_momentum()
 	_reset_event_flags()
+	clear_active_loop_contract()
 	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
 	score_changed.emit(total_score)
@@ -354,16 +468,24 @@ func reset_run() -> void:
 	current_row = 0
 	previous_col = -1
 	total_score = 0
+	set_current_stage_variant(SpecialStageCatalog.Variant.NONE)
 	total_stages_cleared = 0
 	run_busts = 0
 	lives = MAX_LIVES
 	gold = 0
 	best_turn_score = 0
 	luck = 0
+	current_run_exp = 0
+	current_run_stop_shards = 0
+	held_stop_count = 0
+	near_death_banks_this_stage = 0
+	near_death_banks_this_run = 0
+	_last_call_heal_used_this_stage = false
 	event_free_bust = false
 	event_target_multiplier = 1.0
 	reset_momentum()
 	active_modifiers.clear()
+	clear_active_loop_contract()
 	_shop_gold_spent = 0
 	_miser_bonus_pending = false
 	_clear_side_bets()
@@ -382,8 +504,32 @@ func reset_run() -> void:
 	score_changed.emit(total_score)
 	lives_changed.emit(lives)
 	gold_changed.emit(gold)
+	run_exp_changed.emit(current_run_exp)
+	run_stop_shards_changed.emit(current_run_stop_shards)
+	held_stops_changed.emit(held_stop_count)
 	stage_advanced.emit(current_stage)
 	loop_advanced.emit(current_loop)
+
+
+func get_archetype_bank_rewards(effective_stops: int, is_near_death_bank: bool) -> Dictionary:
+	var rewards: Dictionary = {
+		"gold": 0,
+		"exp": 0,
+		"stop_shards": 0,
+		"heal": 0,
+	}
+	match chosen_archetype:
+		Archetype.STOP_COLLECTOR:
+			rewards["gold"] = maxi(0, effective_stops) * 2
+			if current_loop >= ARCHETYPE_CAPSTONE_LOOP and effective_stops >= 2:
+				rewards["exp"] = 1
+		Archetype.LAST_CALL:
+			if is_near_death_bank and lives < MAX_LIVES and not _last_call_heal_used_this_stage:
+				rewards["heal"] = 1
+				_last_call_heal_used_this_stage = true
+			if current_loop >= ARCHETYPE_CAPSTONE_LOOP and is_near_death_bank:
+				rewards["stop_shards"] = 1
+	return rewards
 
 
 func enter_special_stage(rule_id: String) -> void:

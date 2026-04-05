@@ -6,6 +6,8 @@ extends VBoxContainer
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
+const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+const ContractProgressServiceScript: GDScript = preload("res://Scripts/ContractProgressService.gd")
 
 const SCORE_COUNT_DURATION: float = 0.5
 const SCORE_STEP_DURATION: float = 0.18
@@ -23,6 +25,9 @@ const PROGRESS_THICKEN_DEFLATE_DURATION: float = 0.45
 const ALMOST_THERE_THRESHOLD: float = 0.9
 const RISK_PIP_COUNT: int = 5
 const COMBO_BADGE_HEIGHT: int = 26
+const JUICY_DANGER_MIN: float = 0.6
+const JUICY_DANGER_MAX: float = 0.85
+const JUICY_DANGER_SCORE_FLOOR: int = 12
 
 # -- Top bar labels --
 @onready var stage_label: Label      = $TopBar/TopBarMargin/TopBarRow/StageLabel
@@ -49,6 +54,8 @@ const COMBO_BADGE_HEIGHT: int = 26
 
 # -- Info row --
 @onready var stop_label: Label            = $InfoRow/RiskColumn/StopLabel
+@onready var _risk_meta_label: Label = $InfoRow/RiskColumn/RiskMetaLabel
+@onready var _contract_label: Label = $InfoRow/RiskColumn/ContractLabel
 @onready var _risk_meter: PanelContainer = $InfoRow/RiskColumn/RiskMeter
 @onready var _risk_percent_label: Label = $InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskPercentLabel
 @onready var _risk_container: HBoxContainer = $InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskContainer
@@ -85,18 +92,27 @@ var _score_feedback_active: bool = false
 var _score_feedback_is_reroll: bool = false
 var _score_feedback_display_total: int = 0
 var _score_feedback_pending_total: int = -1
+var _last_bust_odds: float = 0.0
+var _held_stop_count: int = 0
+var _near_death_banks: int = 0
+var _contract_progress_service: RefCounted = null
 
 
 func _ready() -> void:
 	_create_risk_pips()
 	_cache_modifier_badges()
 	_apply_theme_styling()
+	_contract_progress_service = ContractProgressServiceScript.new()
 	_progress_bar_base_size = progress_bar.custom_minimum_size
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.lives_changed.connect(_on_lives_changed)
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.luck_changed.connect(_on_luck_changed)
 	GameManager.momentum_changed.connect(_on_momentum_changed)
+	GameManager.held_stops_changed.connect(_on_held_stops_changed)
+	GameManager.near_death_banked.connect(_on_near_death_banked)
+	GameManager.loop_contract_changed.connect(_on_loop_contract_changed)
+	GameManager.loop_contract_progress_changed.connect(_on_loop_contract_progress_changed)
 	GameManager.run_mode_changed.connect(_on_run_mode_changed)
 	GameManager.stage_advanced.connect(_on_stage_advanced)
 	GameManager.run_ended.connect(_on_run_ended)
@@ -108,8 +124,11 @@ func _ready() -> void:
 	_on_gold_changed(GameManager.gold)
 	_refresh_luck_display()
 	_refresh_momentum_display()
+	_held_stop_count = GameManager.held_stop_count
+	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
 	_refresh_modifier_display()
+	_refresh_contract_display()
 	set_active_combos([])
 	_refresh_progress_display()
 	_risk_meter.mouse_entered.connect(_on_risk_meter_mouse_entered)
@@ -170,6 +189,12 @@ func _apply_theme_styling() -> void:
 
 	# Info row
 	stop_label.add_theme_font_size_override("font_size", 18)
+	_risk_meta_label.add_theme_font_override("font", _UITheme.font_mono())
+	_risk_meta_label.add_theme_font_size_override("font_size", 11)
+	_risk_meta_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_contract_label.add_theme_font_override("font", _UITheme.font_mono())
+	_contract_label.add_theme_font_size_override("font_size", 11)
+	_contract_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 	_risk_meter.add_theme_stylebox_override("panel",
 		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, _UITheme.PANEL_SURFACE, 0))
 	_risk_percent_label.add_theme_font_override("font", _UITheme.font_display())
@@ -217,7 +242,8 @@ func update_turn(
 	shield_count: int = 0,
 	_reroll_count: int = 0,
 	bust_odds: float = 0.0,
-	risk_details: String = ""
+	risk_details: String = "",
+	reroll_ev: float = 0.0
 ) -> void:
 	turn_score_label.text = "+%d" % turn_score
 	var stop_text: String = "STOP: %d/%d" % [stop_count, bust_threshold]
@@ -225,7 +251,10 @@ func update_turn(
 		stop_text += " [%s×%d]" % [_UITheme.GLYPH_SHIELD, shield_count]
 	stop_label.text = stop_text
 	stop_label.modulate = _UITheme.DANGER_RED if stop_count > 0 else Color.WHITE
-	_update_risk_meter(bust_odds, risk_details)
+	_last_bust_odds = bust_odds
+	var juicy_danger: bool = _is_juicy_danger(stop_count, bust_threshold, bust_odds, turn_score)
+	_update_risk_meter(bust_odds, risk_details, juicy_danger)
+	_refresh_risk_meta(stop_count, bust_threshold, shield_count, reroll_ev, juicy_danger)
 	_refresh_modifier_display()
 
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
@@ -437,7 +466,7 @@ func show_floating_gold(amount: int) -> void:
 # Risk Pips
 # ---------------------------------------------------------------------------
 
-func _update_risk_meter(bust_odds: float, details: String) -> void:
+func _update_risk_meter(bust_odds: float, details: String, juicy_danger: bool = false) -> void:
 	var ratio: float = clampf(bust_odds, 0.0, 1.0)
 	var percent: int = int(round(ratio * 100.0))
 	_risk_percent_label.text = "RISK %d%%" % percent
@@ -447,12 +476,71 @@ func _update_risk_meter(bust_odds: float, details: String) -> void:
 		_position_risk_tooltip()
 	_update_risk_pips(ratio)
 	var border_color: Color = _UITheme.SUCCESS_GREEN
+	var border_width: int = 1
+	if juicy_danger:
+		border_color = _UITheme.EXPLOSION_ORANGE
+		border_width = 2
 	if ratio >= 0.66:
 		border_color = _UITheme.DANGER_RED
 	elif ratio >= 0.33:
 		border_color = _UITheme.SCORE_GOLD
 	_risk_meter.add_theme_stylebox_override("panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, border_color, 1))
+		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, border_color, border_width))
+
+
+func _refresh_risk_meta(
+	stop_count: int,
+	bust_threshold: int,
+	shield_count: int,
+	reroll_ev: float,
+	juicy_danger: bool
+) -> void:
+	var details: Array[String] = []
+	if juicy_danger:
+		details.append("JUICY")
+	if shield_count > 0:
+		details.append("Shield %d" % shield_count)
+	if _held_stop_count > 0:
+		details.append("Held %d" % _held_stop_count)
+	if _near_death_banks > 0:
+		details.append("Near-Death x%d" % _near_death_banks)
+	var ev_prefix: String = "+" if reroll_ev >= 0.0 else ""
+	details.append("EV %s%.1f" % [ev_prefix, reroll_ev])
+	_risk_meta_label.text = " | ".join(details)
+	if juicy_danger:
+		_risk_meta_label.modulate = _UITheme.EXPLOSION_ORANGE
+	elif stop_count >= bust_threshold - 1:
+		_risk_meta_label.modulate = _UITheme.SCORE_GOLD
+	else:
+		_risk_meta_label.modulate = _UITheme.MUTED_TEXT
+
+
+func _refresh_contract_display() -> void:
+	if GameManager.active_loop_contract_id.is_empty():
+		_contract_label.visible = false
+		_contract_label.text = ""
+		return
+	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(GameManager.active_loop_contract_id)
+	if contract == null:
+		_contract_label.visible = false
+		_contract_label.text = ""
+		return
+	_contract_label.visible = true
+	if _contract_progress_service == null:
+		_contract_label.text = contract.display_name
+		return
+	_contract_label.text = _contract_progress_service.format_progress_text(
+		GameManager.active_loop_contract_id,
+		GameManager.active_loop_contract_progress
+	)
+
+
+func _is_juicy_danger(stop_count: int, bust_threshold: int, bust_odds: float, turn_score: int) -> bool:
+	var one_from_bust: bool = bust_threshold > 1 and stop_count == bust_threshold - 1
+	return (
+		bust_odds >= JUICY_DANGER_MIN and bust_odds <= JUICY_DANGER_MAX
+		or (one_from_bust and turn_score >= JUICY_DANGER_SCORE_FLOOR)
+	)
 
 
 func _update_risk_pips(risk_ratio: float) -> void:
@@ -537,6 +625,22 @@ func _on_gold_changed(new_gold: int) -> void:
 	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
+func _on_held_stops_changed(new_total: int) -> void:
+	_held_stop_count = new_total
+
+
+func _on_near_death_banked(_effective_stops: int, _threshold: int) -> void:
+	_near_death_banks = GameManager.near_death_banks_this_stage
+
+
+func _on_loop_contract_changed(_active_contract_id: String) -> void:
+	_refresh_contract_display()
+
+
+func _on_loop_contract_progress_changed(_progress: Dictionary) -> void:
+	_refresh_contract_display()
+
+
 func _set_gold_label_value(value: float) -> void:
 	gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, int(value)]
 
@@ -570,8 +674,10 @@ func _refresh_momentum_display() -> void:
 
 
 func _on_stage_advanced(_new_stage: int) -> void:
+	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
 	_refresh_progress_display()
+	_refresh_contract_display()
 
 func _on_run_ended() -> void:
 	show_status("RUN OVER — out of lives!", _UITheme.DANGER_RED)
@@ -580,8 +686,10 @@ func _on_stage_cleared() -> void:
 	show_status("STAGE CLEARED!", _UITheme.SUCCESS_GREEN)
 
 func _on_loop_advanced(_new_loop: int) -> void:
+	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
 	_refresh_progress_display()
+	_refresh_contract_display()
 
 func _on_highscore_changed(new_highscore: int) -> void:
 	highscore_label.text = "HI: %d" % new_highscore

@@ -180,6 +180,17 @@ layout_mode = 2
 text = "Stops: 0 / 3"
 horizontal_alignment = 2
 
+[node name="RiskMetaLabel" type="Label" parent="InfoRow/RiskColumn"]
+layout_mode = 2
+text = "EV +0.0"
+horizontal_alignment = 2
+
+[node name="ContractLabel" type="Label" parent="InfoRow/RiskColumn"]
+layout_mode = 2
+visible = false
+text = ""
+horizontal_alignment = 2
+
 [node name="ComboRow" type="HBoxContainer" parent="."]
 layout_mode = 2
 theme_override_constants/separation = 8

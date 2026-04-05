@@ -3,7 +3,7 @@ extends PanelContainer
 ## Full-screen branching stage map. Player picks a node in the current row.
 ## Call open() and listen for node_selected.
 
-signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool)
+signal node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
@@ -292,13 +292,15 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
     btn.focus_mode = Control.FOCUS_NONE
     btn.mouse_filter = Control.MOUSE_FILTER_STOP
     btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+    btn.tooltip_text = node.get_hover_text()
     btn.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
     btn.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
     btn.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
     btn.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
-    btn.pressed.connect(_on_node_pressed.bind(row, col, node.type))
-    btn.mouse_entered.connect(_on_node_hovered.bind(row, col))
+    btn.pressed.connect(_on_node_pressed.bind(row, col))
+    btn.mouse_entered.connect(func() -> void: _show_node_hint(row, col, node))
     btn.focus_entered.connect(_on_node_hovered.bind(row, col))
+    btn.mouse_exited.connect(_refresh_hint_label)
     var medallion: PanelContainer = PanelContainer.new()
     medallion.name = "Medallion"
     medallion.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -486,7 +488,7 @@ func _is_reachable_without_reroute(row: int, col: int) -> bool:
     return _stage_map.is_reachable(row, col, row - 1, _current_col)
 
 
-func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> void:
+func _on_node_pressed(row: int, col: int) -> void:
     _set_selected_node(row, col)
     if _is_closing:
         return
@@ -499,7 +501,7 @@ func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> vo
         node.visited = true
     await _play_close_transition()
     visible = false
-    node_selected.emit(row, col, node_type, used_reroute)
+    node_selected.emit(row, col, node, used_reroute)
 
 
 func _on_node_hovered(row: int, col: int) -> void:
@@ -649,6 +651,27 @@ func _refresh_hint_label() -> void:
     else:
         _hint_label.text = base_text
     _refresh_context_label()
+
+
+func _show_node_hint(row: int, col: int, node: MapNodeData) -> void:
+    _on_node_hovered(row, col)
+    if node == null:
+        _refresh_hint_label()
+        return
+    _hint_label.text = "%s  |  %s" % [_get_route_hint(row, col), node.get_hover_text()]
+    _refresh_context_label()
+
+
+func _get_route_hint(row: int, col: int) -> String:
+    if row < _current_row:
+        return "Row %d visited" % (row + 1)
+    if row > _current_row:
+        return "Row %d future path" % (row + 1)
+    if _reroute_enabled and not _is_reachable_without_reroute(row, col):
+        return "Row %d reroute path" % (row + 1)
+    if _is_reachable_without_reroute(row, col):
+        return "Row %d reachable now" % (row + 1)
+    return "Row %d blocked on this route" % (row + 1)
 
 
 func _refresh_reroute_button() -> void:

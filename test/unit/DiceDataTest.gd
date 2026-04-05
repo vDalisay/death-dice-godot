@@ -244,6 +244,30 @@ func test_blank_canvas_d6_is_mostly_blank() -> void:
 	assert_int(die._count_stop_faces()).is_equal(1)
 
 
+func test_reroll_chaser_starts_at_tier_one() -> void:
+	var die: DiceData = DiceData.make_reroll_chaser_d6()
+	assert_bool(die.is_reroll_evolving()).is_true()
+	assert_int(die.reroll_tier).is_equal(0)
+	assert_str(die.get_reroll_tier_label()).is_equal("R1")
+	assert_int(die._count_stop_faces()).is_equal(1)
+
+
+func test_reroll_chaser_evolves_after_progress() -> void:
+	var die: DiceData = DiceData.make_reroll_chaser_d6()
+	assert_bool(die.apply_reroll_progress(1)).is_true()
+	assert_int(die.reroll_tier).is_equal(1)
+	assert_str(die.get_display_name()).contains("[R2]")
+	assert_int(die.rarity).is_equal(DiceData.Rarity.GREEN)
+
+
+func test_reroll_chaser_can_jump_to_final_tier() -> void:
+	var die: DiceData = DiceData.make_reroll_chaser_d6()
+	assert_bool(die.apply_reroll_progress(3)).is_true()
+	assert_int(die.reroll_tier).is_equal(2)
+	assert_int(die.rarity).is_equal(DiceData.Rarity.BLUE)
+	assert_int(die._count_stop_faces()).is_equal(1)
+
+
 func test_simple_d6_has_six_faces() -> void:
 	var die: DiceData = DiceData.make_simple_d6()
 	assert_int(die.faces.size()).is_equal(6)
@@ -276,14 +300,17 @@ func test_rarity_assignments_by_factory() -> void:
 	assert_int(DiceData.make_blank_canvas_d6().rarity).is_equal(DiceData.Rarity.GREY)
 	assert_int(DiceData.make_standard_d6().rarity).is_equal(DiceData.Rarity.GREY)
 	assert_int(DiceData.make_shield_d6().rarity).is_equal(DiceData.Rarity.GREY)
+	assert_int(DiceData.make_reroll_chaser_d6().rarity).is_equal(DiceData.Rarity.GREY)
 
 	assert_int(DiceData.make_lucky_d6().rarity).is_equal(DiceData.Rarity.GREEN)
 	assert_int(DiceData.make_heavy_d6().rarity).is_equal(DiceData.Rarity.GREEN)
 	assert_int(DiceData.make_heart_d6().rarity).is_equal(DiceData.Rarity.GREEN)
+	assert_int(DiceData.make_reroll_chaser_d6(1).rarity).is_equal(DiceData.Rarity.GREEN)
 
 	assert_int(DiceData.make_golden_d6().rarity).is_equal(DiceData.Rarity.BLUE)
 	assert_int(DiceData.make_gambler_d6().rarity).is_equal(DiceData.Rarity.BLUE)
 	assert_int(DiceData.make_insurance_d6().rarity).is_equal(DiceData.Rarity.BLUE)
+	assert_int(DiceData.make_reroll_chaser_d6(2).rarity).is_equal(DiceData.Rarity.BLUE)
 
 	assert_int(DiceData.make_explosive_d6().rarity).is_equal(DiceData.Rarity.PURPLE)
 	assert_int(DiceData.make_pink_d6().rarity).is_equal(DiceData.Rarity.PURPLE)
