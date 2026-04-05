@@ -67,6 +67,53 @@ func test_two_epic_selections_show_block_message() -> void:
 	assert_str(panel._result_label.text).contains("Cannot forge two Epic dice")
 
 
+func test_skip_closes_after_transition() -> void:
+	_seed_pool([
+		DiceData.make_standard_d6(),
+		DiceData.make_lucky_d6(),
+		DiceData.make_heavy_d6(),
+		DiceData.make_blank_canvas_d6(),
+	])
+	var panel: ForgePanel = auto_free(ForgeScene.instantiate()) as ForgePanel
+	add_child(panel)
+	await await_idle_frame()
+	panel.open()
+	monitor_signals(panel, false)
+
+	panel._on_skip_pressed()
+	assert_bool(panel.visible).is_true()
+	await get_tree().create_timer(0.25).timeout
+
+	assert_bool(panel.visible).is_false()
+	assert_signal(panel).is_emitted("forge_closed")
+
+
+func test_continue_after_forge_closes_after_transition() -> void:
+	_seed_pool([
+		DiceData.make_standard_d6(),
+		DiceData.make_lucky_d6(),
+		DiceData.make_heavy_d6(),
+		DiceData.make_blank_canvas_d6(),
+	])
+	var panel: ForgePanel = auto_free(ForgeScene.instantiate()) as ForgePanel
+	add_child(panel)
+	await await_idle_frame()
+	panel.open()
+	panel._toggle_die(0)
+	panel._toggle_die(1)
+	panel._on_forge_pressed()
+	await get_tree().create_timer(0.75).timeout
+
+	assert_bool(panel._forging_done).is_true()
+	monitor_signals(panel, false)
+	panel._on_forge_pressed()
+	assert_bool(panel.visible).is_true()
+	await get_tree().create_timer(0.25).timeout
+
+	assert_bool(panel.visible).is_false()
+	assert_signal(panel).is_emitted("forge_closed")
+
+
 func _seed_pool(dice: Array[DiceData]) -> void:
 	GameManager.dice_pool.clear()
 	for die: DiceData in dice:

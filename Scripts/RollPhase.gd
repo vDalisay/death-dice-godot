@@ -30,6 +30,8 @@ const NEAR_DEATH_GOLD_BONUS: int = 8
 const META_LEDGER_EXP_REWARD: int = 2
 const META_HIGH_RISK_EXP_REWARD: int = 1
 const META_NEAR_DEATH_SHARD_REWARD: int = 1
+const SURFACE_ENTER_DURATION: float = 0.14
+const SURFACE_EXIT_DURATION: float = 0.12
 
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
@@ -107,6 +109,7 @@ var _resume_surface: String = RESUME_SURFACE_TURN
 var _resume_payload: Dictionary = {}
 var _active_event_overlay: ColorRect = null
 var _active_rest_overlay: ColorRect = null
+var _surface_transition_tweens: Dictionary = {}
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -125,6 +128,7 @@ const BustRiskEstimatorScript: GDScript = preload("res://Scripts/BustRiskEstimat
 const RollResolutionServiceScript: GDScript = preload("res://Scripts/RollResolutionService.gd")
 const ContractProgressServiceScript: GDScript = preload("res://Scripts/ContractProgressService.gd")
 const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoordinator.gd")
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
@@ -159,6 +163,7 @@ func _ready() -> void:
 	new_run_button.visible = false
 	career_button.visible = false
 	codex_button.visible = false
+	_set_post_run_buttons_visible(false)
 	_streak_display = StreakDisplayScript.new()
 	hud.attach_streak_display(_streak_display)
 	_screen_shake = ScreenShakeScript.new()
@@ -469,7 +474,7 @@ func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 		if dice_keep_locked[i]:
 			continue
 		if is_kept and dice_stopped[i]:
-			# Can't keep a stopped die — skip.
+			# Can't keep a stopped die ΓÇö skip.
 			continue
 		if not is_kept and dice_stopped[i]:
 			# Pick up stopped dice of matching type.
@@ -494,7 +499,7 @@ func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 func _roll_all_dice() -> void:
 	_begin_roll_animation_lock()
 	_shake_screen(SHAKE_ROLL, 0.15)
-	# Throw all dice into the arena — faces are rolled inside throw_dice
+	# Throw all dice into the arena ΓÇö faces are rolled inside throw_dice
 	dice_arena.throw_dice(GameManager.dice_pool)
 	# Results will be processed when all_dice_settled signal fires
 
@@ -522,7 +527,7 @@ func _reroll_selected_dice() -> void:
 		_die_reroll_counts[i] += 1
 		rerolled.append(i)
 	if rerolled.is_empty():
-		# No dice to reroll — all are kept/locked, so auto-bank.
+		# No dice to reroll ΓÇö all are kept/locked, so auto-bank.
 		_on_bank_pressed()
 		return
 	# Increment momentum on each reroll.
@@ -554,7 +559,7 @@ func _on_all_dice_settled() -> void:
 
 ## Called when a collision reroll happens during the rolling phase (cosmetic only).
 func _on_die_collision_rerolled(die_index: int, new_face: DiceFaceData) -> void:
-	# Update our tracking — cosmetic only, stops are NOT accumulated
+	# Update our tracking ΓÇö cosmetic only, stops are NOT accumulated
 	current_results[die_index] = new_face
 
 func _process_roll_results(rolled_indices: Array[int]) -> void:
@@ -635,7 +640,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				turn_state = TurnState.BANKED
 				bank_streak = 0
 				_update_streak_display()
-				hud.show_status("GUARDIAN ANGEL! Bust absorbed — turn score forfeited.", Color(0.4, 0.8, 1.0))
+				hud.show_status("GUARDIAN ANGEL! Bust absorbed ΓÇö turn score forfeited.", Color(0.4, 0.8, 1.0))
 				SFXManager.play_close_call()
 				_sync_buttons()
 				_schedule_auto_advance()
@@ -655,7 +660,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if turn_state == TurnState.BUST:
 		pass  # Bust overlay handles messaging.
 	elif is_immune and effective_stops >= threshold:
-		hud.show_status("CLOSE CALL! Turn %d — no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
+		hud.show_status("CLOSE CALL! Turn %d ΓÇö no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
 		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
 		SFXManager.play_close_call()
@@ -1151,7 +1156,7 @@ func _sync_ui() -> void:
 		TurnState.ACTIVE:
 			pass
 		TurnState.BUST:
-			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+			hud.show_status("BUST! %d stops ΓÇö turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:
 			pass  # Already set in _on_bank_pressed
 
@@ -1213,13 +1218,61 @@ func _on_run_ended() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	hud.show_status("RUN OVER — out of lives!", Color(0.9, 0.2, 0.2))
+	hud.show_status("RUN OVER ΓÇö out of lives!", Color(0.9, 0.2, 0.2))
 	highlights_panel.show_highlights(snapshot, prior_bests)
 
 func _on_highlights_closed() -> void:
-	new_run_button.visible = true
-	career_button.visible = true
-	codex_button.visible = true
+	_set_post_run_buttons_visible(true)
+
+
+func _set_post_run_buttons_visible(should_show: bool) -> void:
+	var disable_buttons: bool = not should_show
+	new_run_button.disabled = disable_buttons
+	career_button.disabled = disable_buttons
+	codex_button.disabled = disable_buttons
+	_transition_surface(new_run_button, should_show)
+	_transition_surface(career_button, should_show)
+	_transition_surface(codex_button, should_show)
+
+
+func _set_roll_surface_visible(should_show: bool, show_streak: bool = false) -> void:
+	_transition_surface(_roll_content, should_show)
+	if _streak_display == null:
+		return
+	if should_show and show_streak:
+		_transition_surface(_streak_display, true)
+	else:
+		_transition_surface(_streak_display, false)
+
+
+func _transition_surface(surface: CanvasItem, should_show: bool) -> void:
+	if surface == null:
+		return
+	var surface_key: int = surface.get_instance_id()
+	if _surface_transition_tweens.has(surface_key):
+		var prior_tween: Tween = _surface_transition_tweens.get(surface_key) as Tween
+		if prior_tween != null and prior_tween.is_valid():
+			prior_tween.kill()
+		_surface_transition_tweens.erase(surface_key)
+
+	var tween: Tween = null
+	if should_show:
+		if surface.visible and surface.modulate.a >= 0.999:
+			return
+		tween = FlowTransitionScript.play_fade_in(self, surface, SURFACE_ENTER_DURATION)
+	else:
+		if not surface.visible:
+			return
+		tween = FlowTransitionScript.play_fade_out(self, surface, SURFACE_EXIT_DURATION)
+
+	if tween == null:
+		return
+	_surface_transition_tweens[surface_key] = tween
+	tween.finished.connect(_on_surface_transition_finished.bind(surface_key), CONNECT_ONE_SHOT)
+
+
+func _on_surface_transition_finished(surface_key: int) -> void:
+	_surface_transition_tweens.erase(surface_key)
 
 func _on_stage_cleared() -> void:
 	if _defer_stage_clear_overlay:
@@ -1266,24 +1319,20 @@ func _open_shop(is_loop_complete: bool = false) -> void:
 		"stage": GameManager.current_stage,
 		"is_loop_complete": is_loop_complete,
 	}
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
+	_set_roll_surface_visible(false)
 	shop_panel.open(GameManager.current_stage, is_loop_complete)
 	_persist_active_run_snapshot()
 
 func _on_shop_closed() -> void:
-	shop_panel.visible = false
+	_transition_surface(shop_panel, false)
 	# Return to the path map for the next node.
 	_open_stage_map()
 
 func _on_new_run_pressed() -> void:
 	_record_run_snapshot_if_needed()
-	new_run_button.visible = false
-	career_button.visible = false
-	codex_button.visible = false
-	shop_panel.visible = false
-	_roll_content.visible = true
+	_set_post_run_buttons_visible(false)
+	_transition_surface(shop_panel, false)
+	_set_roll_surface_visible(true, false)
 	_show_archetype_picker(SaveManager.has_active_run_snapshot())
 
 
@@ -1634,7 +1683,7 @@ func _show_bust_overlay(effective_stops: int) -> void:
 	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
 	add_child(overlay)
 	overlay.call("play", 1)
-	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+	hud.show_status("BUST! %d stops ΓÇö turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 
 
 func _shake_screen(intensity: float, duration: float) -> void:
@@ -1694,9 +1743,7 @@ func _maybe_open_forge(is_loop: bool) -> void:
 		_loop_complete_pending = is_loop
 		_resume_surface = RESUME_SURFACE_FORGE
 		_resume_payload.clear()
-		_roll_content.visible = false
-		if _streak_display != null:
-			_streak_display.visible = false
+		_set_roll_surface_visible(false)
 		forge_panel.open()
 		_persist_active_run_snapshot()
 	else:
@@ -1704,7 +1751,7 @@ func _maybe_open_forge(is_loop: bool) -> void:
 
 
 func _on_forge_closed() -> void:
-	forge_panel.visible = false
+	_transition_surface(forge_panel, false)
 	# After forge, return to the path map for next row.
 	_open_stage_map()
 
@@ -1746,9 +1793,7 @@ func _open_stage_map() -> void:
 	if GameManager.current_row >= StageMapDataScript.ROWS_PER_LOOP:
 		_complete_loop()
 		return
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
+	_set_roll_surface_visible(false)
 	stage_map_panel.open(
 		GameManager.stage_map,
 		GameManager.current_row,
@@ -1766,7 +1811,7 @@ func _on_map_node_selected(row: int, col: int, node: MapNodeData, used_reroute: 
 	if selected_node == null and GameManager.stage_map != null:
 		selected_node = GameManager.stage_map.get_node_at(row, col)
 	_stage_flow.advance_row(col)
-	stage_map_panel.visible = false
+	_transition_surface(stage_map_panel, false)
 	var node_type: MapNodeData.NodeType = MapNodeData.NodeType.NORMAL_STAGE
 	if node != null:
 		node_type = node.type
@@ -1796,7 +1841,7 @@ func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: Stri
 		)
 	elif GameManager.has_current_stage_variant():
 		hud.show_status(GameManager.get_current_stage_variant_hover_text(), Color(0.55, 0.9, 1.0))
-	_roll_content.visible = true
+	_set_roll_surface_visible(true, false)
 	_update_streak_display()
 	_run_active = true
 	turn_number = 0
@@ -1812,9 +1857,7 @@ func _open_shop_from_map() -> void:
 		"stage": GameManager.current_stage,
 		"is_loop_complete": false,
 	}
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
+	_set_roll_surface_visible(false)
 	shop_panel.open(GameManager.current_stage, false)
 	_persist_active_run_snapshot()
 
@@ -1823,13 +1866,11 @@ func _open_forge_from_map() -> void:
 	if GameManager.dice_pool.size() >= ForgePanel.MIN_DICE_FOR_FORGE:
 		_resume_surface = RESUME_SURFACE_FORGE
 		_resume_payload.clear()
-		_roll_content.visible = false
-		if _streak_display != null:
-			_streak_display.visible = false
+		_set_roll_surface_visible(false)
 		forge_panel.open()
 		_persist_active_run_snapshot()
 	else:
-		# Not enough dice for forge — open map for next node.
+		# Not enough dice for forge ΓÇö open map for next node.
 		hud.show_status("Not enough dice to forge (need %d)." % ForgePanel.MIN_DICE_FOR_FORGE, Color(1.0, 0.6, 0.0))
 		_open_stage_map()
 
@@ -1905,7 +1946,7 @@ func _maybe_apply_curse() -> void:
 	var target: int = candidates[target_index]
 	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
 	die.faces[target].value = 0
-	hud.show_status("CURSED! %s gained a ☠STOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
+	hud.show_status("CURSED! %s gained a ΓÿáSTOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
 
 # ---------------------------------------------------------------------------
 # Archetype picker
@@ -2253,12 +2294,10 @@ func _restore_resume_surface() -> void:
 
 func _restore_turn_surface() -> void:
 	_run_active = true
-	_roll_content.visible = true
-	shop_panel.visible = false
-	forge_panel.visible = false
-	stage_map_panel.visible = false
-	if _streak_display != null:
-		_streak_display.visible = true
+	_set_roll_surface_visible(true, true)
+	_transition_surface(shop_panel, false)
+	_transition_surface(forge_panel, false)
+	_transition_surface(stage_map_panel, false)
 	_apply_turn_checkpoint_after_resume()
 	dice_arena.reset()
 	_sync_all_dice()
@@ -2294,9 +2333,7 @@ func _restore_stage_map_surface() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
+	_set_roll_surface_visible(false)
 	if GameManager.stage_map == null:
 		GameManager.generate_stage_map()
 	stage_map_panel.open(
@@ -2311,11 +2348,9 @@ func _restore_shop_surface() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
-	stage_map_panel.visible = false
-	forge_panel.visible = false
+	_set_roll_surface_visible(false)
+	_transition_surface(stage_map_panel, false)
+	_transition_surface(forge_panel, false)
 	var shop_state: Dictionary = _resume_payload.get("shop_state", {}) as Dictionary
 	if not shop_state.is_empty() and shop_panel.has_method("open_from_resume"):
 		shop_panel.call("open_from_resume", shop_state)
@@ -2329,11 +2364,9 @@ func _restore_event_surface() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
-	stage_map_panel.visible = false
-	forge_panel.visible = false
+	_set_roll_surface_visible(false)
+	_transition_surface(stage_map_panel, false)
+	_transition_surface(forge_panel, false)
 	var event_overlay: ColorRect = StageEventScene.instantiate() as ColorRect
 	_active_event_overlay = event_overlay
 	add_child(event_overlay)
@@ -2349,11 +2382,9 @@ func _restore_forge_surface() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
-	stage_map_panel.visible = false
-	shop_panel.visible = false
+	_set_roll_surface_visible(false)
+	_transition_surface(stage_map_panel, false)
+	_transition_surface(shop_panel, false)
 	forge_panel.open()
 
 
@@ -2361,12 +2392,10 @@ func _restore_rest_surface() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	_roll_content.visible = false
-	if _streak_display != null:
-		_streak_display.visible = false
-	stage_map_panel.visible = false
-	shop_panel.visible = false
-	forge_panel.visible = false
+	_set_roll_surface_visible(false)
+	_transition_surface(stage_map_panel, false)
+	_transition_surface(shop_panel, false)
+	_transition_surface(forge_panel, false)
 	var overlay: ColorRect = RestOverlayScene.instantiate() as ColorRect
 	_active_rest_overlay = overlay
 	add_child(overlay)

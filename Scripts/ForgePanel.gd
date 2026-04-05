@@ -5,15 +5,19 @@ extends PanelContainer
 
 signal forge_closed()
 
+const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const MIN_DICE_FOR_FORGE: int = 4
 const FORGE_CHANCE: float = 0.25
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const DICE_BUTTON_WIDTH: int = 208
 const DICE_BUTTON_HEIGHT: int = 76
+const MODAL_INTRO_DURATION: float = 0.22
+const MODAL_EXIT_DURATION: float = 0.16
 
 const RARITY_NAMES: Array[String] = ["Common", "Uncommon", "Rare", "Epic"]
 
+@onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
 @onready var _cost_badge: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CostBadge
@@ -30,6 +34,8 @@ const RARITY_NAMES: Array[String] = ["Common", "Uncommon", "Rare", "Epic"]
 var _selected_indices: Array[int] = []
 var _die_buttons: Array[Button] = []
 var _forging_done: bool = false
+var _transition_tween: Tween = null
+var _is_closing: bool = false
 
 
 func _ready() -> void:
@@ -41,26 +47,33 @@ func _ready() -> void:
 
 func open() -> void:
 	_selected_indices.clear()
+	_is_closing = false
 	_forging_done = false
 	_result_label.text = ""
 	_result_card.visible = false
 	_forge_button.disabled = true
 	_forge_button.text = "Forge!"
 	_skip_button.text = "Skip"
+	_skip_button.disabled = false
 	_skip_button.visible = true
 	_refresh_grid()
 	_update_instruction()
 	visible = true
+	_play_open_transition()
 
 
 func _on_skip_pressed() -> void:
-	visible = false
+	if _is_closing:
+		return
+	await _close_panel()
 	forge_closed.emit()
 
 
 func _on_forge_pressed() -> void:
+	if _is_closing:
+		return
 	if _forging_done:
-		visible = false
+		await _close_panel()
 		forge_closed.emit()
 		return
 
@@ -107,6 +120,29 @@ func _on_forge_pressed() -> void:
 	_skip_button.visible = false
 	_selected_indices.clear()
 	_refresh_grid()
+
+
+func _close_panel() -> void:
+	if _is_closing:
+		return
+	_is_closing = true
+	_forge_button.disabled = true
+	_skip_button.disabled = true
+	await _play_close_transition()
+	visible = false
+
+
+func _play_open_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_enter(self, _modal, MODAL_INTRO_DURATION, _backdrop)
+
+
+func _play_close_transition() -> void:
+	if _transition_tween != null:
+		_transition_tween.kill()
+	_transition_tween = FlowTransitionScript.play_exit(self, _modal, MODAL_EXIT_DURATION, _backdrop)
+	await _transition_tween.finished
 
 
 func _update_instruction() -> void:
@@ -233,6 +269,7 @@ func _animate_result_card() -> void:
 
 func _apply_theme_styling() -> void:
 	add_theme_stylebox_override("panel", _UITheme.make_panel_stylebox(Color.TRANSPARENT, 0))
+	_backdrop.color = Color(_UITheme.STAGE_FAMILY_BACKDROP_COLOR, _UITheme.STAGE_FAMILY_BACKDROP_ALPHA)
 	_modal.add_theme_stylebox_override(
 		"panel",
 		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_MODAL, _UITheme.SCORE_GOLD, 2)
