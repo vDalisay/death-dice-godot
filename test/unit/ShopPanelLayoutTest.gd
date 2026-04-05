@@ -4,6 +4,14 @@ extends GdUnitTestSuite
 const ShopPanelScene: PackedScene = preload("res://Scenes/ShopPanel.tscn")
 
 
+func before_test() -> void:
+	GameManager.reset_run()
+
+
+func after_test() -> void:
+	GameManager.reset_run()
+
+
 func test_shop_uses_grouped_offer_sections_and_details_panel() -> void:
 	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
 	add_child(panel)
@@ -114,3 +122,76 @@ func test_hover_selection_updates_details_panel() -> void:
 	await await_idle_frame()
 	var details_title: Label = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel") as Label
 	assert_str(details_title.text).is_equal((panel._all_items[1] as ShopItemData).item_name)
+
+
+func test_spark_chaser_gate_requires_loop_and_luck() -> void:
+	GameManager.reset_run()
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+
+	GameManager.current_loop = 1
+	GameManager.prestige_shop_tier_active = false
+	GameManager.luck = ShopPanel.CHASER_MIN_LUCK
+	assert_bool(panel._can_offer_spark_chaser_die()).is_false()
+
+	GameManager.current_loop = ShopPanel.CHASER_MIN_LOOP
+	GameManager.luck = ShopPanel.CHASER_MIN_LUCK - 1
+	assert_bool(panel._can_offer_spark_chaser_die()).is_false()
+
+	GameManager.luck = ShopPanel.CHASER_MIN_LUCK
+	assert_bool(panel._can_offer_spark_chaser_die()).is_true()
+
+
+func test_dice_offer_pool_surfaces_spark_chaser_only_when_gate_passes() -> void:
+	GameManager.reset_run()
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+
+	GameManager.current_loop = 1
+	GameManager.prestige_shop_tier_active = false
+	GameManager.luck = 0
+	var closed_pool: Array[ShopItemData] = panel._build_dice_offer_pool()
+	assert_bool(_pool_has_item_type(closed_pool, ShopItemData.ItemType.BUY_SPARK_CHASER_DIE)).is_false()
+
+	GameManager.current_loop = ShopPanel.CHASER_MIN_LOOP
+	GameManager.luck = ShopPanel.CHASER_MIN_LUCK
+	var open_pool: Array[ShopItemData] = panel._build_dice_offer_pool()
+	assert_bool(_pool_has_item_type(open_pool, ShopItemData.ItemType.BUY_SPARK_CHASER_DIE)).is_true()
+	for item: ShopItemData in open_pool:
+		if item.item_type == ShopItemData.ItemType.BUY_SPARK_CHASER_DIE:
+			assert_str(item.item_name).is_equal("Spark Chaser Die")
+
+
+func test_buying_spark_chaser_adds_base_tier_and_preserves_evolution_identity() -> void:
+	GameManager.reset_run()
+	GameManager.add_gold(200)
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+
+	var item: ShopItemData = ShopItemData.make_buy_spark_chaser_die()
+	var start_gold: int = GameManager.gold
+	var start_count: int = GameManager.dice_pool.size()
+	panel._on_buy_pressed(item)
+
+	assert_int(GameManager.gold).is_equal(start_gold - item.cost)
+	assert_int(GameManager.dice_pool.size()).is_equal(start_count + 1)
+
+	var bought_die: DiceData = GameManager.dice_pool[GameManager.dice_pool.size() - 1]
+	assert_str(bought_die.dice_name).is_equal("Spark Chaser D6")
+	assert_str(bought_die.reroll_family_id).is_equal("reroll_chaser")
+	assert_int(bought_die.reroll_tier).is_equal(0)
+
+	assert_bool(bought_die.apply_reroll_progress(3)).is_true()
+	assert_str(bought_die.reroll_family_id).is_equal("reroll_chaser")
+	assert_int(bought_die.reroll_tier).is_equal(2)
+	assert_str(bought_die.dice_name).is_equal("Tempest Chaser D6")
+
+
+func _pool_has_item_type(items: Array[ShopItemData], item_type: int) -> bool:
+	for item: ShopItemData in items:
+		if item.item_type == item_type:
+			return true
+	return false

@@ -23,6 +23,7 @@ enum ItemType {
 	INSURANCE_BET,
 	HEAT_BET,
 	EVEN_ODD_BET,
+	BUY_SPARK_CHASER_DIE,
 }
 
 @export var item_name: String = ""
@@ -138,6 +139,15 @@ static func make_buy_heart_die() -> ShopItemData:
 	item.description = "Banked hearts soothe your stop counter. (♥, ♥, 1, 1, STOP, —)"
 	item.cost = 30
 	item.item_type = ItemType.BUY_HEART_DIE
+	return item
+
+
+static func make_buy_spark_chaser_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Spark Chaser Die"
+	item.description = "Reroll evo starter. Scales into Surge/Tempest as rerolls stack."
+	item.cost = 40
+	item.item_type = ItemType.BUY_SPARK_CHASER_DIE
 	return item
 
 

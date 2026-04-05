@@ -20,6 +20,8 @@ const PURCHASE_FLASH_DURATION: float = 0.18
 const DICE_SLOTS: int = 4
 const MODIFIER_SLOTS: int = 2
 const DOUBLE_DOWN_MIN_GOLD: int = 10
+const CHASER_MIN_LOOP: int = 2
+const CHASER_MIN_LUCK: int = 2
 
 var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
 var _ShopItemCardScene: PackedScene = preload("res://Scenes/ShopItemCard.tscn")
@@ -216,21 +218,7 @@ func _generate_items() -> void:
 	_modifier_items.clear()
 	_bet_items.clear()
 
-	var dice_pool: Array[ShopItemData] = [
-		ShopItemData.make_buy_simple_die(),
-		ShopItemData.make_buy_standard_die(),
-		ShopItemData.make_buy_blank_canvas_die(),
-		ShopItemData.make_buy_lucky_die(),
-		ShopItemData.make_buy_heart_die(),
-		ShopItemData.make_buy_pink_die(),
-		ShopItemData.make_buy_fortune_die(),
-	]
-	if GameManager.current_loop >= 2 or GameManager.prestige_shop_tier_active:
-		dice_pool.append(ShopItemData.make_buy_runner_die())
-		dice_pool.append(ShopItemData.make_buy_golden_die())
-		dice_pool.append(ShopItemData.make_buy_insurance_die())
-		dice_pool.append(ShopItemData.make_buy_heavy_die())
-		dice_pool.append(ShopItemData.make_buy_explosive_die())
+	var dice_pool: Array[ShopItemData] = _build_dice_offer_pool()
 
 	GameManager.rng_shuffle_in_place("shop", dice_pool)
 	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
@@ -264,6 +252,32 @@ func _generate_items() -> void:
 			_modifier_items.append(ShopItemData.make_buy_modifier(mod))
 
 	_build_item_cards()
+
+
+func _build_dice_offer_pool() -> Array[ShopItemData]:
+	var dice_pool: Array[ShopItemData] = [
+		ShopItemData.make_buy_simple_die(),
+		ShopItemData.make_buy_standard_die(),
+		ShopItemData.make_buy_blank_canvas_die(),
+		ShopItemData.make_buy_lucky_die(),
+		ShopItemData.make_buy_heart_die(),
+		ShopItemData.make_buy_pink_die(),
+		ShopItemData.make_buy_fortune_die(),
+	]
+	if GameManager.current_loop >= CHASER_MIN_LOOP or GameManager.prestige_shop_tier_active:
+		dice_pool.append(ShopItemData.make_buy_runner_die())
+		dice_pool.append(ShopItemData.make_buy_golden_die())
+		dice_pool.append(ShopItemData.make_buy_insurance_die())
+		dice_pool.append(ShopItemData.make_buy_heavy_die())
+		dice_pool.append(ShopItemData.make_buy_explosive_die())
+	if _can_offer_spark_chaser_die():
+		dice_pool.append(ShopItemData.make_buy_spark_chaser_die())
+	return dice_pool
+
+
+func _can_offer_spark_chaser_die() -> bool:
+	var loop_gate: bool = GameManager.current_loop >= CHASER_MIN_LOOP or GameManager.prestige_shop_tier_active
+	return loop_gate and GameManager.luck >= CHASER_MIN_LUCK
 
 
 func _build_item_cards() -> void:
@@ -505,6 +519,8 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_fortune_d6())
 		ShopItemData.ItemType.BUY_HEART_DIE:
 			GameManager.add_dice(DiceData.make_heart_d6())
+		ShopItemData.ItemType.BUY_SPARK_CHASER_DIE:
+			GameManager.add_dice(DiceData.make_reroll_chaser_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
 			_upgrade_random_die()
 		ShopItemData.ItemType.BUY_MODIFIER:
@@ -900,6 +916,8 @@ func _make_item_from_type(item_type: int) -> ShopItemData:
 			return ShopItemData.make_heat_bet()
 		int(ShopItemData.ItemType.EVEN_ODD_BET):
 			return ShopItemData.make_even_odd_bet()
+		int(ShopItemData.ItemType.BUY_SPARK_CHASER_DIE):
+			return ShopItemData.make_buy_spark_chaser_die()
 	return null
 
 
