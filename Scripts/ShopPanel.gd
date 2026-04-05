@@ -36,10 +36,14 @@ var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn
 @onready var _gold_badge: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
 @onready var _gold_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/GoldBadge/GoldLabel
-@onready var _dice_container: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceContainer
-@onready var _modifier_container: HFlowContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierContainer
-@onready var _dice_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/DiceHeader
-@onready var _modifier_header: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent/ModifierHeader
+@onready var _offer_summary_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/OfferSummaryLabel
+@onready var _offer_grid: GridContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn/OfferGrid
+@onready var _details_panel: PanelContainer = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel
+@onready var _details_eyebrow_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsEyebrowLabel
+@onready var _details_title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsTitleLabel
+@onready var _details_keyword_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsKeywordLabel
+@onready var _details_description_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsDescriptionLabel
+@onready var _details_state_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent/DetailsStateLabel
 @onready var _pool_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/PoolLabel
 @onready var _refresh_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/RefreshButton
 @onready var _continue_button: Button = $CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/ContinueButton
@@ -50,7 +54,8 @@ var _all_items: Array[ShopItemData] = []
 var _buy_buttons: Array[Button] = []
 var _price_labels: Array[Label] = []
 var _card_panels: Array[PanelContainer] = []
-var _double_down_desc_label: Label = null
+var _selected_item: ShopItemData = null
+var _selected_card_index: int = -1
 var _double_down_overlay: DoubleDownOverlay = null
 var _dd_used_this_shop: bool = false
 var _insurance_overlay: Node = null
@@ -120,12 +125,28 @@ func _apply_theme_styling() -> void:
 	_gold_label.add_theme_font_size_override("font_size", 24)
 	_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 
-	_dice_header.add_theme_font_override("font", _UITheme.font_display())
-	_dice_header.add_theme_font_size_override("font_size", 14)
-	_dice_header.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
-	_modifier_header.add_theme_font_override("font", _UITheme.font_display())
-	_modifier_header.add_theme_font_size_override("font_size", 14)
-	_modifier_header.add_theme_color_override("font_color", _UITheme.NEON_PURPLE)
+	_offer_summary_label.add_theme_font_override("font", _UITheme.font_body())
+	_offer_summary_label.add_theme_font_size_override("font_size", 14)
+	_offer_summary_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	_details_panel.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, _UITheme.NEON_PURPLE, 1)
+	)
+	_details_eyebrow_label.add_theme_font_override("font", _UITheme.font_display())
+	_details_eyebrow_label.add_theme_font_size_override("font_size", 12)
+	_details_eyebrow_label.add_theme_color_override("font_color", _UITheme.NEON_PURPLE)
+	_details_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_details_title_label.add_theme_font_size_override("font_size", 14)
+	_details_title_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_details_keyword_label.add_theme_font_override("font", _UITheme.font_mono())
+	_details_keyword_label.add_theme_font_size_override("font_size", 18)
+	_details_keyword_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
+	_details_description_label.add_theme_font_override("font", _UITheme.font_body())
+	_details_description_label.add_theme_font_size_override("font_size", 14)
+	_details_description_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	_details_state_label.add_theme_font_override("font", _UITheme.font_body())
+	_details_state_label.add_theme_font_size_override("font_size", 13)
+	_details_state_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 
 	_pool_label.add_theme_font_override("font", _UITheme.font_body())
 	_pool_label.add_theme_font_size_override("font_size", 18)
@@ -145,7 +166,6 @@ func _apply_theme_styling() -> void:
 func _generate_items() -> void:
 	_dice_items.clear()
 	_modifier_items.clear()
-	_double_down_desc_label = null
 
 	var dice_pool: Array[ShopItemData] = [
 		ShopItemData.make_buy_simple_die(),
@@ -198,24 +218,28 @@ func _generate_items() -> void:
 
 
 func _build_item_cards() -> void:
-	_clear_container(_dice_container)
-	_clear_container(_modifier_container)
+	_clear_container(_offer_grid)
 	_all_items.clear()
 	_buy_buttons.clear()
 	_price_labels.clear()
 	_card_panels.clear()
+	_selected_item = null
+	_selected_card_index = -1
 
-	_dice_header.visible = not _dice_items.is_empty()
 	for item: ShopItemData in _dice_items:
 		var card: PanelContainer = _make_item_card(item)
-		_dice_container.add_child(card)
+		_offer_grid.add_child(card)
 		_all_items.append(item)
 
-	_modifier_header.visible = not _modifier_items.is_empty()
 	for item: ShopItemData in _modifier_items:
 		var card: PanelContainer = _make_item_card(item)
-		_modifier_container.add_child(card)
+		_offer_grid.add_child(card)
 		_all_items.append(item)
+
+	if not _all_items.is_empty():
+		_select_item(0)
+	else:
+		_clear_details()
 
 
 func _clear_container(container: Node) -> void:
@@ -227,7 +251,7 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 	var card: PanelContainer = _ShopItemCardScene.instantiate() as PanelContainer
 	var accent_bar: ColorRect = card.get_node("VBoxContainer/AccentBar") as ColorRect
 	var name_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/NameLabel") as Label
-	var desc_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/DescLabel") as Label
+	var keyword_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/KeywordLabel") as Label
 	var price_label: Label = card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/PriceLabel") as Label
 	var buy_button: Button = card.get_node("VBoxContainer/MarginContainer/Content/FooterRow/BuyButton") as Button
 
@@ -243,14 +267,13 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 	name_label.add_theme_font_size_override("font_size", 11)
 	name_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 
-	desc_label.text = _item_description(item)
-	desc_label.add_theme_font_override("font", _UITheme.font_body())
-	desc_label.add_theme_font_size_override("font_size", 13)
-	desc_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
+	keyword_label.text = _item_keyword_summary(item)
+	keyword_label.add_theme_font_override("font", _UITheme.font_mono())
+	keyword_label.add_theme_font_size_override("font_size", 17)
+	keyword_label.add_theme_color_override("font_color", accent_color)
 
 	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
 		buy_button.text = "Play"
-		_double_down_desc_label = desc_label
 	elif item.item_type == ShopItemData.ItemType.INSURANCE_BET or \
 		item.item_type == ShopItemData.ItemType.HEAT_BET or \
 		item.item_type == ShopItemData.ItemType.EVEN_ODD_BET:
@@ -270,6 +293,10 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 	price_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
 	price_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 
+	var item_index: int = _card_panels.size()
+	card.mouse_entered.connect(_select_item.bind(item_index))
+	buy_button.focus_entered.connect(_select_item.bind(item_index))
+
 	_buy_buttons.append(buy_button)
 	_price_labels.append(price_label)
 	_card_panels.append(card)
@@ -282,6 +309,80 @@ func _item_description(item: ShopItemData) -> String:
 	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
 		return _dd_desc_text()
 	return item.description
+
+
+func _item_keyword_summary(item: ShopItemData) -> String:
+	match item.item_type:
+		ShopItemData.ItemType.BUY_MODIFIER:
+			return "MOD | PASSIVE"
+		ShopItemData.ItemType.UPGRADE_DIE:
+			return "FORGE | UPGRADE"
+		ShopItemData.ItemType.CLEANSE_CURSE:
+			return "CLEANSE | CURSE"
+		ShopItemData.ItemType.DOUBLE_DOWN, ShopItemData.ItemType.INSURANCE_BET, ShopItemData.ItemType.HEAT_BET, ShopItemData.ItemType.EVEN_ODD_BET:
+			return "BET | PLAY"
+		_:
+			return "DIE | BUY"
+
+
+func _item_state_text(item: ShopItemData) -> String:
+	var notes: Array[String] = []
+	if GameManager.gold < item.cost:
+		notes.append("Need %s%d more gold." % [_UITheme.GLYPH_GOLD, item.cost - GameManager.gold])
+	if item.item_type == ShopItemData.ItemType.BUY_MODIFIER:
+		if not GameManager.can_add_modifier():
+			notes.append("Modifier rack is full.")
+		elif item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type):
+			notes.append("Already owned.")
+	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
+		notes.append("Wagers all current gold in the overlay.")
+	if item.item_type == ShopItemData.ItemType.INSURANCE_BET:
+		notes.append("Loss is tracked as shop spend if you place the bet.")
+	if item.item_type == ShopItemData.ItemType.HEAT_BET:
+		notes.append("Predict the exact banked stop count.")
+	if item.item_type == ShopItemData.ItemType.EVEN_ODD_BET:
+		notes.append("Parity checks your kept NUMBER faces.")
+	if notes.is_empty():
+		return "Ready to purchase."
+	return " ".join(notes)
+
+
+func _select_item(index: int) -> void:
+	if index < 0 or index >= _all_items.size():
+		return
+	_selected_item = _all_items[index]
+	_selected_card_index = index
+	_refresh_selected_card_state()
+	_refresh_details()
+
+
+func _refresh_selected_card_state() -> void:
+	for i: int in _card_panels.size():
+		var item: ShopItemData = _all_items[i]
+		var blocked: bool = _buy_buttons[i].disabled
+		var border_color: Color = _item_accent_color(item) if i == _selected_card_index else (_item_accent_color(item) if not blocked else _UITheme.MUTED_TEXT)
+		var border_width: int = 3 if i == _selected_card_index else 2
+		_card_panels[i].add_theme_stylebox_override(
+			"panel",
+			_UITheme.make_panel_stylebox(_UITheme.ELEVATED, _UITheme.CORNER_RADIUS_CARD, border_color, border_width)
+		)
+
+
+func _refresh_details() -> void:
+	if _selected_item == null:
+		_clear_details()
+		return
+	_details_title_label.text = _selected_item.item_name
+	_details_keyword_label.text = _item_keyword_summary(_selected_item)
+	_details_description_label.text = _item_description(_selected_item)
+	_details_state_label.text = _item_state_text(_selected_item)
+
+
+func _clear_details() -> void:
+	_details_title_label.text = "Select an offer"
+	_details_keyword_label.text = ""
+	_details_description_label.text = ""
+	_details_state_label.text = ""
 
 
 func _item_accent_color(item: ShopItemData) -> Color:
@@ -398,6 +499,7 @@ func _on_gold_changed(_new_gold: int) -> void:
 
 func _refresh_display() -> void:
 	_gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, GameManager.gold]
+	_offer_summary_label.text = "%d dice offers | %d mod offers | %d total" % [_dice_items.size(), _modifier_items.size(), _all_items.size()]
 	var mod_text: String = ""
 	if not GameManager.active_modifiers.is_empty():
 		var names: Array[String] = []
@@ -406,6 +508,7 @@ func _refresh_display() -> void:
 		mod_text = "  |  Mods: %s" % ", ".join(names)
 	_pool_label.text = "Dice Pool: %d%s" % [GameManager.dice_pool.size(), mod_text]
 	_refresh_buy_buttons()
+	_refresh_details()
 
 
 func _refresh_buy_buttons() -> void:
@@ -419,8 +522,6 @@ func _refresh_buy_buttons() -> void:
 		_price_labels[i].add_theme_color_override("font_color", _UITheme.DANGER_RED if too_expensive else _UITheme.SCORE_GOLD)
 		_apply_card_affordance(i, blocked, _item_accent_color(item))
 
-	if _double_down_desc_label != null and is_instance_valid(_double_down_desc_label):
-		_double_down_desc_label.text = _dd_desc_text()
 	_refresh_button.disabled = GameManager.gold < REFRESH_COST
 
 
@@ -554,6 +655,8 @@ func _apply_card_affordance(index: int, blocked: bool, accent_color: Color) -> v
 			2
 		)
 	)
+	if index == _selected_card_index:
+		_refresh_selected_card_state()
 
 
 func _play_purchase_feedback(accent_color: Color) -> void:

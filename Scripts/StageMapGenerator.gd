@@ -2,8 +2,10 @@ class_name StageMapGenerator
 extends RefCounted
 ## Generates StageMapData while keeping generation algorithms out of the data Resource.
 
-const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+const StageMapDataScript := preload("res://Scripts/StageMapData.gd")
+const MapNodeDataScript := preload("res://Scripts/MapNodeData.gd")
 const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
+const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const NORMAL_STAGE_RATIO: float = 0.5
 const SHOP_RATIO: float = 0.15
@@ -33,14 +35,16 @@ static func generate(_loop: int) -> Resource:
 	for size_value: int in row_sizes:
 		total_nodes += size_value
 
-	var node_types: Array[MapNodeData.NodeType] = allocate_node_types(total_nodes)
+	var node_types: Array[MapNodeData.NodeType] = allocate_node_types_for_loop(total_nodes, _loop)
+	var special_rule_ids: Array[String] = allocate_special_rule_ids(node_types, _loop)
 
 	var type_index: int = 0
 	for row_index: int in StageMapDataScript.ROWS_PER_LOOP:
 		var row: Array[MapNodeData] = []
 		for col_index: int in row_sizes[row_index]:
-			var node: MapNodeData = MapNodeData.new()
+			var node: MapNodeData = MapNodeDataScript.new() as MapNodeData
 			node.type = node_types[type_index]
+			node.special_rule_id = special_rule_ids[type_index]
 			node.column = col_index
 			type_index += 1
 			row.append(node)
@@ -110,6 +114,10 @@ static func nearest_parent(target_col: int, current_count: int, next_count: int)
 
 
 static func allocate_node_types(total_nodes: int) -> Array[MapNodeData.NodeType]:
+	return allocate_node_types_for_loop(total_nodes, 1)
+
+
+static func allocate_node_types_for_loop(total_nodes: int, loop_number: int) -> Array[MapNodeData.NodeType]:
 	var types: Array[MapNodeData.NodeType] = []
 
 	var normal_count: int = maxi(StageMapDataScript.MIN_NORMAL_STAGES, int(total_nodes * NORMAL_STAGE_RATIO))
@@ -159,6 +167,8 @@ static func allocate_node_types(total_nodes: int) -> Array[MapNodeData.NodeType]
 			types[i] = temp
 			break
 
+	_inject_special_stage_types(types, loop_number)
+
 	return types
 
 
@@ -192,3 +202,57 @@ static func assign_special_stage_variants(map: StageMapData, loop_number: int) -
 			continue
 		candidates.shuffle()
 		candidates[0].stage_variant = int(available_variants[assignment_index])
+
+
+static func allocate_special_rule_ids(types: Array[MapNodeData.NodeType], loop_number: int) -> Array[String]:
+	var rule_ids: Array[String] = []
+	rule_ids.resize(types.size())
+	rule_ids.fill("")
+	var pool: Array[String] = SpecialStageRegistryScript.call("get_generation_rule_ids", loop_number) as Array[String]
+	if pool.is_empty():
+		return rule_ids
+	var rotating_pool: Array[String] = pool.duplicate()
+	rotating_pool.shuffle()
+	var pool_index: int = 0
+	for i: int in types.size():
+		if types[i] != MapNodeData.SPECIAL_STAGE_TYPE:
+			continue
+		if pool_index >= rotating_pool.size():
+			rotating_pool = pool.duplicate()
+			rotating_pool.shuffle()
+			pool_index = 0
+		rule_ids[i] = rotating_pool[pool_index]
+		pool_index += 1
+	return rule_ids
+
+
+static func _inject_special_stage_types(types: Array[MapNodeData.NodeType], loop_number: int) -> void:
+	var special_count: int = _get_special_stage_count(loop_number, types.size())
+	if special_count <= 0:
+		return
+	var candidate_indices: Array[int] = []
+	var normal_count: int = 0
+	for t: MapNodeData.NodeType in types:
+		if t == MapNodeData.NodeType.NORMAL_STAGE:
+			normal_count += 1
+	for i: int in maxi(types.size() - 1, 0):
+		if types[i] == MapNodeData.NodeType.NORMAL_STAGE:
+			candidate_indices.append(i)
+	candidate_indices.shuffle()
+	var inserted: int = 0
+	for index: int in candidate_indices:
+		if inserted >= special_count:
+			break
+		if normal_count <= StageMapDataScript.MIN_NORMAL_STAGES:
+			break
+		types[index] = MapNodeData.SPECIAL_STAGE_TYPE
+		normal_count -= 1
+		inserted += 1
+
+
+static func _get_special_stage_count(loop_number: int, total_nodes: int) -> int:
+	if total_nodes < 6:
+		return 0
+	if loop_number >= 3:
+		return 2
+	return 1

@@ -2,6 +2,7 @@ extends GdUnitTestSuite
 ## Unit tests for StageEventOverlay effects and GameManager event flags.
 
 const StageEventScript: GDScript = preload("res://Scripts/StageEventOverlay.gd")
+const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
 
 var _gm: Node
 var _overlay: Node
@@ -96,8 +97,21 @@ func test_boost_shield_faces() -> void:
 
 func test_gain_random_dice() -> void:
 	var before_size: int = GameManager.dice_pool.size()
-	_overlay._gain_random_dice(2)
+	var gained_dice: Array[DiceData] = _overlay._gain_random_dice(2)
 	assert_int(GameManager.dice_pool.size()).is_equal(before_size + 2)
+	assert_int(gained_dice.size()).is_equal(2)
+	for die: DiceData in gained_dice:
+		assert_bool(GameManager.dice_pool.has(die)).is_true()
+
+
+func test_gain_random_dice_summary_lists_awarded_dice() -> void:
+	var gained_dice: Array[DiceData] = [DiceData.make_standard_d6(), DiceData.make_blank_canvas_d6()]
+	var summary: String = _overlay._build_effect_summary(
+		{"type": StageEventScript.EffectType.GAIN_RANDOM_DICE},
+		{"gained_dice": gained_dice}
+	)
+	assert_str(summary).contains(gained_dice[0].dice_name)
+	assert_str(summary).contains(gained_dice[1].dice_name)
 
 
 func test_free_bust_sets_flag() -> void:
@@ -161,7 +175,7 @@ func test_lose_life_emits_lives_changed() -> void:
 	GameManager.lives = 3
 	monitor_signals(GameManager, false)
 	_overlay._apply_effect({"type": 8})
-	await assert_signal(GameManager).is_emitted("lives_changed", [2])
+	assert_signal(GameManager).is_emitted("lives_changed", [2])
 
 
 func test_lose_life_emits_run_ended_at_zero() -> void:
@@ -169,7 +183,7 @@ func test_lose_life_emits_run_ended_at_zero() -> void:
 	monitor_signals(GameManager, false)
 	_overlay._apply_effect({"type": 8})
 	assert_int(GameManager.lives).is_equal(0)
-	await assert_signal(GameManager).is_emitted("run_ended")
+	assert_signal(GameManager).is_emitted("run_ended")
 
 
 func test_lose_gold_removes_20() -> void:
@@ -182,7 +196,7 @@ func test_lose_gold_emits_gold_changed() -> void:
 	GameManager.gold = 50
 	monitor_signals(GameManager, false)
 	_overlay._apply_effect({"type": 9})
-	await assert_signal(GameManager).is_emitted("gold_changed", [30])
+	assert_signal(GameManager).is_emitted("gold_changed", [30])
 
 
 func test_lose_gold_clamps_to_zero() -> void:
@@ -214,3 +228,42 @@ func test_each_curse_has_required_keys() -> void:
 		assert_bool(c.has("name")).is_true()
 		assert_bool(c.has("desc")).is_true()
 		assert_bool(c.has("icon")).is_true()
+
+
+func test_gain_random_dice_choice_waits_for_result_continue() -> void:
+	var overlay: ColorRect = auto_free(StageEventScene.instantiate()) as ColorRect
+	add_child(overlay)
+	await await_idle_frame()
+	var blessing_event: Dictionary = {
+		"type": StageEventScript.EffectType.GAIN_RANDOM_DICE,
+		"name": "Lucky Find",
+		"icon": "🎲",
+		"desc": "Gain 2 random dice",
+		"color_key": "SUCCESS_GREEN",
+	}
+	var curse_event: Dictionary = {
+		"type": StageEventScript.EffectType.LOSE_GOLD,
+		"name": "Pickpocket",
+		"icon": "💸",
+		"desc": "-20g",
+		"color_key": "SCORE_GOLD",
+	}
+	overlay.set("_blessing", blessing_event)
+	overlay.set("_curse", curse_event)
+	var blessing_card: PanelContainer = overlay.call("_build_choice_card", blessing_event, true) as PanelContainer
+	var curse_card: PanelContainer = overlay.call("_build_choice_card", curse_event, false) as PanelContainer
+	var choice_row: HBoxContainer = overlay.get_node("CenterContainer/Card/MarginContainer/Content/ChoiceRow") as HBoxContainer
+	choice_row.add_child(blessing_card)
+	choice_row.add_child(curse_card)
+	overlay.set("_choice_cards", [blessing_card, curse_card])
+	monitor_signals(overlay, false)
+	overlay.call("_on_choice_made", true)
+	await get_tree().create_timer(0.75).timeout
+	assert_signal(overlay).is_not_emitted("event_resolved")
+	var continue_button: Button = overlay.get("_continue_button") as Button
+	assert_object(continue_button).is_not_null()
+	assert_bool(continue_button.visible).is_true()
+	var title_label: Label = overlay.get_node("CenterContainer/Card/MarginContainer/Content/TitleLabel") as Label
+	assert_str(title_label.text).is_equal("REWARD GAINED")
+	continue_button.pressed.emit()
+	assert_signal(overlay).is_emitted("event_resolved")

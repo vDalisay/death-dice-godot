@@ -88,11 +88,16 @@ const BURST_TARGET_RADIUS_X: float = 560.0
 const BURST_TARGET_RADIUS_Y: float = 185.0
 const BURST_TARGET_JITTER_X: float = 34.0
 const BURST_TARGET_JITTER_Y: float = 22.0
+const LARGE_POOL_BURST_THRESHOLD: int = 12
+const LARGE_POOL_BURST_MIN_RING: float = 0.52
+const LARGE_POOL_BURST_ANGLE_JITTER: float = 0.14
+const LARGE_POOL_BURST_JITTER_SCALE: float = 0.65
 const REROLL_BURST_TARGET_RADIUS_X: float = 470.0
 const REROLL_BURST_TARGET_RADIUS_Y: float = 150.0
 const REROLL_BURST_TARGET_JITTER_X: float = 24.0
 const REROLL_BURST_TARGET_JITTER_Y: float = 16.0
 const GOLDEN_ANGLE: float = 2.39996323
+const REROLL_EXIT_LIFT_Y: float = 18.0
 
 ## Spawn origin presets for dice throwing.
 ## Items can override per-die spawn origins in the future.
@@ -447,9 +452,18 @@ func _burst_target_position(index: int, total: int, is_reroll: bool) -> Vector2:
 	var radius_y: float = REROLL_BURST_TARGET_RADIUS_Y if is_reroll else BURST_TARGET_RADIUS_Y
 	var jitter_x: float = REROLL_BURST_TARGET_JITTER_X if is_reroll else BURST_TARGET_JITTER_X
 	var jitter_y: float = REROLL_BURST_TARGET_JITTER_Y if is_reroll else BURST_TARGET_JITTER_Y
-	var spiral_progress: float = sqrt((float(index) + 0.5) / float(safe_total))
-	var ring_ratio: float = lerpf(BURST_TARGET_MIN_RING, 1.0, spiral_progress)
-	var angle: float = GOLDEN_ANGLE * float(index) + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
+	var ring_ratio: float = 1.0
+	var angle: float = 0.0
+	if not is_reroll and total >= LARGE_POOL_BURST_THRESHOLD:
+		var sector_size: float = TAU / float(safe_total)
+		ring_ratio = randf_range(LARGE_POOL_BURST_MIN_RING, 1.0)
+		angle = float(index) * sector_size + randf_range(-sector_size * LARGE_POOL_BURST_ANGLE_JITTER, sector_size * LARGE_POOL_BURST_ANGLE_JITTER)
+		jitter_x *= LARGE_POOL_BURST_JITTER_SCALE
+		jitter_y *= LARGE_POOL_BURST_JITTER_SCALE
+	else:
+		var spiral_progress: float = sqrt((float(index) + 0.5) / float(safe_total))
+		ring_ratio = lerpf(BURST_TARGET_MIN_RING, 1.0, spiral_progress)
+		angle = GOLDEN_ANGLE * float(index) + randf_range(-VOLLEY_CONE_JITTER, VOLLEY_CONE_JITTER)
 	var offset := Vector2(cos(angle) * radius_x * ring_ratio, sin(angle) * radius_y * ring_ratio)
 	offset.x += randf_range(-jitter_x, jitter_x)
 	offset.y += randf_range(-jitter_y, jitter_y)
@@ -494,6 +508,7 @@ func _reroll_target_position(slot: int, total: int) -> Vector2:
 
 
 func _animate_reroll_exit(die: PhysicsDie) -> void:
+	var start_position: Vector2 = die.position
 	die.collision_layer = 0
 	die.collision_mask = 0
 	die.freeze = true
@@ -501,6 +516,7 @@ func _animate_reroll_exit(die: PhysicsDie) -> void:
 	die.linear_velocity = Vector2.ZERO
 	die.angular_velocity = 0.0
 	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(die, "position", start_position + Vector2(0.0, -REROLL_EXIT_LIFT_Y), REROLL_EXIT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(die, "scale", Vector2(0.18, 0.18), REROLL_EXIT_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_property(die, "modulate:a", 0.0, REROLL_EXIT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 

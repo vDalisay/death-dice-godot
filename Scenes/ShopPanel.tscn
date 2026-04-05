@@ -68,33 +68,72 @@ vertical_alignment = 1
 [node name="HSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
+[node name="MainContent" type="HBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
+theme_override_constants/separation = 20
 
-[node name="ScrollContent" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer"]
+[node name="OfferColumn" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 24
+theme_override_constants/separation = 12
 
-[node name="DiceHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="OfferSummaryLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn"]
 layout_mode = 2
-text = "DICE"
+text = "Browse offers. Select a card to inspect it."
 
-[node name="DiceContainer" type="HFlowContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="OfferGrid" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/OfferColumn"]
 layout_mode = 2
+size_flags_vertical = 3
+columns = 4
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 16
 
-[node name="ModifierHeader" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="DetailsPanel" type="PanelContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent"]
 layout_mode = 2
-text = "MODIFIERS"
+custom_minimum_size = Vector2(320, 0)
 
-[node name="ModifierContainer" type="HFlowContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/ScrollContent"]
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel"]
 layout_mode = 2
-theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 16
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="DetailsContent" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DetailsEyebrowLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+layout_mode = 2
+text = "DETAILS"
+
+[node name="DetailsTitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+layout_mode = 2
+text = "Select an offer"
+autowrap_mode = 3
+
+[node name="DetailsKeywordLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+layout_mode = 2
+text = ""
+autowrap_mode = 3
+
+[node name="DetailsSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+layout_mode = 2
+
+[node name="DetailsDescriptionLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+layout_mode = 2
+size_flags_vertical = 3
+text = ""
+autowrap_mode = 3
+
+[node name="DetailsStateLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/MainContent/DetailsPanel/MarginContainer/DetailsContent"]
+layout_mode = 2
+text = ""
+autowrap_mode = 3
+
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
+layout_mode = 2
 
 [node name="FooterRow" type="HBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2

@@ -16,6 +16,7 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
+
 ThemeManager="*res://Scripts/ThemeManager.gd"
 GameManager="*res://Scripts/GameManager.gd"
 SaveManager="*res://Scripts/SaveManager.gd"

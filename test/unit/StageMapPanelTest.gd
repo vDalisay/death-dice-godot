@@ -9,10 +9,11 @@ func test_stage_map_scene_has_required_nodes() -> void:
 	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
 	add_child(panel)
 	await await_idle_frame()
-	assert_object(panel.get_node("Backdrop")).is_not_null()
-	assert_object(panel.get_node("MarginContainer/VBoxContainer/TitleLabel")).is_not_null()
-	assert_object(panel.get_node("MarginContainer/VBoxContainer/MapArea")).is_not_null()
-	assert_object(panel.get_node("MarginContainer/VBoxContainer/HintLabel")).is_not_null()
+	assert_object(panel.get_node("AtmosphereLayer/Backdrop")).is_not_null()
+	assert_object(panel.get_node("MarginContainer/RootVBox/HeaderPanel")).is_not_null()
+	assert_object(panel.get_node("MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox/MapArea")).is_not_null()
+	assert_object(panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle")).is_not_null()
+	assert_object(panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel")).is_not_null()
 
 
 func test_open_updates_hint_text() -> void:
@@ -23,13 +24,38 @@ func test_open_updates_hint_text() -> void:
 	panel.call("open", map, 0, -1)
 	for _i: int in 16:
 		await await_idle_frame()
-	var hint_label: Label = panel.get_node("MarginContainer/VBoxContainer/HintLabel") as Label
+	var hint_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel") as Label
+	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
+	var selected_type: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeType") as Label
 	assert_str(hint_label.text).contains("Stage 1 / 7")
-	var content: VBoxContainer = panel.get_node("MarginContainer/VBoxContainer") as VBoxContainer
-	var map_area: Control = panel.get_node("MarginContainer/VBoxContainer/MapArea") as Control
+	assert_str(selected_title.text).is_not_empty()
+	assert_str(selected_type.text).contains("Available Now")
+	var content: VBoxContainer = panel.get_node("MarginContainer/RootVBox") as VBoxContainer
+	var map_area: Control = panel.get_node("MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox/MapArea") as Control
 	assert_float(panel.modulate.a).is_equal(1.0)
 	assert_float(content.modulate.a).is_greater(0.0)
 	assert_int(map_area.get_child_count()).is_greater(0)
+
+
+func test_hovering_node_updates_inspector_and_special_rule_preview() -> void:
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_special_preview_map()
+	panel.call("open", map, 1, 0)
+	for _i: int in 8:
+		await await_idle_frame()
+	var node_buttons: Array = panel.get("_node_buttons") as Array
+	var current_row_buttons: Array = node_buttons[1] as Array
+	(current_row_buttons[1] as Button).emit_signal("mouse_entered")
+	await await_idle_frame()
+	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
+	var selected_summary: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeSummary") as Label
+	var selected_rule: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeRule") as Label
+	assert_str(selected_title.text).is_equal("Lucky Floor")
+	assert_str(selected_summary.text).contains("rules modifier")
+	assert_bool(selected_rule.visible).is_true()
+	assert_str(selected_rule.text).contains("First reroll each turn grants +2 LUCK")
 
 
 func test_open_consumes_loop_reveal_only_once_per_loop() -> void:
@@ -73,14 +99,9 @@ func test_open_skips_to_next_unvisited_row_when_requested_row_is_stale() -> void
 	await await_idle_frame()
 	assert_int(panel.get("_current_row")).is_equal(5)
 	assert_int(panel.get("_current_col")).is_equal(1)
-	var node_buttons: Array = panel.get("_node_buttons") as Array
-	var row_four: Array = node_buttons[4] as Array
-	var row_five: Array = node_buttons[5] as Array
-	for button_variant: Variant in row_four:
-		assert_bool((button_variant as Button).disabled).is_true()
-	assert_bool((row_five[0] as Button).disabled).is_false()
-	assert_bool((row_five[1] as Button).disabled).is_true()
-	assert_bool((row_five[2] as Button).disabled).is_false()
+	assert_bool(panel.call("_can_reach", 5, 0)).is_true()
+	assert_bool(panel.call("_can_reach", 5, 1)).is_false()
+	assert_bool(panel.call("_can_reach", 5, 2)).is_true()
 
 
 func test_future_row_connections_stay_dim_until_that_row_is_current() -> void:
@@ -104,18 +125,19 @@ func test_special_stage_nodes_show_variant_label_and_hover_copy() -> void:
 	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
 	add_child(panel)
 	await await_idle_frame()
-	var map: StageMapData = _build_special_stage_map()
+	var map: StageMapData = _build_special_variant_map()
 	panel.call("open", map, 0, -1)
-	await await_idle_frame()
+	for _i: int in 4:
+		await await_idle_frame()
 	var node_buttons: Array = panel.get("_node_buttons") as Array
 	var special_button: Button = ((node_buttons[0] as Array)[0] as Button)
-	var label: Label = special_button.get_child(0) as Label
-	assert_str(label.text).is_equal("Clean")
 	assert_str(special_button.tooltip_text).contains("Clean Room")
 	assert_str(special_button.tooltip_text).contains("target")
-	var hint_label: Label = panel.get_node("MarginContainer/VBoxContainer/HintLabel") as Label
+	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
+	var hint_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel") as Label
 	special_button.emit_signal("mouse_entered")
 	await await_idle_frame()
+	assert_str(selected_title.text).is_equal("Clean Room")
 	assert_str(hint_label.text).contains("reachable now")
 	assert_str(hint_label.text).contains("Clean Room")
 	special_button.emit_signal("mouse_exited")
@@ -147,7 +169,7 @@ func _build_active_path_map() -> StageMapData:
 	return map
 
 
-func _build_special_stage_map() -> StageMapData:
+func _build_special_variant_map() -> StageMapData:
 	var map := StageMapData.new()
 	map.rows = [
 		[_make_node([0], false, 0, SpecialStageCatalog.Variant.CLEAN_ROOM), _make_node([0], false, 1)],
@@ -157,9 +179,19 @@ func _build_special_stage_map() -> StageMapData:
 	return map
 
 
+func _build_special_preview_map() -> StageMapData:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_node([0, 1], true, 0)],
+		[_make_node([0], false, 0), _make_special_node([0], "lucky_floor", 1)],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
 func _count_lines_from_row_with_color(lines: Array, row_buttons: Array, color: Color) -> int:
 	var count: int = 0
-	var row_start_y: float = ((row_buttons[0] as Button).position.y) + StageMapPanel.NODE_SIZE
+	var row_start_y: float = ((row_buttons[0] as Button).position.y) + (((row_buttons[0] as Button).size.y) * 0.5)
 	for line_variant: Variant in lines:
 		var line: Line2D = line_variant as Line2D
 		if line == null:
@@ -178,4 +210,13 @@ func _make_node(connections: Array[int], visited: bool = false, column: int = 0,
 	node.visited = visited
 	node.column = column
 	node.stage_variant = stage_variant
+	return node
+
+
+func _make_special_node(connections: Array[int], special_rule_id: String, column: int = 0) -> MapNodeData:
+	var node := MapNodeData.new()
+	node.type = MapNodeData.NodeType.SPECIAL_STAGE
+	node.connections = connections.duplicate()
+	node.special_rule_id = special_rule_id
+	node.column = column
 	return node

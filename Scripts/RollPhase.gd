@@ -181,6 +181,7 @@ func _start_new_turn() -> void:
 	accumulated_shield_count = 0
 	_turn_entered_high_risk = false
 	GameManager.set_held_stop_count(0)
+	GameManager.begin_special_stage_turn()
 	hud.reset_score_feedback_visuals(true)
 	_reroll_count = 0
 	_triggered_combo_ids.clear()
@@ -220,6 +221,8 @@ func _on_bank_pressed() -> void:
 	turn_state = TurnState.BANKED
 	bank_streak += 1
 	_update_streak_display()
+	var shield_count: int = _count_shields()
+	var effective_stops: int = maxi(0, accumulated_stop_count - shield_count)
 	var heart_relief: int = _apply_banked_heart_relief()
 	var bank_threshold: int = _get_bust_threshold()
 	var bank_effective_stops: int = _get_effective_stop_count()
@@ -267,12 +270,21 @@ func _on_bank_pressed() -> void:
 	# Momentum multiplier: grows +5% per reroll this stage.
 	var momentum_mult: float = _get_momentum_multiplier()
 	var banked: int = int(base_banked * streak_mult * momentum_mult)
+	var special_preview: Dictionary = GameManager.get_special_stage_bank_preview(effective_stops, _reroll_count)
+	banked += int(special_preview.get("bonus_score", 0))
 	var old_total: int = GameManager.total_score
 	var will_clear_stage: bool = old_total + banked >= GameManager.stage_target_score
+	var special_clear_rewards: Dictionary = GameManager.get_special_stage_clear_rewards(effective_stops, will_clear_stage)
 	_defer_stage_clear_overlay = will_clear_stage
 	_pending_stage_clear_overlay = false
 	GameManager.add_score(banked)
 	_defer_stage_clear_overlay = false
+	var special_gold: int = int(special_preview.get("bonus_gold", 0)) + int(special_clear_rewards.get("bonus_gold", 0))
+	if special_gold > 0:
+		GameManager.add_gold(special_gold)
+	var special_luck: int = int(special_preview.get("bonus_luck", 0)) + int(special_clear_rewards.get("bonus_luck", 0))
+	if special_luck > 0:
+		GameManager.add_luck(special_luck)
 	# Reset momentum after banking (cashes out the bonus).
 	GameManager.reset_momentum()
 	# Accumulate LUCK face values for dice reward rarity.
@@ -360,6 +372,14 @@ func _on_bank_pressed() -> void:
 		status_parts.append("LAB +%d EXP" % meta_exp_reward)
 	if meta_shard_reward > 0:
 		status_parts.append("LAB +%d SHARD" % meta_shard_reward)
+	for special_part: String in special_preview.get("status_parts", []) as Array[String]:
+		status_parts.append(special_part)
+	for special_part: String in special_clear_rewards.get("status_parts", []) as Array[String]:
+		status_parts.append(special_part)
+	for special_part: String in special_preview.get("status_parts", []) as Array[String]:
+		status_parts.append(special_part)
+	for special_part: String in special_clear_rewards.get("status_parts", []) as Array[String]:
+		status_parts.append(special_part)
 	if streak_mult > 1.0:
 		status_parts.append("ON FIRE x%.1f" % streak_mult)
 	if momentum_mult > 1.0:
@@ -453,6 +473,9 @@ func _roll_all_dice() -> void:
 
 func _reroll_selected_dice() -> void:
 	_reroll_count += 1
+	var special_reroll_status: String = GameManager.apply_special_stage_reroll_bonus(_reroll_count)
+	if special_reroll_status != "":
+		hud.show_status(special_reroll_status, GameManager.get_active_special_stage_color())
 	# Lock all currently-kept dice permanently before rerolling.
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] and not dice_keep_locked[i]:
@@ -1641,10 +1664,13 @@ func _open_stage_map() -> void:
 	)
 
 
-func _on_map_node_selected(_row: int, col: int, node: MapNodeData, used_reroute: bool) -> void:
+func _on_map_node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool) -> void:
 	if used_reroute:
 		GameManager.use_reroute_token()
 		hud.show_status("REROUTE SPENT! Path broken for this pick.", Color(1.0, 0.72, 0.35))
+	var selected_node: MapNodeData = node
+	if selected_node == null and GameManager.stage_map != null:
+		selected_node = GameManager.stage_map.get_node_at(row, col)
 	_stage_flow.advance_row(col)
 	stage_map_panel.visible = false
 	var node_type: MapNodeData.NodeType = MapNodeData.NodeType.NORMAL_STAGE
@@ -1652,7 +1678,9 @@ func _on_map_node_selected(_row: int, col: int, node: MapNodeData, used_reroute:
 		node_type = node.type
 	match node_type:
 		MapNodeData.NodeType.NORMAL_STAGE:
-			_start_stage_from_map(node)
+			_start_stage_from_map(selected_node)
+		MapNodeData.SPECIAL_STAGE_TYPE:
+			_start_stage_from_map(selected_node, selected_node.special_rule_id if selected_node != null else "")
 		MapNodeData.NodeType.SHOP:
 			_open_shop_from_map()
 		MapNodeData.NodeType.FORGE:
@@ -1663,9 +1691,17 @@ func _on_map_node_selected(_row: int, col: int, node: MapNodeData, used_reroute:
 			_show_stage_event()
 
 
-func _start_stage_from_map(stage_node: MapNodeData) -> void:
+func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: String = "") -> void:
 	_stage_flow.begin_stage_from_map(stage_node)
 	_reset_stage_contract_trackers()
+	if special_rule_id != "":
+		GameManager.enter_special_stage(special_rule_id)
+		hud.show_status(
+			"SPECIAL STAGE: %s" % GameManager.get_active_special_stage_summary(),
+			GameManager.get_active_special_stage_color()
+		)
+	elif GameManager.has_current_stage_variant():
+		hud.show_status(GameManager.get_current_stage_variant_hover_text(), Color(0.55, 0.9, 1.0))
 	_roll_content.visible = true
 	_update_streak_display()
 	_run_active = true

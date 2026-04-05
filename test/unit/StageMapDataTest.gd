@@ -14,6 +14,7 @@ func test_map_node_defaults() -> void:
 	assert_bool(node.visited).is_false()
 	assert_int(node.column).is_equal(0)
 	assert_int(node.connections.size()).is_equal(0)
+	assert_str(node.special_rule_id).is_equal("")
 
 
 func test_map_node_display_name() -> void:
@@ -36,14 +37,16 @@ func test_map_node_color() -> void:
 
 func test_map_node_serialization_roundtrip() -> void:
 	var node: MapNodeData = MapNodeData.new()
-	node.type = MapNodeData.NodeType.RANDOM_EVENT
+	node.type = MapNodeData.SPECIAL_STAGE_TYPE
+	node.special_rule_id = "clean_room"
 	node.connections = [0, 2]
 	node.visited = true
 	node.column = 1
 	node.stage_variant = SpecialStageCatalog.Variant.HOT_TABLE
 	var data: Dictionary = node.to_dict()
 	var restored: MapNodeData = MapNodeData.from_dict(data)
-	assert_int(restored.type).is_equal(MapNodeData.NodeType.RANDOM_EVENT)
+	assert_int(restored.type).is_equal(MapNodeData.SPECIAL_STAGE_TYPE)
+	assert_str(restored.special_rule_id).is_equal("clean_room")
 	assert_int(restored.connections.size()).is_equal(2)
 	assert_int(restored.connections[0]).is_equal(0)
 	assert_int(restored.connections[1]).is_equal(2)
@@ -59,6 +62,15 @@ func test_special_stage_node_uses_variant_metadata() -> void:
 	assert_str(node.get_display_name()).is_equal("Clean Room")
 	assert_str(node.get_map_label()).is_equal("Clean")
 	assert_str(node.get_hover_text()).contains("Clean Room")
+
+
+func test_special_stage_node_uses_registry_display_data() -> void:
+	var node: MapNodeData = MapNodeData.new()
+	node.type = MapNodeData.SPECIAL_STAGE_TYPE
+	node.special_rule_id = "precision_hall"
+	assert_str(node.get_display_name()).is_equal("Precision Hall")
+	assert_str(node.get_icon()).is_equal("🎯")
+	assert_str(node.get_hover_description()).contains("exactly 2 effective STOP")
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +236,18 @@ func test_generate_loop_2() -> void:
 	assert_int(map.get_row_count()).is_equal(StageMapData.ROWS_PER_LOOP)
 	# Should still obey all the same constraints.
 	assert_int(map.count_type(MapNodeData.NodeType.NORMAL_STAGE)).is_greater_equal(StageMapData.MIN_NORMAL_STAGES)
+
+
+func test_generated_maps_include_special_stage_metadata() -> void:
+	var map: StageMapData = StageMapData.generate(1)
+	var special_count: int = 0
+	for r: int in map.get_row_count():
+		for node: MapNodeData in map.get_row(r):
+			if node.type != MapNodeData.SPECIAL_STAGE_TYPE:
+				continue
+			special_count += 1
+			assert_str(node.special_rule_id).is_not_empty()
+	assert_int(special_count).is_greater_equal(1)
 
 
 func test_connections_are_proportionally_adjacent() -> void:
