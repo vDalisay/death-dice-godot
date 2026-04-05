@@ -1641,15 +1641,18 @@ func _open_stage_map() -> void:
 	)
 
 
-func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool) -> void:
+func _on_map_node_selected(_row: int, col: int, node: MapNodeData, used_reroute: bool) -> void:
 	if used_reroute:
 		GameManager.use_reroute_token()
 		hud.show_status("REROUTE SPENT! Path broken for this pick.", Color(1.0, 0.72, 0.35))
 	_stage_flow.advance_row(col)
 	stage_map_panel.visible = false
+	var node_type: MapNodeData.NodeType = MapNodeData.NodeType.NORMAL_STAGE
+	if node != null:
+		node_type = node.type
 	match node_type:
 		MapNodeData.NodeType.NORMAL_STAGE:
-			_start_stage_from_map()
+			_start_stage_from_map(node)
 		MapNodeData.NodeType.SHOP:
 			_open_shop_from_map()
 		MapNodeData.NodeType.FORGE:
@@ -1660,8 +1663,8 @@ func _on_map_node_selected(_row: int, col: int, node_type: MapNodeData.NodeType,
 			_show_stage_event()
 
 
-func _start_stage_from_map() -> void:
-	_stage_flow.begin_stage_from_map()
+func _start_stage_from_map(stage_node: MapNodeData) -> void:
+	_stage_flow.begin_stage_from_map(stage_node)
 	_reset_stage_contract_trackers()
 	_roll_content.visible = true
 	_update_streak_display()

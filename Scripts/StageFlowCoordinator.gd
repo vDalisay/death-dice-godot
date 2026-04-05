@@ -7,8 +7,8 @@ func advance_row(col: int) -> void:
 	GameManager.advance_row(col)
 
 
-func begin_stage_from_map() -> void:
-	GameManager.begin_stage_from_map()
+func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
+	GameManager.begin_stage_from_map(stage_node)
 
 
 func apply_rest_rewards(heal_lives: int, gold_bonus: int) -> void:

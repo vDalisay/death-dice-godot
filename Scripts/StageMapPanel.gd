@@ -3,7 +3,7 @@ extends PanelContainer
 ## Full-screen branching stage map. Player picks a node in the current row.
 ## Call open() and listen for node_selected.
 
-signal node_selected(row: int, col: int, node_type: MapNodeData.NodeType, used_reroute: bool)
+signal node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
@@ -47,6 +47,7 @@ var _reroute_enabled: bool = false
 var _transition_tween: Tween = null
 var _last_open_used_loop_reveal: bool = false
 var _is_closing: bool = false
+var _default_hint_text: String = ""
 
 
 func _ready() -> void:
@@ -256,9 +257,9 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
 	if node.visited:
 		_style_visited(style, btn, node_color)
 	elif row == _current_row and _reroute_enabled and not _is_reachable_without_reroute(row, col):
-		_style_reroute(style, btn, row, col, node.type)
+		_style_reroute(style, btn, row, col)
 	elif row == _current_row and _can_reach(row, col):
-		_style_active(style, btn, node_color, row, col, node.type)
+		_style_active(style, btn, node_color, row, col)
 	elif row == _current_row:
 		_style_unreachable(style, btn, node_color)
 	elif row > _current_row:
@@ -273,10 +274,16 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
 	btn.add_theme_color_override("font_color", node_color)
 	btn.add_theme_color_override("font_hover_color", Color.WHITE)
 	btn.add_theme_color_override("font_disabled_color", Color(node_color, 0.5))
+	btn.tooltip_text = node.get_hover_text()
+	var hover_row: int = row
+	var hover_col: int = col
+	var hover_node: MapNodeData = node
+	btn.mouse_entered.connect(func() -> void: _show_node_hint(hover_row, hover_col, hover_node))
+	btn.mouse_exited.connect(_refresh_hint_label)
 
 	# Type label below the icon.
 	var lbl: Label = Label.new()
-	lbl.text = node.get_display_name()
+	lbl.text = node.get_map_label()
 	lbl.add_theme_font_override("font", _UITheme.font_mono())
 	lbl.add_theme_font_size_override("font_size", LABEL_FONT_SIZE)
 	lbl.add_theme_color_override("font_color", Color(node_color, 0.7))
@@ -296,30 +303,28 @@ func _style_visited(style: StyleBoxFlat, btn: Button, color: Color) -> void:
 	btn.modulate = Color(1, 1, 1, VISITED_ALPHA)
 
 
-func _style_active(style: StyleBoxFlat, btn: Button, _color: Color, row: int, col: int, ntype: MapNodeData.NodeType) -> void:
+func _style_active(style: StyleBoxFlat, btn: Button, _color: Color, row: int, col: int) -> void:
 	style.bg_color = _UITheme.ELEVATED
 	style.border_color = CURRENT_ROW_GLOW
 	style.set_border_width_all(3)
 	btn.disabled = false
 	var r: int = row
 	var c: int = col
-	var t: MapNodeData.NodeType = ntype
-	btn.pressed.connect(func() -> void: _on_node_pressed(r, c, t))
+	btn.pressed.connect(func() -> void: _on_node_pressed(r, c))
 	# Hover variant.
 	var hover_style: StyleBoxFlat = style.duplicate()
 	hover_style.bg_color = _UITheme.ELEVATED.lightened(0.12)
 	btn.add_theme_stylebox_override("hover", hover_style)
 
 
-func _style_reroute(style: StyleBoxFlat, btn: Button, row: int, col: int, ntype: MapNodeData.NodeType) -> void:
+func _style_reroute(style: StyleBoxFlat, btn: Button, row: int, col: int) -> void:
 	style.bg_color = Color(_UITheme.ELEVATED, 0.9)
 	style.border_color = REROUTE_GLOW
 	style.set_border_width_all(3)
 	btn.disabled = false
 	var r: int = row
 	var c: int = col
-	var t: MapNodeData.NodeType = ntype
-	btn.pressed.connect(func() -> void: _on_node_pressed(r, c, t))
+	btn.pressed.connect(func() -> void: _on_node_pressed(r, c))
 	btn.add_theme_color_override("font_color", REROUTE_GLOW)
 	btn.add_theme_color_override("font_hover_color", Color.WHITE)
 	var hover_style: StyleBoxFlat = style.duplicate()
@@ -365,7 +370,7 @@ func _is_reachable_without_reroute(row: int, col: int) -> bool:
 	return _stage_map.is_reachable(row, col, row - 1, _current_col)
 
 
-func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> void:
+func _on_node_pressed(row: int, col: int) -> void:
 	if _is_closing:
 		return
 	_is_closing = true
@@ -375,7 +380,7 @@ func _on_node_pressed(row: int, col: int, node_type: MapNodeData.NodeType) -> vo
 		node.visited = true
 	await _play_close_transition()
 	visible = false
-	node_selected.emit(row, col, node_type, used_reroute)
+	node_selected.emit(row, col, node, used_reroute)
 
 
 # ---------------------------------------------------------------------------
@@ -459,11 +464,31 @@ func _ensure_reroute_button() -> void:
 func _refresh_hint_label() -> void:
 	var base_text: String = "Stage %d / %d" % [_current_row + 1, StageMapData.ROWS_PER_LOOP]
 	if _reroute_enabled:
-		_hint_label.text = "%s  |  Reroute preview active: token spends only if you break path" % base_text
+		_default_hint_text = "%s  |  Reroute preview active: token spends only if you break path" % base_text
 	elif _reroute_uses > 0:
-		_hint_label.text = "%s  |  %d reroute token%s ready" % [base_text, _reroute_uses, "" if _reroute_uses == 1 else "s"]
+		_default_hint_text = "%s  |  %d reroute token%s ready" % [base_text, _reroute_uses, "" if _reroute_uses == 1 else "s"]
 	else:
-		_hint_label.text = base_text
+		_default_hint_text = base_text
+	_hint_label.text = _default_hint_text
+
+
+func _show_node_hint(row: int, col: int, node: MapNodeData) -> void:
+	if node == null:
+		_refresh_hint_label()
+		return
+	_hint_label.text = "%s  |  %s" % [_get_route_hint(row, col), node.get_hover_text()]
+
+
+func _get_route_hint(row: int, col: int) -> String:
+	if row < _current_row:
+		return "Row %d visited" % (row + 1)
+	if row > _current_row:
+		return "Row %d future path" % (row + 1)
+	if _reroute_enabled and not _is_reachable_without_reroute(row, col):
+		return "Row %d reroute path" % (row + 1)
+	if _is_reachable_without_reroute(row, col):
+		return "Row %d reachable now" % (row + 1)
+	return "Row %d blocked on this route" % (row + 1)
 
 
 func _refresh_reroute_button() -> void:

@@ -2,6 +2,7 @@ extends GdUnitTestSuite
 ## Unit tests for StageFlowCoordinator map progression helpers.
 
 var _coordinator: RefCounted
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 
 
 func before_test() -> void:
@@ -21,9 +22,12 @@ func test_advance_row_updates_game_manager_path_state() -> void:
 func test_begin_stage_from_map_advances_stage_and_resets_score() -> void:
 	GameManager.total_score = 50
 	var start_stage: int = GameManager.current_stage
-	_coordinator.begin_stage_from_map()
+	var node := MapNodeData.new()
+	node.stage_variant = SpecialStageCatalog.Variant.LUCKY_FLOOR
+	_coordinator.begin_stage_from_map(node)
 	assert_int(GameManager.current_stage).is_equal(start_stage + 1)
 	assert_int(GameManager.total_score).is_equal(0)
+	assert_int(GameManager.current_stage_variant).is_equal(SpecialStageCatalog.Variant.LUCKY_FLOOR)
 
 
 func test_apply_rest_rewards_heals_and_grants_gold() -> void:

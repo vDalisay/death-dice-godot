@@ -6,6 +6,14 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 const HUDScene: PackedScene = preload("res://Scenes/HUD.tscn")
 
 
+func before_test() -> void:
+	GameManager.active_modifiers.clear()
+	GameManager.clear_active_loop_contract()
+	GameManager.set_held_stop_count(0)
+	GameManager.near_death_banks_this_stage = 0
+	GameManager.near_death_banks_this_run = 0
+
+
 # ---------------------------------------------------------------------------
 # Risk pip calculation
 # ---------------------------------------------------------------------------
@@ -124,6 +132,37 @@ func test_update_turn_with_shields_shows_diamond() -> void:
 	hud.update_turn(10, 1, 3, 2)
 	assert_str(hud.stop_label.text).contains(_UITheme.GLYPH_SHIELD)
 	assert_str(hud.stop_label.text).contains("2")
+
+
+func test_update_turn_risk_meta_shows_held_stops_and_ev() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._on_held_stops_changed(2)
+	GameManager.near_death_banks_this_stage = 1
+	hud._on_near_death_banked(3, 4)
+	hud.update_turn(18, 3, 4, 1, 2, 0.72, "details", 4.5)
+	var meta_label: Label = hud.get_node("InfoRow/RiskColumn/RiskMetaLabel") as Label
+	assert_str(meta_label.text).contains("Held 2")
+	assert_str(meta_label.text).contains("Near-Death x1")
+	assert_str(meta_label.text).contains("EV +4.5")
+	assert_str(meta_label.text).contains("JUICY")
+
+
+func test_contract_label_reflects_active_contract_progress() -> void:
+	GameManager.activate_loop_contract("safe_hands")
+	GameManager.update_loop_contract_progress({
+		"contract_id": "safe_hands",
+		"current": 1,
+		"target": 3,
+		"completed": false,
+	})
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	var contract_label: Label = hud.get_node("InfoRow/RiskColumn/ContractLabel") as Label
+	assert_bool(contract_label.visible).is_true()
+	assert_str(contract_label.text).is_equal("Safe Hands 1/3")
 
 
 func test_score_label_total_format() -> void:

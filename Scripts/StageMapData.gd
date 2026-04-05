@@ -88,6 +88,26 @@ func count_type(node_type: MapNodeData.NodeType) -> int:
 	return count
 
 
+func count_special_stage_nodes() -> int:
+	var count: int = 0
+	for row: Array in rows:
+		for node: Variant in row:
+			var n: MapNodeData = node as MapNodeData
+			if n != null and n.has_special_stage_variant():
+				count += 1
+	return count
+
+
+func count_stage_variant(stage_variant: int) -> int:
+	var count: int = 0
+	for row: Array in rows:
+		for node: Variant in row:
+			var n: MapNodeData = node as MapNodeData
+			if n != null and n.stage_variant == stage_variant:
+				count += 1
+	return count
+
+
 # ---------------------------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------------------------

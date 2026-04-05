@@ -1,6 +1,8 @@
 extends GdUnitTestSuite
 ## Unit tests for GameManager autoload.
 
+const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
+
 var _gm: Node
 var _saved_prestige_unlocks: Array[String] = []
 
@@ -23,6 +25,7 @@ func test_initial_state() -> void:
 	assert_int(_gm.lives).is_equal(3)
 	assert_int(_gm.stage_target_score).is_equal(30)
 	assert_int(_gm.current_stage).is_equal(1)
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
 	assert_int(_gm.gold).is_equal(0)
 	assert_int(_gm.run_mode).is_equal(_gm.RunMode.CLASSIC)
 
@@ -95,6 +98,7 @@ func test_reset_run_restores_defaults() -> void:
 	_gm.add_score(300)
 	_gm.lose_life()
 	_gm.current_stage = 3
+	_gm.set_current_stage_variant(SpecialStageCatalog.Variant.HOT_TABLE)
 	_gm.gold = 100
 	_gm.current_run_exp = 5
 	_gm.current_run_stop_shards = 2
@@ -110,6 +114,7 @@ func test_reset_run_restores_defaults() -> void:
 	assert_int(_gm.current_run_exp).is_equal(0)
 	assert_int(_gm.current_run_stop_shards).is_equal(0)
 	assert_int(_gm.held_stop_count).is_equal(0)
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
 	assert_str(_gm.active_loop_contract_id).is_equal("")
 
 
@@ -416,13 +421,23 @@ func test_begin_stage_from_map_updates_stage_and_score() -> void:
 	_gm.current_stage = 1
 	_gm.total_stages_cleared = 0
 	_gm.total_score = 77
+	var node := MapNodeData.new()
+	node.stage_variant = SpecialStageCatalog.Variant.PRECISION_HALL
 	monitor_signals(_gm, false)
-	_gm.begin_stage_from_map()
+	_gm.begin_stage_from_map(node)
 	assert_int(_gm.current_stage).is_equal(2)
 	assert_int(_gm.total_stages_cleared).is_equal(1)
 	assert_int(_gm.total_score).is_equal(0)
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.PRECISION_HALL)
 	await assert_signal(_gm).is_emitted("score_changed", [0])
+	await assert_signal(_gm).is_emitted("stage_variant_changed", [SpecialStageCatalog.Variant.PRECISION_HALL])
 	await assert_signal(_gm).is_emitted("stage_advanced", [2])
+
+
+func test_begin_stage_from_map_without_node_clears_variant() -> void:
+	_gm.set_current_stage_variant(SpecialStageCatalog.Variant.HOT_TABLE)
+	_gm.begin_stage_from_map()
+	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
 
 
 func test_register_turn_score_updates_only_when_higher() -> void:
