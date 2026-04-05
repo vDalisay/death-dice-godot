@@ -51,17 +51,41 @@ theme_override_constants/separation = 12
 [node name="TitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "PRESTIGE SHOP"
+text = "META LAB"
 
 [node name="CurrencyLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
 layout_mode = 2
 text = "Skulls: 0"
 
+[node name="MetaCurrencyLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
+layout_mode = 2
+text = "EXP 0  |  Shards 0"
+
 [node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="CardsContainer" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer"]
+[node name="SectionsVBox" type="VBoxContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 18
+
+[node name="PrestigeLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/SectionsVBox"]
+layout_mode = 2
+text = "Prestige Unlocks"
+
+[node name="PrestigeCardsContainer" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/SectionsVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
+[node name="UpgradeLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/SectionsVBox"]
+layout_mode = 2
+text = "Reroll Lab"
+
+[node name="UpgradeCardsContainer" type="GridContainer" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ScrollContainer/SectionsVBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 columns = 3

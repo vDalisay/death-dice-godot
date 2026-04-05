@@ -51,16 +51,18 @@ static func get_by_id(contract_id: String) -> LoopContractData:
 	return null
 
 
-static func get_offers_for_loop(loop_number: int) -> Array[LoopContractData]:
+static func get_offers_for_loop(loop_number: int, offer_count: int = 3) -> Array[LoopContractData]:
 	var offer_ids: Array[String] = []
 	if loop_number <= 1:
-		offer_ids = ["safe_hands", "one_more_time", "dead_close"]
+		offer_ids = ["safe_hands", "one_more_time", "dead_close", "even_flow"]
 	elif loop_number == 2:
-		offer_ids = ["comeback", "third_spin", "shield_line"]
+		offer_ids = ["comeback", "third_spin", "shield_line", "clean_finish"]
 	else:
-		offer_ids = ["pressure_player", "third_spin", "exact_heat"]
+		offer_ids = ["pressure_player", "third_spin", "exact_heat", "clean_finish"]
 	var offers: Array[LoopContractData] = []
 	for contract_id: String in offer_ids:
+		if offers.size() >= offer_count:
+			break
 		var contract: LoopContractData = get_by_id(contract_id)
 		if contract != null:
 			offers.append(contract)

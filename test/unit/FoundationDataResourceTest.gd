@@ -23,3 +23,11 @@ func test_permanent_upgrade_data_to_dict_includes_dual_costs() -> void:
 	assert_str(serialized["upgrade_id"] as String).is_equal("high_risk_engine")
 	assert_int(int(serialized["exp_cost"])).is_equal(12)
 	assert_int(int(serialized["stop_shard_cost"])).is_equal(4)
+
+
+func test_permanent_upgrade_catalog_exposes_contract_scout() -> void:
+	var upgrade: PermanentUpgradeData = PermanentUpgradeData.get_by_id("contract_scout")
+	assert_object(upgrade).is_not_null()
+	assert_str(upgrade.display_name).is_equal("Contract Scout")
+	assert_int(upgrade.exp_cost).is_equal(12)
+	assert_int(upgrade.stop_shard_cost).is_equal(4)

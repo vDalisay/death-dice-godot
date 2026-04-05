@@ -27,3 +27,9 @@ func test_lookup_by_id_returns_reward_payload() -> void:
 	assert_object(contract).is_not_null()
 	assert_int(contract.reward_gold).is_equal(28)
 	assert_int(contract.reward_stop_shards).is_equal(1)
+
+
+func test_loop_one_can_offer_four_contracts_with_upgrade() -> void:
+	var offers: Array[LoopContractData] = LoopContractCatalogScript.get_offers_for_loop(1, 4)
+	assert_int(offers.size()).is_equal(4)
+	assert_str(offers[3].contract_id).is_equal("even_flow")

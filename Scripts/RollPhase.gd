@@ -27,6 +27,9 @@ const SCORE_ANIM_SPEEDUP_PER_DIE: float = 0.06
 const SCORE_ANIM_BASE_INTERVAL_FLOOR: float = 0.05
 const HIGH_RISK_ODDS_THRESHOLD: float = 0.55
 const NEAR_DEATH_GOLD_BONUS: int = 8
+const META_LEDGER_EXP_REWARD: int = 2
+const META_HIGH_RISK_EXP_REWARD: int = 1
+const META_NEAR_DEATH_SHARD_REWARD: int = 1
 
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
@@ -222,9 +225,21 @@ func _on_bank_pressed() -> void:
 	var bank_effective_stops: int = _get_effective_stop_count()
 	GameManager.set_held_stop_count(_count_intentionally_held_stops())
 	var is_near_death_bank: bool = bank_threshold > 1 and bank_effective_stops == bank_threshold - 1
+	var meta_exp_reward: int = 0
+	var meta_shard_reward: int = 0
 	if is_near_death_bank:
 		GameManager.register_near_death_bank(bank_effective_stops, bank_threshold)
 		GameManager.add_gold(NEAR_DEATH_GOLD_BONUS)
+		if SaveManager.has_permanent_upgrade("shard_magnet"):
+			meta_shard_reward += META_NEAR_DEATH_SHARD_REWARD
+	if SaveManager.has_permanent_upgrade("reroll_ledger") and _reroll_count >= 2:
+		meta_exp_reward += META_LEDGER_EXP_REWARD
+	if SaveManager.has_permanent_upgrade("close_call_study") and _turn_entered_high_risk:
+		meta_exp_reward += META_HIGH_RISK_EXP_REWARD
+	if meta_exp_reward > 0:
+		GameManager.add_run_exp(meta_exp_reward)
+	if meta_shard_reward > 0:
+		GameManager.add_run_stop_shards(meta_shard_reward)
 	var base_banked: int = _calculate_turn_score()
 	# Iron Bank: +50% score if no rerolls.
 	if GameManager.has_modifier(RunModifier.ModifierType.IRON_BANK) and _reroll_count == 0:
@@ -318,6 +333,10 @@ func _on_bank_pressed() -> void:
 		status_parts.append("HEARTS -%d STOP" % heart_relief)
 	if is_near_death_bank:
 		status_parts.append("NEAR DEATH +%dg" % NEAR_DEATH_GOLD_BONUS)
+	if meta_exp_reward > 0:
+		status_parts.append("LAB +%d EXP" % meta_exp_reward)
+	if meta_shard_reward > 0:
+		status_parts.append("LAB +%d SHARD" % meta_shard_reward)
 	if streak_mult > 1.0:
 		status_parts.append("ON FIRE x%.1f" % streak_mult)
 	if momentum_mult > 1.0:
@@ -1730,7 +1749,8 @@ func _on_archetype_selected(run_mode: int, archetype: int) -> void:
 
 
 func _begin_loop_contract_flow(continuation: int) -> void:
-	var offers: Array[LoopContractData] = LoopContractCatalogScript.get_offers_for_loop(GameManager.current_loop)
+	var offer_count: int = 4 if SaveManager.has_permanent_upgrade("contract_scout") else 3
+	var offers: Array[LoopContractData] = LoopContractCatalogScript.get_offers_for_loop(GameManager.current_loop, offer_count)
 	if offers.is_empty():
 		_continue_after_contract_selection(continuation)
 		return
