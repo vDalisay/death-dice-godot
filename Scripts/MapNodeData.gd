@@ -2,6 +2,7 @@ class_name MapNodeData
 extends Resource
 ## A single node on the stage map. Holds type, connections to next row, and visit state.
 
+const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 enum NodeType { NORMAL_STAGE, SHOP, RANDOM_EVENT, FORGE, REST, SPECIAL_STAGE }
@@ -67,13 +68,13 @@ const NODE_TYPE_MECHANICS: Dictionary = {
 @export var visited: bool = false
 ## Column index within the row (set during generation).
 @export var column: int = 0
-@export var stage_variant: int = SpecialStageCatalog.Variant.NONE
+@export var stage_variant: int = SpecialStageCatalogScript.Variant.NONE
 @export var special_rule_id: String = ""
 
 
 func get_display_name() -> String:
 	if type == NodeType.NORMAL_STAGE and has_special_stage_variant():
-		return SpecialStageCatalog.get_display_name(stage_variant)
+		return SpecialStageCatalogScript.get_display_name(stage_variant)
 	if type == SPECIAL_STAGE_TYPE and SpecialStageRegistryScript.call("has_rule", special_rule_id):
 		return str(SpecialStageRegistryScript.call("get_rule_name", special_rule_id))
 	return NODE_TYPE_NAMES.get(type, "Unknown")
@@ -85,20 +86,20 @@ func get_type_name() -> String:
 
 func get_map_label() -> String:
 	if type == NodeType.NORMAL_STAGE:
-		return SpecialStageCatalog.get_map_label(stage_variant)
+		return SpecialStageCatalogScript.get_map_label(stage_variant)
 	return get_display_name()
 
 
 func get_hover_text() -> String:
 	if type == NodeType.NORMAL_STAGE:
-		return SpecialStageCatalog.get_hover_text(stage_variant)
+		return SpecialStageCatalogScript.get_hover_text(stage_variant)
 	if type == SPECIAL_STAGE_TYPE and SpecialStageRegistryScript.call("has_rule", special_rule_id):
 		return "%s: %s" % [get_display_name(), get_hover_description()]
 	return "%s node." % get_display_name()
 
 
 func has_special_stage_variant() -> bool:
-	return type == NodeType.NORMAL_STAGE and stage_variant != SpecialStageCatalog.Variant.NONE
+	return type == NodeType.NORMAL_STAGE and stage_variant != SpecialStageCatalogScript.Variant.NONE
 
 
 func get_icon() -> String:
@@ -109,7 +110,7 @@ func get_icon() -> String:
 
 func get_color() -> Color:
 	if has_special_stage_variant():
-		return SpecialStageCatalog.get_accent_color(stage_variant)
+		return SpecialStageCatalogScript.get_accent_color(stage_variant)
 	if type == SPECIAL_STAGE_TYPE and SpecialStageRegistryScript.call("has_rule", special_rule_id):
 		return SpecialStageRegistryScript.call("get_rule_color", special_rule_id) as Color
 	return NODE_TYPE_COLORS.get(type, Color.WHITE)
@@ -175,6 +176,6 @@ static func from_dict(data: Dictionary) -> MapNodeData:
 		node.connections.append(int(c))
 	node.visited = bool(data.get("visited", false))
 	node.column = int(data.get("column", 0))
-	node.stage_variant = SpecialStageCatalog.sanitize(int(data.get("stage_variant", SpecialStageCatalog.Variant.NONE)))
+	node.stage_variant = SpecialStageCatalogScript.sanitize(int(data.get("stage_variant", SpecialStageCatalogScript.Variant.NONE)))
 	node.special_rule_id = str(data.get("special_rule_id", ""))
 	return node

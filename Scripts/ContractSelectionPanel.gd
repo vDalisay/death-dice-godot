@@ -6,6 +6,7 @@ signal contract_selected(contract_id: String)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
 
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
@@ -20,7 +21,7 @@ func _ready() -> void:
 	_apply_theme()
 
 
-func open(loop_number: int, offers: Array[LoopContractData]) -> void:
+func open(loop_number: int, offers: Array[LoopContractDataType]) -> void:
 	_interaction_locked = false
 	_title_label.text = "Loop %d Contract" % loop_number
 	_subtitle_label.text = "Choose one contract for this loop. Only one can be active."
@@ -44,14 +45,14 @@ func _apply_theme() -> void:
 	_subtitle_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_CONTEXT_COLOR)
 
 
-func _rebuild_cards(offers: Array[LoopContractData]) -> void:
+func _rebuild_cards(offers: Array[LoopContractDataType]) -> void:
 	for child: Node in _cards_container.get_children():
 		child.queue_free()
-	for offer: LoopContractData in offers:
+	for offer: LoopContractDataType in offers:
 		_cards_container.add_child(_build_contract_card(offer))
 
 
-func _build_contract_card(contract: LoopContractData) -> PanelContainer:
+func _build_contract_card(contract: LoopContractDataType) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(240, 220)
 	card.add_theme_stylebox_override(

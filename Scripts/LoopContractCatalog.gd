@@ -3,6 +3,7 @@ extends RefCounted
 ## Static catalog and offer rules for loop contracts.
 
 const LoopContractDataScript: GDScript = preload("res://Scripts/LoopContractData.gd")
+const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
 
 
 static func make(
@@ -15,8 +16,8 @@ static func make(
 	reward_stop_shards: int,
 	target_value: int,
 	tags: Array[String] = []
-) -> LoopContractData:
-	var data: LoopContractData = LoopContractDataScript.new()
+) -> LoopContractDataType:
+	var data: LoopContractDataType = LoopContractDataScript.new()
 	data.contract_id = id
 	data.display_name = name
 	data.description = description
@@ -29,7 +30,7 @@ static func make(
 	return data
 
 
-static func get_all() -> Array[LoopContractData]:
+static func get_all() -> Array[LoopContractDataType]:
 	return [
 		make("safe_hands", "Safe Hands", "Bank 3 turns this loop with 0-1 effective stops.", "steady", 20, 1, 0, 3, ["bank", "low_stop"]),
 		make("one_more_time", "One More Time", "Bank once after at least 2 rerolls.", "greedy", 18, 1, 0, 1, ["bank", "reroll_depth"]),
@@ -44,14 +45,14 @@ static func get_all() -> Array[LoopContractData]:
 	]
 
 
-static func get_by_id(contract_id: String) -> LoopContractData:
-	for contract: LoopContractData in get_all():
+static func get_by_id(contract_id: String) -> LoopContractDataType:
+	for contract: LoopContractDataType in get_all():
 		if contract.contract_id == contract_id:
 			return contract
 	return null
 
 
-static func get_offers_for_loop(loop_number: int, offer_count: int = 3) -> Array[LoopContractData]:
+static func get_offers_for_loop(loop_number: int, offer_count: int = 3) -> Array[LoopContractDataType]:
 	var offer_ids: Array[String] = []
 	if loop_number <= 1:
 		offer_ids = ["safe_hands", "one_more_time", "dead_close", "even_flow"]
@@ -59,11 +60,11 @@ static func get_offers_for_loop(loop_number: int, offer_count: int = 3) -> Array
 		offer_ids = ["comeback", "third_spin", "shield_line", "clean_finish"]
 	else:
 		offer_ids = ["pressure_player", "third_spin", "exact_heat", "clean_finish"]
-	var offers: Array[LoopContractData] = []
+	var offers: Array[LoopContractDataType] = []
 	for contract_id: String in offer_ids:
 		if offers.size() >= offer_count:
 			break
-		var contract: LoopContractData = get_by_id(contract_id)
+		var contract: LoopContractDataType = get_by_id(contract_id)
 		if contract != null:
 			offers.append(contract)
 	return offers

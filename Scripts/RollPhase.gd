@@ -115,6 +115,7 @@ const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoo
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
 
 func _ready() -> void:
 	_turn_score_service = TurnScoreServiceScript.new()
@@ -1812,12 +1813,12 @@ func _on_archetype_selected(run_mode: int, archetype: int) -> void:
 
 func _begin_loop_contract_flow(continuation: int) -> void:
 	var offer_count: int = 4 if SaveManager.has_permanent_upgrade("contract_scout") else 3
-	var offers: Array[LoopContractData] = LoopContractCatalogScript.get_offers_for_loop(GameManager.current_loop, offer_count)
+	var offers: Array[LoopContractDataType] = LoopContractCatalogScript.get_offers_for_loop(GameManager.current_loop, offer_count)
 	if offers.is_empty():
 		_continue_after_contract_selection(continuation)
 		return
 	var offered_ids: Array[String] = []
-	for offer: LoopContractData in offers:
+	for offer: LoopContractDataType in offers:
 		offered_ids.append(offer.contract_id)
 	GameManager.set_offered_loop_contract_ids(offered_ids)
 	if GameManager.skip_archetype_picker:
@@ -1838,7 +1839,7 @@ func _on_loop_contract_selected(contract_id: String, continuation: int) -> void:
 
 func _apply_selected_loop_contract(contract_id: String, continuation: int) -> void:
 	GameManager.activate_loop_contract(contract_id)
-	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(contract_id)
+	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(contract_id)
 	if contract != null:
 		hud.show_status("Loop Contract: %s" % contract.display_name, Color(0.35, 0.92, 1.0))
 	_continue_after_contract_selection(continuation)
@@ -1908,14 +1909,14 @@ func _commit_active_contract_progress(contract_id: String, old_progress: Diction
 	var is_completed: bool = bool(new_progress.get("completed", false))
 	if was_completed or not is_completed:
 		return ""
-	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(contract_id)
+	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(contract_id)
 	if contract == null:
 		return ""
 	_apply_contract_reward(contract)
 	return "CONTRACT COMPLETE: %s" % contract.display_name
 
 
-func _apply_contract_reward(contract: LoopContractData) -> void:
+func _apply_contract_reward(contract: LoopContractDataType) -> void:
 	if contract.reward_gold > 0:
 		GameManager.add_gold(contract.reward_gold)
 	if contract.reward_exp > 0:

@@ -8,6 +8,7 @@ const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd"
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const PrestigeUnlockDataScript: GDScript = preload("res://Scripts/PrestigeUnlockData.gd")
 const PermanentUpgradeDataScript: GDScript = preload("res://Scripts/PermanentUpgradeData.gd")
+const PermanentUpgradeDataType: GDScript = preload("res://Scripts/PermanentUpgradeData.gd")
 
 @onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
@@ -70,7 +71,7 @@ func _rebuild_cards() -> void:
 		child.queue_free()
 	for unlock: Resource in PrestigeUnlockDataScript.get_all():
 		_cards_container.add_child(_build_unlock_card(unlock))
-	for upgrade: PermanentUpgradeData in PermanentUpgradeDataScript.get_all():
+	for upgrade: PermanentUpgradeDataType in PermanentUpgradeDataScript.get_all():
 		_upgrade_cards_container.add_child(_build_upgrade_card(upgrade))
 
 
@@ -140,7 +141,7 @@ func _build_unlock_card(unlock: Resource) -> PanelContainer:
 	return card
 
 
-func _build_upgrade_card(upgrade: PermanentUpgradeData) -> PanelContainer:
+func _build_upgrade_card(upgrade: PermanentUpgradeDataType) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(320, 176)
 	card.add_theme_stylebox_override(

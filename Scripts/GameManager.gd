@@ -2,6 +2,7 @@ extends Node
 ## Global score and run state. Registered as autoload "GameManager".
 
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
+const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const MAX_LIVES: int = 3
@@ -79,7 +80,7 @@ var previous_col: int = -1
 var stage_map: Resource = null
 var gold: int = 0
 var stage_target_score: int = BASE_STAGE_TARGET
-var current_stage_variant: int = SpecialStageCatalog.Variant.NONE
+var current_stage_variant: int = SpecialStageCatalogScript.Variant.NONE
 var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
 var best_turn_score: int = 0
@@ -224,24 +225,24 @@ func heal_lives(amount: int) -> void:
 
 
 func set_current_stage_variant(stage_variant: int) -> void:
-	current_stage_variant = SpecialStageCatalog.sanitize(stage_variant)
+	current_stage_variant = SpecialStageCatalogScript.sanitize(stage_variant)
 	stage_variant_changed.emit(current_stage_variant)
 
 
 func has_current_stage_variant() -> bool:
-	return current_stage_variant != SpecialStageCatalog.Variant.NONE
+	return current_stage_variant != SpecialStageCatalogScript.Variant.NONE
 
 
 func get_current_stage_variant_name() -> String:
-	return SpecialStageCatalog.get_display_name(current_stage_variant)
+	return SpecialStageCatalogScript.get_display_name(current_stage_variant)
 
 
 func get_current_stage_variant_hover_text() -> String:
-	return SpecialStageCatalog.get_hover_text(current_stage_variant)
+	return SpecialStageCatalogScript.get_hover_text(current_stage_variant)
 
 
 func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
-	var stage_variant: int = SpecialStageCatalog.Variant.NONE
+	var stage_variant: int = SpecialStageCatalogScript.Variant.NONE
 	if stage_node != null:
 		stage_variant = stage_node.stage_variant
 	set_current_stage_variant(stage_variant)
@@ -385,7 +386,7 @@ func get_run_mode_name() -> String:
 
 
 func advance_stage() -> void:
-	set_current_stage_variant(SpecialStageCatalog.Variant.NONE)
+	set_current_stage_variant(SpecialStageCatalogScript.Variant.NONE)
 	clear_special_stage()
 	total_stages_cleared += 1
 	current_stage += 1
@@ -409,7 +410,7 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
-	set_current_stage_variant(SpecialStageCatalog.Variant.NONE)
+	set_current_stage_variant(SpecialStageCatalogScript.Variant.NONE)
 	near_death_banks_this_stage = 0
 	_last_call_heal_used_this_stage = false
 	reset_momentum()
@@ -467,7 +468,7 @@ func reset_run() -> void:
 	current_row = 0
 	previous_col = -1
 	total_score = 0
-	set_current_stage_variant(SpecialStageCatalog.Variant.NONE)
+	set_current_stage_variant(SpecialStageCatalogScript.Variant.NONE)
 	total_stages_cleared = 0
 	run_busts = 0
 	lives = MAX_LIVES

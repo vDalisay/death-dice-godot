@@ -4,6 +4,7 @@ extends RefCounted
 
 const StageMapDataScript := preload("res://Scripts/StageMapData.gd")
 const MapNodeDataScript := preload("res://Scripts/MapNodeData.gd")
+const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 
 const NORMAL_STAGE_RATIO: float = 0.5
@@ -180,7 +181,7 @@ static func desired_special_stage_count(loop_number: int) -> int:
 static func assign_special_stage_variants(map: StageMapData, loop_number: int) -> void:
 	if map == null:
 		return
-	var available_variants: Array[int] = SpecialStageCatalog.get_mvp_shortlist()
+	var available_variants: Array[int] = SpecialStageCatalogScript.get_mvp_shortlist()
 	available_variants.shuffle()
 	var eligible_rows: Array[int] = []
 	for row_index: int in range(SPECIAL_STAGE_MIN_ROW_INDEX, maxi(map.get_row_count() - 1, 0)):

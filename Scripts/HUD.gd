@@ -8,6 +8,7 @@ const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const _ModifierBadgeScene: PackedScene = preload("res://Scenes/ModifierBadge.tscn")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 const ContractProgressServiceScript: GDScript = preload("res://Scripts/ContractProgressService.gd")
+const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
 
 const SCORE_COUNT_DURATION: float = 0.5
 const SCORE_STEP_DURATION: float = 0.18
@@ -520,7 +521,7 @@ func _refresh_contract_display() -> void:
 		_contract_label.visible = false
 		_contract_label.text = ""
 		return
-	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(GameManager.active_loop_contract_id)
+	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(GameManager.active_loop_contract_id)
 	if contract == null:
 		_contract_label.visible = false
 		_contract_label.text = ""

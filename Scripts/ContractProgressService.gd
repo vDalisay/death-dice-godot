@@ -3,10 +3,11 @@ extends RefCounted
 ## Pure contract progress tracking and completion evaluation.
 
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
 
 
 func make_initial_progress(contract_id: String) -> Dictionary:
-	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(contract_id)
+	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(contract_id)
 	if contract == null:
 		return {}
 	return {
@@ -76,7 +77,7 @@ func on_stage_clear(contract_id: String, progress: Dictionary, context: Dictiona
 
 
 func format_progress_text(contract_id: String, progress: Dictionary) -> String:
-	var contract: LoopContractData = LoopContractCatalogScript.get_by_id(contract_id)
+	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(contract_id)
 	if contract == null:
 		return ""
 	var current: int = int(progress.get("current", 0))
