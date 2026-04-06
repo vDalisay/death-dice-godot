@@ -14,6 +14,8 @@ Mcp/godot-mcp-runtime
 # Test artifacts
 test_stderr.txt
 test_stdout.txt
+*_stderr.txt
+*_stdout.txt
 
 # Local planning notes
 PRESTIGE_SIDEBETS_PLAN.md
