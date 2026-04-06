@@ -121,6 +121,7 @@ var event_target_multiplier: float = 1.0
 var event_next_stage_target_multiplier: float = 1.0
 var event_next_stage_first_bank_gold_multiplier: float = 1.0
 var event_next_stage_clear_gold_multiplier: float = 1.0
+var event_next_stage_starting_stop_pressure: int = 0
 ## Momentum: consecutive banks this stage. Resets on bust / stage transition.
 var momentum: int = 0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
@@ -327,6 +328,10 @@ func set_next_stage_clear_gold_multiplier(multiplier: float) -> void:
 	event_next_stage_clear_gold_multiplier = multiplier
 
 
+func set_next_stage_starting_stop_pressure(amount: int) -> void:
+	event_next_stage_starting_stop_pressure = maxi(0, amount)
+
+
 func apply_pending_next_stage_modifiers() -> void:
 	if not is_equal_approx(event_next_stage_target_multiplier, 1.0):
 		stage_target_score = roundi(float(stage_target_score) * event_next_stage_target_multiplier)
@@ -347,6 +352,12 @@ func consume_next_stage_clear_gold_bonus(base_gold: int) -> int:
 	var adjusted_gold: int = roundi(float(base_gold) * event_next_stage_clear_gold_multiplier)
 	event_next_stage_clear_gold_multiplier = 1.0
 	return adjusted_gold
+
+
+func consume_next_stage_starting_stop_pressure() -> int:
+	var pressure: int = maxi(0, event_next_stage_starting_stop_pressure)
+	event_next_stage_starting_stop_pressure = 0
+	return pressure
 
 
 func remove_gold(amount: int) -> void:
@@ -867,6 +878,7 @@ func _reset_event_flags() -> void:
 	event_next_stage_target_multiplier = 1.0
 	event_next_stage_first_bank_gold_multiplier = 1.0
 	event_next_stage_clear_gold_multiplier = 1.0
+	event_next_stage_starting_stop_pressure = 0
 
 
 func apply_prestige_reward_reroll_used() -> void:
@@ -991,6 +1003,7 @@ func build_active_run_state() -> Dictionary:
 		"event_next_stage_target_multiplier": event_next_stage_target_multiplier,
 		"event_next_stage_first_bank_gold_multiplier": event_next_stage_first_bank_gold_multiplier,
 		"event_next_stage_clear_gold_multiplier": event_next_stage_clear_gold_multiplier,
+		"event_next_stage_starting_stop_pressure": event_next_stage_starting_stop_pressure,
 		"momentum": momentum,
 		"shop_gold_spent": _shop_gold_spent,
 		"miser_bonus_pending": _miser_bonus_pending,
@@ -1045,6 +1058,7 @@ func apply_active_run_state(data: Dictionary) -> void:
 	event_next_stage_target_multiplier = float(data.get("event_next_stage_target_multiplier", 1.0))
 	event_next_stage_first_bank_gold_multiplier = float(data.get("event_next_stage_first_bank_gold_multiplier", 1.0))
 	event_next_stage_clear_gold_multiplier = float(data.get("event_next_stage_clear_gold_multiplier", 1.0))
+	event_next_stage_starting_stop_pressure = int(data.get("event_next_stage_starting_stop_pressure", 0))
 	momentum = int(data.get("momentum", 0))
 	_shop_gold_spent = int(data.get("shop_gold_spent", 0))
 	_miser_bonus_pending = bool(data.get("miser_bonus_pending", false))

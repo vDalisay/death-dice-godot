@@ -90,6 +90,7 @@ var _die_reroll_counts: Array[int] = []
 ## bank, bust, or new turn. Used for the accumulated bust check.
 var accumulated_stop_count: int = 0
 var accumulated_shield_count: int = 0
+var _stage_starting_stop_pressure: int = 0
 
 var _run_active: bool = true
 var _loop_complete_pending: bool = false
@@ -225,6 +226,8 @@ func _start_new_turn() -> void:
 	_resume_surface = RESUME_SURFACE_TURN
 	_resume_payload.clear()
 	accumulated_stop_count = 0
+	if turn_number == 1 and _stage_starting_stop_pressure > 0:
+		accumulated_stop_count = _stage_starting_stop_pressure
 	accumulated_shield_count = 0
 	_turn_entered_high_risk = false
 	GameManager.set_held_stop_count(0)
@@ -245,6 +248,8 @@ func _start_new_turn() -> void:
 	dice_keep_locked.resize(count)
 	dice_keep_locked.fill(false)
 	dice_arena.reset()
+	if turn_number == 1 and _stage_starting_stop_pressure > 0:
+		hud.show_status("PRESSURE UP! Stage starts with %d stop." % _stage_starting_stop_pressure, Color(1.0, 0.62, 0.2))
 	_sync_ui()
 	_persist_active_run_snapshot()
 
@@ -1941,6 +1946,7 @@ func _on_map_node_selected(row: int, col: int, node: MapNodeData, used_reroute: 
 func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: String = "") -> void:
 	_stage_flow.begin_stage_from_map(stage_node)
 	_reset_stage_contract_trackers()
+	_stage_starting_stop_pressure = GameManager.consume_next_stage_starting_stop_pressure()
 	if special_rule_id != "":
 		GameManager.enter_special_stage(special_rule_id)
 		hud.show_status(
@@ -2417,6 +2423,7 @@ func _apply_turn_checkpoint_after_resume() -> void:
 	turn_state = TurnState.IDLE
 	accumulated_stop_count = 0
 	accumulated_shield_count = 0
+	_stage_starting_stop_pressure = 0
 	_reroll_count = 0
 	_turn_entered_high_risk = false
 	_triggered_combo_ids.clear()

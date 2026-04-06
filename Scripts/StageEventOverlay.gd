@@ -38,6 +38,8 @@ enum EffectType {
 	SET_NEXT_STAGE_TARGET_MULTIPLIER,
 	SET_NEXT_STAGE_FIRST_BANK_GOLD_MULTIPLIER,
 	SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER,
+	GAIN_STOP_SHARDS,
+	SET_NEXT_STAGE_STARTING_STOP_PRESSURE,
 }
 
 const CHOICE_SAFE: String = "SAFE VALUE"
@@ -327,6 +329,10 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 			GameManager.set_next_stage_first_bank_gold_multiplier(float(effect.get("multiplier", 1.35)))
 		EffectType.SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER:
 			GameManager.set_next_stage_clear_gold_multiplier(float(effect.get("multiplier", 2.0)))
+		EffectType.GAIN_STOP_SHARDS:
+			GameManager.add_run_stop_shards(int(effect.get("amount", 10)))
+		EffectType.SET_NEXT_STAGE_STARTING_STOP_PRESSURE:
+			GameManager.set_next_stage_starting_stop_pressure(int(effect.get("amount", 1)))
 	return {}
 
 
@@ -612,6 +618,52 @@ func _build_event_pool() -> Array[Dictionary]:
 				},
 			],
 		},
+		{
+			"title": "STOP BROKER",
+			"flavor": "A bookmaker in mirrored shades offers shards on the cheap, then names the catch.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Pocket the Chips",
+					"icon": "🧩",
+					"color_key": "ACTION_CYAN",
+					"upside": "+10 stop shards",
+					"downside": "No extra payout",
+					"summary": "EVENT: Stop Broker paid 10 stop shards",
+					"hint_type": "stop_build",
+					"effects": [{"type": EffectType.GAIN_STOP_SHARDS, "amount": 10}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Carry the Mark",
+					"icon": "☠",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "+25 stop shards and +20g",
+					"downside": "A random die gains a Cursed Stop",
+					"summary": "EVENT: Stop Broker marked a die for shards and gold",
+					"hint_type": "stop_build",
+					"effects": [
+						{"type": EffectType.ADD_CURSED_STOP, "count": 1},
+						{"type": EffectType.GAIN_STOP_SHARDS, "amount": 25},
+						{"type": EffectType.GAIN_GOLD, "amount": 20},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Open Under Pressure",
+					"icon": "🔥",
+					"color_key": "NEON_PURPLE",
+					"upside": "+40 stop shards",
+					"downside": "Next stage starts with +1 stop pressure",
+					"summary": "EVENT: Stop Broker front-loaded the next stage for 40 stop shards",
+					"hint_type": "shield_build",
+					"effects": [
+						{"type": EffectType.GAIN_STOP_SHARDS, "amount": 40},
+						{"type": EffectType.SET_NEXT_STAGE_STARTING_STOP_PRESSURE, "amount": 1},
+					],
+				},
+			],
+		},
 	]
 
 
@@ -691,6 +743,9 @@ func _choice_hint(choice: Dictionary) -> String:
 		"momentum_low":
 			if GameManager.momentum <= 1:
 				return "GOOD IF YOU'RE RESETTING"
+		"stop_build":
+			if GameManager.held_stop_count > 0 or GameManager.chosen_archetype == GameManager.Archetype.STOP_COLLECTOR:
+				return "GOOD WITH STOP BUILDS"
 	return ""
 
 

@@ -15,6 +15,8 @@ var _orig_stage_target: int = 0
 var _orig_next_stage_target_multiplier: float = 1.0
 var _orig_next_stage_first_bank_gold_multiplier: float = 1.0
 var _orig_next_stage_clear_gold_multiplier: float = 1.0
+var _orig_next_stage_starting_stop_pressure: int = 0
+var _orig_run_stop_shards: int = 0
 
 
 func before_test() -> void:
@@ -29,6 +31,8 @@ func before_test() -> void:
 	_orig_next_stage_target_multiplier = GameManager.event_next_stage_target_multiplier
 	_orig_next_stage_first_bank_gold_multiplier = GameManager.event_next_stage_first_bank_gold_multiplier
 	_orig_next_stage_clear_gold_multiplier = GameManager.event_next_stage_clear_gold_multiplier
+	_orig_next_stage_starting_stop_pressure = GameManager.event_next_stage_starting_stop_pressure
+	_orig_run_stop_shards = GameManager.current_run_stop_shards
 
 
 func after_test() -> void:
@@ -42,6 +46,8 @@ func after_test() -> void:
 	GameManager.event_next_stage_target_multiplier = _orig_next_stage_target_multiplier
 	GameManager.event_next_stage_first_bank_gold_multiplier = _orig_next_stage_first_bank_gold_multiplier
 	GameManager.event_next_stage_clear_gold_multiplier = _orig_next_stage_clear_gold_multiplier
+	GameManager.event_next_stage_starting_stop_pressure = _orig_next_stage_starting_stop_pressure
+	GameManager.current_run_stop_shards = _orig_run_stop_shards
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +60,7 @@ func test_event_flags_default_values() -> void:
 	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 
 
 func test_reset_event_flags() -> void:
@@ -62,12 +69,14 @@ func test_reset_event_flags() -> void:
 	_gm.event_next_stage_target_multiplier = 1.2
 	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
 	_gm.event_next_stage_clear_gold_multiplier = 2.0
+	_gm.event_next_stage_starting_stop_pressure = 1
 	_gm._reset_event_flags()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 
 
 func test_reset_run_clears_event_flags() -> void:
@@ -76,12 +85,14 @@ func test_reset_run_clears_event_flags() -> void:
 	_gm.event_next_stage_target_multiplier = 1.2
 	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
 	_gm.event_next_stage_clear_gold_multiplier = 2.0
+	_gm.event_next_stage_starting_stop_pressure = 1
 	_gm.reset_run()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +213,17 @@ func test_set_next_stage_first_bank_gold_multiplier_sets_flag() -> void:
 func test_set_next_stage_clear_gold_multiplier_sets_flag() -> void:
 	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER, "multiplier": 2.0})
 	assert_float(GameManager.event_next_stage_clear_gold_multiplier).is_equal(2.0)
+
+
+func test_gain_stop_shards_adds_to_run_total() -> void:
+	GameManager.current_run_stop_shards = 0
+	_overlay._apply_effect({"type": StageEventScript.EffectType.GAIN_STOP_SHARDS, "amount": 25})
+	assert_int(GameManager.current_run_stop_shards).is_equal(25)
+
+
+func test_set_next_stage_starting_stop_pressure_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_STARTING_STOP_PRESSURE, "amount": 1})
+	assert_int(GameManager.event_next_stage_starting_stop_pressure).is_equal(1)
 
 
 func test_reset_momentum_effect_sets_momentum_to_zero() -> void:
