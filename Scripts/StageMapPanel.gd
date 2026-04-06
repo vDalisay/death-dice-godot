@@ -7,6 +7,8 @@ signal node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool)
 
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const RouteBoardStateMachineScript: GDScript = preload("res://Scripts/RouteBoardStateMachine.gd")
+const RouteNodeVisualPolicyScript: GDScript = preload("res://Scripts/RouteNodeVisualPolicy.gd")
 
 const NODE_SIZE: float = _UITheme.STAGE_MAP_NODE_SIZE
 const MIN_H_SPACING: float = _UITheme.STAGE_MAP_MIN_SPACING
@@ -28,6 +30,7 @@ const STATE_FONT_SIZE: int = _UITheme.STAGE_MAP_STATE_FONT_SIZE
 const PANEL_INTRO_DURATION: float = _UITheme.STAGE_MAP_PANEL_INTRO_DURATION
 const NODE_REVEAL_STAGGER: float = _UITheme.STAGE_MAP_NODE_REVEAL_STAGGER
 const NODE_REVEAL_DURATION: float = _UITheme.STAGE_MAP_NODE_REVEAL_DURATION
+const RULE_HEADER_DEFAULT: String = "RULE: NORMAL"
 
 @onready var _backdrop: ColorRect = $AtmosphereLayer/Backdrop
 @onready var _content: VBoxContainer = $MarginContainer/RootVBox
@@ -66,11 +69,17 @@ var _last_open_used_loop_reveal: bool = false
 var _is_closing: bool = false
 var _route_restriction: int = GameManager.NextRouteRestriction.NONE
 var _next_row_reveal_active: bool = false
+var _hovered_row: int = -1
+var _hovered_col: int = -1
+var _hover_pulse_tweens: Dictionary = {}
+var _route_state_machine: RouteBoardStateMachineScript = RouteBoardStateMachineScript.new()
+var _route_visual_policy: RouteNodeVisualPolicyScript = RouteNodeVisualPolicyScript.new()
 
 
 func _ready() -> void:
     visible = false
     _apply_theme_styling()
+    _route_state_machine.finish_close()
     if not _reroute_button.pressed.is_connected(_on_reroute_button_pressed):
         _reroute_button.pressed.connect(_on_reroute_button_pressed)
     _map_area.resized.connect(_on_map_area_resized)
@@ -93,6 +102,7 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
     visible = true
     _is_closing = false
     _last_open_used_loop_reveal = GameManager.consume_loop_reveal(GameManager.current_loop)
+    _route_state_machine.begin_open(_last_open_used_loop_reveal)
     _refresh_context_label()
     _refresh_hint_label()
     _refresh_reveal_preview()
@@ -197,6 +207,7 @@ func _rebuild_map() -> void:
             row_btns.append(btn)
         _node_buttons.append(row_btns)
     _ensure_selected_node()
+    _refresh_context_label()
     _refresh_visual_state()
     if _last_open_used_loop_reveal:
         _prepare_nodes_for_intro()
@@ -212,6 +223,8 @@ func _resolve_row_spacing(area_width: float, node_count: int) -> float:
 
 
 func _clear_map() -> void:
+    _clear_hovered_node_state(false)
+    _clear_hover_pulse_tweens()
     for line: Line2D in _connection_lines:
         if is_instance_valid(line):
             line.queue_free()
@@ -294,7 +307,7 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
     btn.size = Vector2(NODE_SIZE, NODE_SIZE)
     btn.flat = true
     btn.text = ""
-    btn.focus_mode = Control.FOCUS_NONE
+    btn.focus_mode = Control.FOCUS_ALL
     btn.mouse_filter = Control.MOUSE_FILTER_STOP
     btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
     btn.tooltip_text = node.get_hover_text()
@@ -303,9 +316,10 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
     btn.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
     btn.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
     btn.pressed.connect(_on_node_pressed.bind(row, col))
-    btn.mouse_entered.connect(func() -> void: _show_node_hint(row, col, node))
-    btn.focus_entered.connect(_on_node_hovered.bind(row, col))
-    btn.mouse_exited.connect(_refresh_hint_label)
+    btn.mouse_entered.connect(_on_node_mouse_entered.bind(row, col, node))
+    btn.focus_entered.connect(_on_node_focus_entered.bind(row, col, node))
+    btn.mouse_exited.connect(_on_node_mouse_exited.bind(row, col))
+    btn.focus_exited.connect(_on_node_focus_exited.bind(row, col))
     var medallion: PanelContainer = PanelContainer.new()
     medallion.name = "Medallion"
     medallion.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -336,6 +350,13 @@ func _make_node_button(node: MapNodeData, row: int, col: int) -> Button:
     state_label.position = Vector2(8.0, medallion.size.y - 24.0)
     state_label.size = Vector2(medallion.size.x - 16.0, 16.0)
     medallion.add_child(state_label)
+    var hover_frame: PanelContainer = PanelContainer.new()
+    hover_frame.name = "HoverFrame"
+    hover_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    hover_frame.position = Vector2.ZERO
+    hover_frame.size = medallion.size
+    hover_frame.visible = false
+    medallion.add_child(hover_frame)
     return btn
 
 
@@ -366,6 +387,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
     var accent_bar: ColorRect = medallion.get_node("AccentBar") as ColorRect
     var stamp_label: Label = medallion.get_node("StampLabel") as Label
     var state_label: Label = medallion.get_node("StateLabel") as Label
+    var hover_frame: PanelContainer = medallion.get_node("HoverFrame") as PanelContainer
     var node_color: Color = node.get_color()
     var is_selected: bool = row == _selected_row and col == _selected_col
     var is_current_row: bool = row == _current_row
@@ -462,6 +484,12 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
     state_label.add_theme_font_override("font", _UITheme.font_mono())
     state_label.add_theme_font_size_override("font_size", STATE_FONT_SIZE)
     state_label.add_theme_color_override("font_color", state_color)
+    var is_hovered: bool = row == _hovered_row and col == _hovered_col
+    _apply_hover_frame_visual(
+        hover_frame,
+        node.type,
+        _route_visual_policy.should_show_hover_outline(_route_state_machine.is_interactive(), is_hovered)
+    )
 
 
 func _can_reach(row: int, col: int) -> bool:
@@ -524,12 +552,15 @@ func _is_reachable_without_reroute(row: int, col: int) -> bool:
 
 
 func _on_node_pressed(row: int, col: int) -> void:
+    if not _route_state_machine.allows_selection():
+        return
     _set_selected_node(row, col)
     if _is_closing:
         return
     if row != _current_row or not _can_reach(row, col):
         return
     _is_closing = true
+    _route_state_machine.begin_close()
     var node: MapNodeData = _stage_map.get_node_at(row, col)
     var used_reroute: bool = try_consume_reroute_for(row, col)
     if node != null:
@@ -540,6 +571,8 @@ func _on_node_pressed(row: int, col: int) -> void:
 
 
 func _on_node_hovered(row: int, col: int) -> void:
+    if not _route_state_machine.allows_hover():
+        return
     _set_selected_node(row, col)
 
 
@@ -590,8 +623,18 @@ func _ensure_selected_node() -> void:
 
 
 func _refresh_context_label() -> void:
-    _context_label.text = "Loop %d  |  Stage %d / %d" % [GameManager.current_loop, _current_row + 1, StageMapData.ROWS_PER_LOOP]
-    _header_seal.text = "BRASS TOKEN ARMED" if _reroute_enabled else "CHOOSE THE NEXT MARK"
+    var route_state_text: String = "CHOOSE THE NEXT MARK"
+    if _route_state_machine.is_intro_reveal():
+        route_state_text = "SURVEYING ROUTES"
+    elif _reroute_enabled:
+        route_state_text = "BRASS TOKEN ARMED"
+    _context_label.text = "Loop %d  |  Stage %d / %d  |  %s" % [
+        GameManager.current_loop,
+        _current_row + 1,
+        StageMapData.ROWS_PER_LOOP,
+        route_state_text,
+    ]
+    _header_seal.text = _build_rule_header_text()
 
 
 func _refresh_selected_node_panel() -> void:
@@ -680,6 +723,9 @@ func _play_intro() -> void:
     modulate.a = 1.0
     _transition_tween = FlowTransitionScript.play_enter(self, _content, PANEL_INTRO_DURATION, _backdrop)
     if not _last_open_used_loop_reveal:
+        _route_state_machine.mark_intro_reveal_complete()
+        _refresh_hint_label()
+        _refresh_visual_state()
         return
     var reveal_index: int = 0
     for row_index: int in _node_buttons.size():
@@ -687,6 +733,13 @@ func _play_intro() -> void:
         for col_index: int in row_btns.size():
             _transition_tween.tween_callback(Callable(self, "_reveal_node_button_by_index").bind(row_index, col_index)).set_delay(NODE_REVEAL_STAGGER * reveal_index)
             reveal_index += 1
+    if reveal_index <= 0:
+        _route_state_machine.mark_intro_reveal_complete()
+        _refresh_hint_label()
+        _refresh_visual_state()
+        return
+    var reveal_finish_delay: float = NODE_REVEAL_STAGGER * float(reveal_index - 1) + NODE_REVEAL_DURATION + 0.02
+    _transition_tween.tween_callback(Callable(self, "_on_intro_reveal_finished")).set_delay(reveal_finish_delay)
 
 
 func _reveal_node_button(btn: Button) -> void:
@@ -709,6 +762,13 @@ func _reveal_node_button_by_index(row_index: int, col_index: int) -> void:
 
 
 func _refresh_hint_label() -> void:
+    if _route_state_machine.is_intro_reveal():
+        _hint_label.text = "Stage %d / %d  |  Lantern sweep in progress. Route interactions unlock when marks settle." % [
+            _current_row + 1,
+            StageMapData.ROWS_PER_LOOP,
+        ]
+        _refresh_context_label()
+        return
     var base_text: String = "Stage %d / %d  |  Inspect a route, then commit from the lit row." % [_current_row + 1, StageMapData.ROWS_PER_LOOP]
     if _selected_node != null:
         base_text = "Stage %d / %d  |  %s" % [_current_row + 1, StageMapData.ROWS_PER_LOOP, _selected_node.get_hover_description()]
@@ -730,12 +790,130 @@ func _refresh_hint_label() -> void:
 
 
 func _show_node_hint(row: int, col: int, node: MapNodeData) -> void:
+    if not _route_state_machine.allows_hover():
+        _refresh_hint_label()
+        return
     _on_node_hovered(row, col)
     if node == null:
         _refresh_hint_label()
         return
     _hint_label.text = "%s  |  %s" % [_get_route_hint(row, col), node.get_hover_text()]
     _refresh_context_label()
+
+
+func _on_node_mouse_entered(row: int, col: int, node: MapNodeData) -> void:
+    _set_hovered_node(row, col)
+    _show_node_hint(row, col, node)
+
+
+func _on_node_focus_entered(row: int, col: int, node: MapNodeData) -> void:
+    _set_hovered_node(row, col)
+    _show_node_hint(row, col, node)
+
+
+func _on_node_mouse_exited(row: int, col: int) -> void:
+    _clear_hovered_node_if_matches(row, col)
+
+
+func _on_node_focus_exited(row: int, col: int) -> void:
+    _clear_hovered_node_if_matches(row, col)
+
+
+func _set_hovered_node(row: int, col: int) -> void:
+    if not _route_state_machine.allows_hover():
+        return
+    if _hovered_row == row and _hovered_col == col:
+        return
+    _hovered_row = row
+    _hovered_col = col
+    _refresh_visual_state()
+
+
+func _clear_hovered_node_if_matches(row: int, col: int) -> void:
+    if _hovered_row != row or _hovered_col != col:
+        return
+    _clear_hovered_node_state()
+    _refresh_hint_label()
+
+
+func _clear_hovered_node_state(refresh_visuals: bool = true) -> void:
+    if _hovered_row == -1 and _hovered_col == -1:
+        return
+    _hovered_row = -1
+    _hovered_col = -1
+    if refresh_visuals:
+        _refresh_visual_state()
+
+
+func _apply_hover_frame_visual(hover_frame: PanelContainer, node_type: MapNodeData.NodeType, show_outline: bool) -> void:
+    if hover_frame == null:
+        return
+    if not show_outline:
+        hover_frame.visible = false
+        _stop_hover_pulse(hover_frame)
+        return
+    var outline_style: StyleBoxFlat = StyleBoxFlat.new()
+    outline_style.bg_color = Color(1.0, 1.0, 1.0, 0.0)
+    outline_style.border_color = _route_visual_policy.get_outline_color()
+    outline_style.set_border_width_all(_route_visual_policy.get_outline_width())
+    outline_style.set_corner_radius_all(_get_medallion_corner(node_type))
+    hover_frame.add_theme_stylebox_override("panel", outline_style)
+    hover_frame.visible = true
+    _start_hover_pulse(hover_frame)
+
+
+func _start_hover_pulse(hover_frame: Control) -> void:
+    var key: int = hover_frame.get_instance_id()
+    if _hover_pulse_tweens.has(key):
+        var existing_tween: Tween = _hover_pulse_tweens.get(key) as Tween
+        if existing_tween != null and existing_tween.is_valid():
+            return
+    hover_frame.scale = Vector2.ONE
+    hover_frame.modulate = Color(1.0, 1.0, 1.0, 0.82)
+    var pulse_duration: float = _route_visual_policy.get_pulse_half_cycle()
+    var pulse_scale: float = _route_visual_policy.get_pulse_scale()
+    var pulse_tween: Tween = create_tween().set_loops()
+    pulse_tween.tween_property(hover_frame, "scale", Vector2(pulse_scale, pulse_scale), pulse_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    pulse_tween.parallel().tween_property(hover_frame, "modulate:a", 1.0, pulse_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    pulse_tween.tween_property(hover_frame, "scale", Vector2.ONE, pulse_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+    pulse_tween.parallel().tween_property(hover_frame, "modulate:a", 0.82, pulse_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+    _hover_pulse_tweens[key] = pulse_tween
+
+
+func _stop_hover_pulse(hover_frame: Control) -> void:
+    var key: int = hover_frame.get_instance_id()
+    if _hover_pulse_tweens.has(key):
+        var pulse_tween: Tween = _hover_pulse_tweens.get(key) as Tween
+        if pulse_tween != null and pulse_tween.is_valid():
+            pulse_tween.kill()
+        _hover_pulse_tweens.erase(key)
+    hover_frame.scale = Vector2.ONE
+    hover_frame.modulate = Color.WHITE
+
+
+func _clear_hover_pulse_tweens() -> void:
+    for key: Variant in _hover_pulse_tweens.keys():
+        var pulse_tween: Tween = _hover_pulse_tweens[key] as Tween
+        if pulse_tween != null and pulse_tween.is_valid():
+            pulse_tween.kill()
+    _hover_pulse_tweens.clear()
+
+
+func _build_rule_header_text() -> String:
+    if _selected_node == null:
+        return RULE_HEADER_DEFAULT
+    if _selected_node.type == MapNodeData.SPECIAL_STAGE_TYPE:
+        var special_name: String = _selected_node.get_display_name().strip_edges()
+        return "RULE: %s" % (special_name.to_upper() if not special_name.is_empty() else "SPECIAL")
+    if _selected_node.has_special_stage_variant():
+        return "RULE: %s" % _selected_node.get_display_name().to_upper()
+    return RULE_HEADER_DEFAULT
+
+
+func _on_intro_reveal_finished() -> void:
+    _route_state_machine.mark_intro_reveal_complete()
+    _refresh_hint_label()
+    _refresh_visual_state()
 
 
 func _get_route_hint(row: int, col: int) -> String:
@@ -760,6 +938,8 @@ func _refresh_reroute_button() -> void:
 
 
 func _on_reroute_button_pressed() -> void:
+    if not _route_state_machine.is_interactive():
+        return
     if _reroute_uses <= 0:
         return
     _reroute_enabled = not _reroute_enabled
@@ -773,6 +953,7 @@ func _play_close_transition() -> void:
         _transition_tween.kill()
     _transition_tween = FlowTransitionScript.play_exit(self, _content, 0.16, _backdrop)
     await _transition_tween.finished
+    _route_state_machine.finish_close()
 
 
 func _apply_theme_styling() -> void:

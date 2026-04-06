@@ -3,6 +3,7 @@ extends GdUnitTestSuite
 
 const StageMapScene: PackedScene = preload("res://Scenes/StageMap.tscn")
 const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
+const RouteNodeVisualPolicyScript: GDScript = preload("res://Scripts/RouteNodeVisualPolicy.gd")
 
 var _saved_route_restriction: int = 0
 var _saved_map_row_reveal: bool = false
@@ -226,6 +227,75 @@ func test_loaded_lantern_reveals_the_next_row_preview() -> void:
 	assert_bool(GameManager.event_next_map_row_reveal).is_false()
 
 
+func test_intro_reveal_blocks_hover_selection_until_reveal_finishes() -> void:
+	GameManager.reset_run()
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_intro_gate_map()
+	panel.call("open", map, 0, -1)
+	await await_idle_frame()
+	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
+	var starting_title: String = selected_title.text
+	var node_buttons: Array = panel.get("_node_buttons") as Array
+	var current_row_buttons: Array = node_buttons[0] as Array
+	(current_row_buttons[1] as Button).emit_signal("mouse_entered")
+	await await_idle_frame()
+	assert_str(selected_title.text).is_equal(starting_title)
+	panel.call("_on_intro_reveal_finished")
+	await await_idle_frame()
+	(current_row_buttons[1] as Button).emit_signal("mouse_entered")
+	await await_idle_frame()
+	assert_str(selected_title.text).is_equal("Shop")
+
+
+func test_hovered_node_shows_red_outline_and_pulse_overlay() -> void:
+	GameManager.reset_run()
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_intro_gate_map()
+	panel.call("open", map, 0, -1)
+	for _i: int in 8:
+		await await_idle_frame()
+	panel.visible = false
+	panel.call("open", map, 0, -1)
+	for _j: int in 6:
+		await await_idle_frame()
+	var node_buttons: Array = panel.get("_node_buttons") as Array
+	var node_button: Button = ((node_buttons[0] as Array)[0] as Button)
+	var hover_frame: PanelContainer = node_button.get_node("Medallion/HoverFrame") as PanelContainer
+	node_button.emit_signal("mouse_entered")
+	await await_idle_frame()
+	assert_bool(hover_frame.visible).is_true()
+	var hover_style: StyleBoxFlat = hover_frame.get_theme_stylebox("panel") as StyleBoxFlat
+	assert_object(hover_style).is_not_null()
+	assert_bool(hover_style.border_color == RouteNodeVisualPolicyScript.OUTLINE_COLOR).is_true()
+	assert_int(hover_style.border_width_left).is_equal(RouteNodeVisualPolicyScript.OUTLINE_WIDTH)
+	for _k: int in 12:
+		await await_idle_frame()
+	assert_float(hover_frame.scale.x).is_greater(1.0)
+	node_button.emit_signal("mouse_exited")
+	await await_idle_frame()
+	assert_bool(hover_frame.visible).is_false()
+	assert_float(hover_frame.scale.x).is_equal(1.0)
+	node_button.emit_signal("focus_entered")
+	await await_idle_frame()
+	assert_bool(hover_frame.visible).is_true()
+
+
+func test_header_seal_uses_selected_stage_rule_name() -> void:
+	GameManager.reset_run()
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_single_special_header_map()
+	panel.call("open", map, 0, -1)
+	await await_idle_frame()
+	var header_seal: Label = panel.get_node("MarginContainer/RootVBox/HeaderPanel/MarginContainer/HeaderRow/HeaderSeal") as Label
+	assert_str(header_seal.text).is_equal("RULE: LUCKY FLOOR")
+
+
 func _build_stale_progression_map() -> StageMapData:
 	var map := StageMapData.new()
 	map.rows = [
@@ -296,6 +366,24 @@ func _build_lantern_preview_map() -> StageMapData:
 	map.rows = [
 		[_make_node([0, 1], false, 0), _make_node([0, 1], false, 1)],
 		[_make_shop_node([0], 0), _make_node([0], false, 1, SpecialStageCatalog.Variant.LUCKY_FLOOR)],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
+func _build_intro_gate_map() -> StageMapData:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_node([0], false, 0), _make_shop_node([0], 1)],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
+func _build_single_special_header_map() -> StageMapData:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_special_node([0], "lucky_floor", 0)],
 		[_make_node([], false, 0)],
 	]
 	return map
