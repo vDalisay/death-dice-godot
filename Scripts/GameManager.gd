@@ -6,7 +6,8 @@ const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageC
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 const RunSeedServiceScript: GDScript = preload("res://Scripts/RunSeedService.gd")
 
-const MAX_LIVES: int = 3
+const BASE_STAGE_HANDS: int = 5
+const MAX_LIVES: int = BASE_STAGE_HANDS
 const STARTING_DICE_COUNT: int = 5
 const STAGES_LOOP_1: int = 5
 const STAGES_LOOP_2_PLUS: int = 7
@@ -52,9 +53,13 @@ const RUN_MODE_NAMES: Dictionary = {
 }
 const GAUNTLET_LOOP_MULT_STEP: float = 0.75
 const GAUNTLET_STAGE_STEP_MULT: float = 1.25
+const CLASSIC_LOOP_1_TARGETS: Array[int] = [18, 26, 34, 42, 52]
+const CLASSIC_LOOP_2_TARGETS: Array[int] = [24, 36, 48, 62, 78, 96, 118]
+const INITIAL_CLASSIC_STAGE_TARGET: int = 18
 
 signal score_changed(new_total: int)
 signal turn_banked(points: int, new_total: int)
+signal hands_changed(new_hands: int)
 signal lives_changed(new_lives: int)
 signal gold_changed(new_gold: int)
 signal stage_advanced(new_stage: int)
@@ -75,14 +80,20 @@ signal run_seed_changed(is_seeded: bool, seed_text: String)
 signal resumable_run_changed(has_resumable: bool)
 
 var total_score: int = 0
-var lives: int = MAX_LIVES
+var hands: int = BASE_STAGE_HANDS
+var stage_hand_cap: int = BASE_STAGE_HANDS
+var lives: int:
+	get:
+		return hands
+	set(value):
+		hands = maxi(0, value)
 var current_stage: int = 1
 var current_loop: int = 1
 var current_row: int = 0
 var previous_col: int = -1
 var stage_map: Resource = null
 var gold: int = 0
-var stage_target_score: int = BASE_STAGE_TARGET
+var stage_target_score: int = INITIAL_CLASSIC_STAGE_TARGET
 var current_stage_variant: int = SpecialStageCatalogScript.Variant.NONE
 var dice_pool: Array[DiceData] = []
 var total_stages_cleared: int = 0
@@ -306,9 +317,48 @@ func remove_gold(amount: int) -> void:
 	gold_changed.emit(gold)
 
 
+func reset_stage_hands() -> void:
+	stage_hand_cap = BASE_STAGE_HANDS
+	hands = stage_hand_cap
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
+
+
+func adjust_stage_hand_cap(amount: int) -> void:
+	if amount == 0:
+		return
+	stage_hand_cap = maxi(1, stage_hand_cap + amount)
+	hands = clampi(hands + amount, 0, stage_hand_cap)
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
+
+
+func spend_hand_on_bank(will_clear_stage: bool) -> void:
+	hands = maxi(0, hands - 1)
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
+	if hands <= 0 and not will_clear_stage:
+		run_ended.emit()
+
+
+func spend_hand_on_bust() -> void:
+	hands = maxi(0, hands - 1)
+	run_busts += 1
+	reset_momentum()
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
+	if hands <= 0:
+		run_ended.emit()
+
+
+func heal_hands(amount: int) -> void:
+	hands = mini(hands + maxi(0, amount), stage_hand_cap)
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
+
+
 func heal_lives(amount: int) -> void:
-	lives = mini(lives + maxi(0, amount), MAX_LIVES)
-	lives_changed.emit(lives)
+	heal_hands(amount)
 
 
 func set_current_stage_variant(stage_variant: int) -> void:
@@ -352,6 +402,7 @@ func register_turn_score(turn_score: int) -> bool:
 
 func _ready() -> void:
 	_ensure_seed_service_initialized()
+	stage_target_score = _calculate_stage_target(current_stage)
 	_build_starting_pool()
 	generate_stage_map()
 
@@ -459,6 +510,14 @@ func _loop_multiplier() -> float:
 
 
 func _calculate_stage_target(stage: int) -> int:
+	if run_mode == RunMode.CLASSIC:
+		var target_row: int = current_row if stage_map else (stage - 1)
+		var loop_targets: Array[int] = CLASSIC_LOOP_1_TARGETS if current_loop <= 1 else CLASSIC_LOOP_2_TARGETS
+		var base_target: int = loop_targets[clampi(target_row, 0, loop_targets.size() - 1)]
+		if current_loop <= 2:
+			return base_target
+		var loop_two_multiplier: float = 1.0 + 0.5 * (2 - 1)
+		return roundi(float(base_target) * (_loop_multiplier() / loop_two_multiplier))
 	var mult: float = _loop_multiplier()
 	var row: int = current_row if stage_map else (stage - 1)
 	var step_mult: float = GAUNTLET_STAGE_STEP_MULT if run_mode == RunMode.GAUNTLET else 1.0
@@ -480,6 +539,7 @@ func advance_stage() -> void:
 	total_stages_cleared += 1
 	current_stage += 1
 	total_score = 0
+	reset_stage_hands()
 	near_death_banks_this_stage = 0
 	_last_call_heal_used_this_stage = false
 	reset_momentum()
@@ -499,6 +559,7 @@ func advance_loop() -> void:
 	current_loop += 1
 	current_stage = 1
 	total_score = 0
+	reset_stage_hands()
 	set_current_stage_variant(SpecialStageCatalogScript.Variant.NONE)
 	near_death_banks_this_stage = 0
 	_last_call_heal_used_this_stage = false
@@ -534,16 +595,11 @@ func get_stage_clear_bonus() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Lives
+# Hand budget
 # ---------------------------------------------------------------------------
 
 func lose_life() -> void:
-	lives -= 1
-	run_busts += 1
-	reset_momentum()
-	lives_changed.emit(lives)
-	if lives <= 0:
-		run_ended.emit()
+	spend_hand_on_bust()
 
 
 # ---------------------------------------------------------------------------
@@ -561,7 +617,8 @@ func reset_run() -> void:
 	set_current_stage_variant(SpecialStageCatalogScript.Variant.NONE)
 	total_stages_cleared = 0
 	run_busts = 0
-	lives = MAX_LIVES
+	stage_hand_cap = BASE_STAGE_HANDS
+	hands = BASE_STAGE_HANDS
 	gold = 0
 	best_turn_score = 0
 	luck = 0
@@ -593,7 +650,8 @@ func reset_run() -> void:
 		gold = prestige_starting_gold_bonus
 	generate_stage_map()
 	score_changed.emit(total_score)
-	lives_changed.emit(lives)
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
 	gold_changed.emit(gold)
 	run_exp_changed.emit(current_run_exp)
 	run_stop_shards_changed.emit(current_run_stop_shards)
@@ -615,7 +673,7 @@ func get_archetype_bank_rewards(effective_stops: int, is_near_death_bank: bool) 
 			if current_loop >= ARCHETYPE_CAPSTONE_LOOP and effective_stops >= 2:
 				rewards["exp"] = 1
 		Archetype.LAST_CALL:
-			if is_near_death_bank and lives < MAX_LIVES and not _last_call_heal_used_this_stage:
+			if is_near_death_bank and hands < stage_hand_cap and not _last_call_heal_used_this_stage:
 				rewards["heal"] = 1
 				_last_call_heal_used_this_stage = true
 			if current_loop >= ARCHETYPE_CAPSTONE_LOOP and is_near_death_bank:
@@ -861,7 +919,9 @@ func build_active_run_state() -> Dictionary:
 		map_data = stage_map.call("to_dict") as Dictionary
 	return {
 		"total_score": total_score,
-		"lives": lives,
+		"hands": hands,
+		"stage_hand_cap": stage_hand_cap,
+		"lives": hands,
 		"current_stage": current_stage,
 		"current_loop": current_loop,
 		"current_row": current_row,
@@ -909,13 +969,14 @@ func build_active_run_state() -> Dictionary:
 
 func apply_active_run_state(data: Dictionary) -> void:
 	total_score = int(data.get("total_score", 0))
-	lives = int(data.get("lives", MAX_LIVES))
+	hands = int(data.get("hands", data.get("lives", BASE_STAGE_HANDS)))
+	stage_hand_cap = int(data.get("stage_hand_cap", maxi(BASE_STAGE_HANDS, hands)))
 	current_stage = int(data.get("current_stage", 1))
 	current_loop = int(data.get("current_loop", 1))
 	current_row = int(data.get("current_row", 0))
 	previous_col = int(data.get("previous_col", -1))
 	gold = int(data.get("gold", 0))
-	stage_target_score = int(data.get("stage_target_score", BASE_STAGE_TARGET))
+	stage_target_score = int(data.get("stage_target_score", INITIAL_CLASSIC_STAGE_TARGET))
 	current_stage_variant = SpecialStageCatalog.sanitize(int(data.get("current_stage_variant", SpecialStageCatalog.Variant.NONE)))
 	total_stages_cleared = int(data.get("total_stages_cleared", 0))
 	best_turn_score = int(data.get("best_turn_score", 0))
@@ -962,7 +1023,8 @@ func apply_active_run_state(data: Dictionary) -> void:
 		generate_stage_map()
 
 	score_changed.emit(total_score)
-	lives_changed.emit(lives)
+	hands_changed.emit(hands)
+	lives_changed.emit(hands)
 	gold_changed.emit(gold)
 	luck_changed.emit(luck)
 	momentum_changed.emit(momentum)

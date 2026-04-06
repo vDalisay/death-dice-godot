@@ -16,7 +16,7 @@ enum ModifierType {
 	DOUBLE_DOWN,      ## On bank: roll D6. Even = 2x gold. Odd = 0 gold.
 	SCAVENGER,        ## +1g per kept die when banking
 	RECYCLER,         ## +1g per die rerolled each reroll
-	LAST_STAND,       ## Bust threshold +2 when at 1 life
+	LAST_STAND,       ## Bust threshold +2 when at 1 hand
 	CHAIN_LIGHTNING,  ## 3+ kept dice with same value: each scores +3
 	HIGH_ROLLER,      ## NUMBER faces with value >= 4 score +3
 	OVERCHARGE,       ## EXPLODE faces score 2x their value
@@ -187,7 +187,7 @@ static func make_last_stand() -> RunModifier:
 	var m := RunModifier.new()
 	m.modifier_type = ModifierType.LAST_STAND
 	m.modifier_name = "Last Stand"
-	m.description = "Bust threshold +2 when at 1 life."
+	m.description = "Bust threshold +2 when at 1 hand."
 	m.cost = 30
 	return m
 

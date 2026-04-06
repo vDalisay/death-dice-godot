@@ -1,6 +1,6 @@
 extends GdUnitTestSuite
 ## Unit tests for the redesigned HUD 3-zone dashboard.
-## Tests risk pip logic, label formats, and theme styling.
+## Tests risk tooltip hooks, label formats, and theme styling.
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const HUDScene: PackedScene = preload("res://Scenes/HUD.tscn")
@@ -36,70 +36,53 @@ func after_test() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Risk pip calculation
+# Risk tooltip / meter migration
 # ---------------------------------------------------------------------------
 
-func test_risk_pips_zero_stops_all_empty() -> void:
+func test_hud_no_longer_has_legacy_risk_meter_node() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud._update_risk_pips(0.0)
-	for pip: Label in hud._risk_pips:
-		assert_str(pip.text).is_equal("○")
+	assert_object(hud.get_node_or_null("InfoRow/RiskColumn/RiskMeter")).is_null()
 
 
-func test_risk_pips_one_of_three_fills_two() -> void:
+func test_show_risk_tooltip_displays_text() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud._update_risk_pips(0.33)
-	# ratio = 0.33, ceil(0.33 * 5) = 2
-	var filled: int = 0
-	for pip: Label in hud._risk_pips:
-		if pip.text == "●":
-			filled += 1
-	assert_int(filled).is_equal(2)
+	hud.show_risk_tooltip(Rect2(Vector2(120, 80), Vector2(64, 32)), "Risk details")
+	assert_bool(hud._risk_tooltip.visible).is_true()
+	assert_str(hud._risk_tooltip_label.text).contains("Risk details")
 
 
-func test_risk_pips_at_threshold_fills_all() -> void:
+func test_hide_risk_tooltip_hides_panel() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud._update_risk_pips(1.0)
-	# ratio = 1.0, ceil(1.0 * 5) = 5
-	var filled: int = 0
-	for pip: Label in hud._risk_pips:
-		if pip.text == "●":
-			filled += 1
-	assert_int(filled).is_equal(5)
-
-
-func test_risk_pips_count_is_five() -> void:
-	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
-	add_child(hud)
-	await await_idle_frame()
-	assert_int(hud._risk_pips.size()).is_equal(5)
+	hud.show_risk_tooltip(Rect2(Vector2(120, 80), Vector2(64, 32)), "Risk details")
+	hud.hide_risk_tooltip()
+	assert_bool(hud._risk_tooltip.visible).is_false()
 
 
 # ---------------------------------------------------------------------------
 # Label formatting
 # ---------------------------------------------------------------------------
 
-func test_lives_display_hearts() -> void:
+func test_lives_display_formats_hand_count() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
 	hud._on_lives_changed(3)
-	assert_int(hud.lives_label.text.length()).is_equal(3)
-	assert_str(hud.lives_label.text).contains(_UITheme.GLYPH_HEART)
+	assert_str(hud.lives_label.text).is_equal("HANDS: 3")
+	assert_object(hud.get_node("InfoRow/RiskColumn/HandsLabel")).is_not_null()
 
 
-func test_lives_display_zero_shows_stop() -> void:
+func test_lives_display_zero_shows_empty_hand_count() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
 	hud._on_lives_changed(0)
-	assert_str(hud.lives_label.text).is_equal(_UITheme.GLYPH_STOP)
+	assert_str(hud.lives_label.text).is_equal("HANDS: 0")
 
 
 func test_gold_display_format() -> void:
@@ -138,21 +121,13 @@ func test_update_turn_sets_turn_score() -> void:
 	assert_str(hud.turn_score_label.text).is_equal("+42")
 
 
-func test_update_turn_sets_stop_text() -> void:
+func test_update_turn_does_not_override_hands_label() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	hud.update_turn(10, 2, 3)
-	assert_str(hud.stop_label.text).contains("2/3")
-
-
-func test_update_turn_with_shields_shows_diamond() -> void:
-	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
-	add_child(hud)
-	await await_idle_frame()
-	hud.update_turn(10, 1, 3, 2)
-	assert_str(hud.stop_label.text).contains(_UITheme.GLYPH_SHIELD)
-	assert_str(hud.stop_label.text).contains("2")
+	hud._on_lives_changed(4)
+	hud.update_turn(10, 2, 3, 2)
+	assert_str(hud.lives_label.text).is_equal("HANDS: 4")
 
 
 func test_update_turn_risk_meta_shows_held_stops_and_ev() -> void:
@@ -382,14 +357,6 @@ func test_hud_has_streak_slot_in_progress_tile() -> void:
 	await await_idle_frame()
 	var slot: Control = hud.get_node("ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot") as Control
 	assert_object(slot).is_not_null()
-
-
-func test_update_turn_sets_risk_percent_label() -> void:
-	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
-	add_child(hud)
-	await await_idle_frame()
-	hud.update_turn(5, 1, 3, 0, 2, 0.42, "detail")
-	assert_str(hud._risk_percent_label.text).contains("42")
 
 
 func test_flash_combo_updates_status_text() -> void:

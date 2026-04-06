@@ -166,24 +166,24 @@ func test_boost_targets_sets_multiplier() -> void:
 
 
 func test_lose_life_decrements() -> void:
-	GameManager.lives = 3
+	GameManager.reset_stage_hands()
 	_overlay._apply_effect({"type": 8})
-	assert_int(GameManager.lives).is_equal(2)
+	assert_int(GameManager.hands).is_equal(4)
 
 
 func test_lose_life_emits_lives_changed() -> void:
-	GameManager.lives = 3
+	GameManager.reset_stage_hands()
 	monitor_signals(GameManager, false)
 	_overlay._apply_effect({"type": 8})
-	assert_signal(GameManager).is_emitted("lives_changed", [2])
+	assert_signal(GameManager).is_emitted("hands_changed", [4])
 
 
-func test_lose_life_emits_run_ended_at_zero() -> void:
-	GameManager.lives = 1
+func test_lose_life_does_not_end_run_when_budget_reduced_between_stages() -> void:
+	GameManager.reset_stage_hands()
 	monitor_signals(GameManager, false)
 	_overlay._apply_effect({"type": 8})
-	assert_int(GameManager.lives).is_equal(0)
-	assert_signal(GameManager).is_emitted("run_ended")
+	assert_int(GameManager.hands).is_equal(4)
+	assert_signal(GameManager).is_not_emitted("run_ended")
 
 
 func test_lose_gold_removes_20() -> void:

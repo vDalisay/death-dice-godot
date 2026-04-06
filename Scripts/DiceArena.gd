@@ -54,6 +54,7 @@ const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
 const PREVIEW_BOUNDS_PADDING: float = 10.0
+const MIN_ARENA_FIT_SCALE: float = 0.45
 
 # Dice bag (kept-dice staging area)
 const BAG_PANEL_W: float = 176.0
@@ -727,8 +728,18 @@ func _update_centering() -> void:
 	if viewport == null:
 		return
 	var viewport_size: Vector2 = Vector2(viewport.size)
-	position = (viewport_size - Vector2(ARENA_WIDTH, ARENA_HEIGHT)) * 0.5
+	var fit_scale: float = _calculate_fit_scale(viewport_size)
+	scale = Vector2.ONE * fit_scale
+	position = (viewport_size - Vector2(ARENA_WIDTH, ARENA_HEIGHT) * fit_scale) * 0.5
 	_refresh_popup_bounds_for_dice()
+
+
+func _calculate_fit_scale(viewport_size: Vector2) -> float:
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return 1.0
+	var fit_x: float = viewport_size.x / ARENA_WIDTH
+	var fit_y: float = viewport_size.y / ARENA_HEIGHT
+	return clampf(minf(fit_x, fit_y), MIN_ARENA_FIT_SCALE, 1.0)
 
 
 func _get_popup_bounds_global() -> Rect2:

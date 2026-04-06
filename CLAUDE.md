@@ -130,22 +130,6 @@ The full game loop is implemented and playable:
 - **Personal best turn score**: tracked in GameManager; "NEW BEST TURN!" flash when beaten.
 - **Bust risk indicator**: after each roll, HUD shows "Bust risk: LOW / MEDIUM / HIGH" based on stop count vs threshold.
 
-## Roadmap (rough)
-
-1. [x] Core dice rolling system (roll N dice, display faces)
-2. [x] Reroll mechanic (select dice, reroll subset)
-3. [x] Stop/bust mechanic
-4. [x] Basic scoring and stage targets
-5. [x] Stage progression loop
-6. [x] Between-stage shop/upgrade screen
-7. [x] Dice pool management (buy, upgrade faces)
-8. [x] Dice balance invariant (every die keeps ≥1 STOP face)
-9. [x] New face types (SHIELD absorbs stops, MULTIPLY amplifies score)
-10. [x] New dice types (Runner, Shield, Multiplier — Cubitos-inspired)
-11. [x] Endless loop progression (loops escalate targets and unlock dice)
-12. [ ] Passive modifier system (Joker-equivalents)
-13. [x] Run structure (start → stages → loops → die)
-14. [ ] Polish: animations, sound, UI
 
 ## Agent Instructions
 

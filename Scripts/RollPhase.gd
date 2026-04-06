@@ -30,6 +30,8 @@ const NEAR_DEATH_GOLD_BONUS: int = 8
 const META_LEDGER_EXP_REWARD: int = 2
 const META_HIGH_RISK_EXP_REWARD: int = 1
 const META_NEAR_DEATH_SHARD_REWARD: int = 1
+const RISK_TOWER_LIGHT_COUNT: int = 10
+const RISK_TOWER_STOP_DOT_COUNT: int = 4
 const SURFACE_ENTER_DURATION: float = 0.14
 const SURFACE_EXIT_DURATION: float = 0.12
 
@@ -52,8 +54,8 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 
 @onready var _roll_content: MarginContainer = $MarginContainer
 @onready var hud: HUD           = $MarginContainer/VBoxContainer/HUD
-@onready var dice_arena: DiceArena = $MarginContainer/VBoxContainer/ArenaViewportContainer/ArenaViewport/DiceArena
-@onready var _arena_viewport_container: SubViewportContainer = $MarginContainer/VBoxContainer/ArenaViewportContainer
+@onready var dice_arena: DiceArena = $MarginContainer/VBoxContainer/ArenaRow/ArenaViewportContainer/ArenaViewport/DiceArena
+@onready var _arena_viewport_container: SubViewportContainer = $MarginContainer/VBoxContainer/ArenaRow/ArenaViewportContainer
 @onready var roll_button: Button = $MarginContainer/VBoxContainer/ButtonRow/RollButton
 @onready var bank_button: Button = $MarginContainer/VBoxContainer/ButtonRow/BankButton
 @onready var new_run_button: Button = $MarginContainer/VBoxContainer/ButtonRow/NewRunButton
@@ -65,9 +67,14 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 @onready var highlights_panel: HighlightsPanel = $HighlightsPanel
 @onready var forge_panel: ForgePanel = $ForgePanel
 @onready var stage_map_panel: StageMapPanel = $StageMapPanel
-@onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay
-@onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
-@onready var _contract_overlay_text_label: Label = $MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel
+@onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay
+@onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
+@onready var _contract_overlay_text_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel
+@onready var _risk_tower_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay
+@onready var _risk_tower_title_label: Label = $MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/RiskTitleLabel
+@onready var _risk_tower_lights_column: VBoxContainer = $MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/LightsColumn
+@onready var _risk_tower_stop_dots_column: VBoxContainer = $MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/StopDotsColumn
+@onready var _risk_tower_percent_label: Label = $MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/RiskPercentLabel
 
 var turn_state: TurnState = TurnState.IDLE
 var turn_number: int = 0
@@ -109,6 +116,10 @@ var _resume_surface: String = RESUME_SURFACE_TURN
 var _resume_payload: Dictionary = {}
 var _active_event_overlay: ColorRect = null
 var _active_rest_overlay: ColorRect = null
+var _risk_tower_lights: Array[ColorRect] = []
+var _risk_tower_stop_dots: Array[Label] = []
+var _risk_tower_tooltip_text: String = ""
+var _risk_tower_hovered: bool = false
 var _surface_transition_tweens: Dictionary = {}
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
@@ -171,6 +182,11 @@ func _ready() -> void:
 	_screen_shake.setup(_roll_content)
 	_screen_overlay = ScreenOverlayScript.new()
 	add_child(_screen_overlay)
+	_build_risk_tower_lights()
+	_build_risk_tower_stop_dots()
+	_apply_risk_tower_theme()
+	_risk_tower_overlay.mouse_entered.connect(_on_risk_tower_mouse_entered)
+	_risk_tower_overlay.mouse_exited.connect(_on_risk_tower_mouse_exited)
 	_apply_contract_overlay_theme()
 	_add_button_micro_tween(roll_button)
 	_add_button_micro_tween(bank_button)
@@ -281,7 +297,7 @@ func _on_bank_pressed() -> void:
 	if int(archetype_rewards.get("stop_shards", 0)) > 0:
 		GameManager.add_run_stop_shards(int(archetype_rewards.get("stop_shards", 0)))
 	if int(archetype_rewards.get("heal", 0)) > 0:
-		GameManager.heal_lives(int(archetype_rewards.get("heal", 0)))
+		GameManager.heal_hands(int(archetype_rewards.get("heal", 0)))
 	if SaveManager.has_permanent_upgrade("reroll_ledger") and _reroll_count >= 2:
 		meta_exp_reward += META_LEDGER_EXP_REWARD
 	if SaveManager.has_permanent_upgrade("close_call_study") and _turn_entered_high_risk:
@@ -310,6 +326,7 @@ func _on_bank_pressed() -> void:
 	_defer_stage_clear_overlay = will_clear_stage
 	_pending_stage_clear_overlay = false
 	GameManager.add_score(banked)
+	GameManager.spend_hand_on_bank(will_clear_stage)
 	_defer_stage_clear_overlay = false
 	var special_gold: int = int(special_preview.get("bonus_gold", 0)) + int(special_clear_rewards.get("bonus_gold", 0))
 	if special_gold > 0:
@@ -399,7 +416,7 @@ func _on_bank_pressed() -> void:
 	if int(archetype_rewards.get("stop_shards", 0)) > 0:
 		status_parts.append("CAPSTONE +%d SHARD" % int(archetype_rewards.get("stop_shards", 0)))
 	if int(archetype_rewards.get("heal", 0)) > 0:
-		status_parts.append("LAST CALL +%d LIFE" % int(archetype_rewards.get("heal", 0)))
+		status_parts.append("LAST CALL +%d HAND" % int(archetype_rewards.get("heal", 0)))
 	if meta_exp_reward > 0:
 		status_parts.append("LAB +%d EXP" % meta_exp_reward)
 	if meta_shard_reward > 0:
@@ -474,7 +491,7 @@ func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 		if dice_keep_locked[i]:
 			continue
 		if is_kept and dice_stopped[i]:
-			# Can't keep a stopped die ΓÇö skip.
+			# Can't keep a stopped die — skip.
 			continue
 		if not is_kept and dice_stopped[i]:
 			# Pick up stopped dice of matching type.
@@ -499,7 +516,7 @@ func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 func _roll_all_dice() -> void:
 	_begin_roll_animation_lock()
 	_shake_screen(SHAKE_ROLL, 0.15)
-	# Throw all dice into the arena ΓÇö faces are rolled inside throw_dice
+	# Throw all dice into the arena — faces are rolled inside throw_dice
 	dice_arena.throw_dice(GameManager.dice_pool)
 	# Results will be processed when all_dice_settled signal fires
 
@@ -527,7 +544,7 @@ func _reroll_selected_dice() -> void:
 		_die_reroll_counts[i] += 1
 		rerolled.append(i)
 	if rerolled.is_empty():
-		# No dice to reroll ΓÇö all are kept/locked, so auto-bank.
+		# No dice to reroll — all are kept/locked, so auto-bank.
 		_on_bank_pressed()
 		return
 	# Increment momentum on each reroll.
@@ -559,7 +576,7 @@ func _on_all_dice_settled() -> void:
 
 ## Called when a collision reroll happens during the rolling phase (cosmetic only).
 func _on_die_collision_rerolled(die_index: int, new_face: DiceFaceData) -> void:
-	# Update our tracking ΓÇö cosmetic only, stops are NOT accumulated
+	# Update our tracking — cosmetic only, stops are NOT accumulated
 	current_results[die_index] = new_face
 
 func _process_roll_results(rolled_indices: Array[int]) -> void:
@@ -640,7 +657,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				turn_state = TurnState.BANKED
 				bank_streak = 0
 				_update_streak_display()
-				hud.show_status("GUARDIAN ANGEL! Bust absorbed ΓÇö turn score forfeited.", Color(0.4, 0.8, 1.0))
+				hud.show_status("GUARDIAN ANGEL! Bust absorbed — turn score forfeited.", Color(0.4, 0.8, 1.0))
 				SFXManager.play_close_call()
 				_sync_buttons()
 				_schedule_auto_advance()
@@ -660,7 +677,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if turn_state == TurnState.BUST:
 		pass  # Bust overlay handles messaging.
 	elif is_immune and effective_stops >= threshold:
-		hud.show_status("CLOSE CALL! Turn %d ΓÇö no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
+		hud.show_status("CLOSE CALL! Turn %d — no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
 		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
 		SFXManager.play_close_call()
@@ -849,7 +866,7 @@ func _apply_bust_outcome(effective_stops: int) -> void:
 	hud.reset_score_feedback_visuals(true)
 	GameManager.set_held_stop_count(0)
 	_update_active_contract_on_bust()
-	GameManager.lose_life()
+	GameManager.spend_hand_on_bust()
 	var insurance_payout: int = GameManager.resolve_insurance_bet()
 	AchievementManager.on_bust()
 	SFXManager.play_bust()
@@ -996,7 +1013,7 @@ func _get_bust_threshold() -> int:
 		turn_number,
 		GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON),
 		GameManager.has_modifier(RunModifier.ModifierType.LAST_STAND),
-		GameManager.lives
+		GameManager.hands
 	)
 
 
@@ -1147,6 +1164,7 @@ func _sync_ui() -> void:
 	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds, reroll_ev)
 	var turn_score: int = _calculate_turn_score()
 	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details, reroll_ev)
+	_refresh_risk_tower(bust_odds, effective_stops, risk_details)
 	_sync_buttons()
 	_refresh_contract_overlay()
 
@@ -1156,7 +1174,7 @@ func _sync_ui() -> void:
 		TurnState.ACTIVE:
 			pass
 		TurnState.BUST:
-			hud.show_status("BUST! %d stops ΓÇö turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 		TurnState.BANKED:
 			pass  # Already set in _on_bank_pressed
 
@@ -1173,6 +1191,93 @@ func _apply_contract_overlay_theme() -> void:
 	_contract_overlay_text_label.add_theme_font_override("font", _UITheme.font_mono())
 	_contract_overlay_text_label.add_theme_font_size_override("font_size", 12)
 	_contract_overlay_text_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
+
+
+func _build_risk_tower_lights() -> void:
+	if _risk_tower_lights_column == null:
+		return
+	for child: Node in _risk_tower_lights_column.get_children():
+		child.queue_free()
+	_risk_tower_lights.clear()
+	for _i: int in RISK_TOWER_LIGHT_COUNT:
+		var light := ColorRect.new()
+		light.custom_minimum_size = Vector2(16, 12)
+		light.color = Color("#1A2229")
+		_risk_tower_lights_column.add_child(light)
+		_risk_tower_lights.append(light)
+
+
+func _build_risk_tower_stop_dots() -> void:
+	if _risk_tower_stop_dots_column == null:
+		return
+	for child: Node in _risk_tower_stop_dots_column.get_children():
+		child.queue_free()
+	_risk_tower_stop_dots.clear()
+	for _i: int in RISK_TOWER_STOP_DOT_COUNT:
+		var dot := Label.new()
+		dot.text = "●"
+		dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		dot.add_theme_font_override("font", _UITheme.font_display())
+		dot.add_theme_font_size_override("font_size", 16)
+		dot.modulate = Color("#40252A")
+		_risk_tower_stop_dots_column.add_child(dot)
+		_risk_tower_stop_dots.append(dot)
+
+
+func _apply_risk_tower_theme() -> void:
+	if _risk_tower_overlay == null:
+		return
+	_risk_tower_overlay.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
+	)
+	_risk_tower_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_risk_tower_title_label.add_theme_font_size_override("font_size", 11)
+	_risk_tower_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
+	_risk_tower_percent_label.add_theme_font_override("font", _UITheme.font_mono())
+	_risk_tower_percent_label.add_theme_font_size_override("font_size", 28)
+	_risk_tower_percent_label.add_theme_color_override("font_color", _UITheme.SUCCESS_GREEN)
+	_refresh_risk_tower(0.0, 0, "")
+
+
+func _refresh_risk_tower(bust_odds: float, effective_stops: int, risk_details: String) -> void:
+	if _risk_tower_overlay == null:
+		return
+	_risk_tower_overlay.visible = _roll_content.visible
+	if not _risk_tower_overlay.visible:
+		_risk_tower_hovered = false
+		hud.hide_risk_tooltip()
+		return
+	_risk_tower_tooltip_text = risk_details
+	var ratio: float = clampf(bust_odds, 0.0, 1.0)
+	var filled: int = ceili(ratio * float(RISK_TOWER_LIGHT_COUNT))
+	var percent: int = int(round(ratio * 100.0))
+	var light_color: Color = _UITheme.SUCCESS_GREEN
+	if ratio >= 0.66:
+		light_color = _UITheme.DANGER_RED
+	elif ratio >= 0.33:
+		light_color = _UITheme.SCORE_GOLD
+	_risk_tower_percent_label.text = "%03d%%" % percent
+	_risk_tower_percent_label.modulate = light_color
+	for i: int in RISK_TOWER_LIGHT_COUNT:
+		var is_lit: bool = i >= RISK_TOWER_LIGHT_COUNT - filled
+		_risk_tower_lights[i].color = light_color if is_lit else Color("#1A2229")
+	var lit_stop_dots: int = mini(maxi(effective_stops, 0), RISK_TOWER_STOP_DOT_COUNT)
+	for i: int in RISK_TOWER_STOP_DOT_COUNT:
+		var dot_lit: bool = i >= RISK_TOWER_STOP_DOT_COUNT - lit_stop_dots
+		_risk_tower_stop_dots[i].modulate = _UITheme.DANGER_RED if dot_lit else Color("#40252A")
+	if _risk_tower_hovered:
+		hud.show_risk_tooltip(_risk_tower_overlay.get_global_rect(), _risk_tower_tooltip_text)
+
+
+func _on_risk_tower_mouse_entered() -> void:
+	_risk_tower_hovered = true
+	hud.show_risk_tooltip(_risk_tower_overlay.get_global_rect(), _risk_tower_tooltip_text)
+
+
+func _on_risk_tower_mouse_exited() -> void:
+	_risk_tower_hovered = false
+	hud.hide_risk_tooltip()
 
 
 func _refresh_contract_overlay() -> void:
@@ -1218,7 +1323,7 @@ func _on_run_ended() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	hud.show_status("RUN OVER ΓÇö out of lives!", Color(0.9, 0.2, 0.2))
+	hud.show_status("RUN OVER — out of hands!", Color(0.9, 0.2, 0.2))
 	highlights_panel.show_highlights(snapshot, prior_bests)
 
 func _on_highlights_closed() -> void:
@@ -1292,6 +1397,7 @@ func _perform_stage_clear() -> void:
 	GameManager.add_gold(bonus)
 	SFXManager.play_stage_clear()
 	var is_loop: bool = GameManager.is_final_stage()
+	GameManager.reset_stage_hands()
 	if contract_status != "":
 		hud.show_status(contract_status, Color(1.0, 0.88, 0.3))
 	if is_loop:
@@ -1422,6 +1528,8 @@ func _schedule_auto_advance(after_delay: float = 0.0) -> void:
 
 
 func _auto_advance_turn() -> void:
+	if not _run_active:
+		return
 	if turn_state == TurnState.BANKED or turn_state == TurnState.BUST:
 		_start_new_turn()
 
@@ -1683,7 +1791,7 @@ func _show_bust_overlay(effective_stops: int) -> void:
 	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
 	add_child(overlay)
 	overlay.call("play", 1)
-	hud.show_status("BUST! %d stops ΓÇö turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 
 
 func _shake_screen(intensity: float, duration: float) -> void:
@@ -1870,7 +1978,7 @@ func _open_forge_from_map() -> void:
 		forge_panel.open()
 		_persist_active_run_snapshot()
 	else:
-		# Not enough dice for forge ΓÇö open map for next node.
+		# Not enough dice for forge — open map for next node.
 		hud.show_status("Not enough dice to forge (need %d)." % ForgePanel.MIN_DICE_FOR_FORGE, Color(1.0, 0.6, 0.0))
 		_open_stage_map()
 
@@ -1879,7 +1987,7 @@ func _execute_rest_node() -> void:
 	var lives_before: int = GameManager.lives
 	_stage_flow.apply_rest_rewards(REST_HEAL_LIVES, REST_GOLD_BONUS)
 	var lives_after: int = GameManager.lives
-	hud.show_status("Rested! +%d life, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
+	hud.show_status("Rested! +%d hand, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
 	SFXManager.play_stage_clear()
 	_show_rest_overlay(lives_before, lives_after)
 
@@ -1946,7 +2054,7 @@ func _maybe_apply_curse() -> void:
 	var target: int = candidates[target_index]
 	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
 	die.faces[target].value = 0
-	hud.show_status("CURSED! %s gained a ΓÿáSTOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
+	hud.show_status("CURSED! %s gained a ☠STOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
 
 # ---------------------------------------------------------------------------
 # Archetype picker

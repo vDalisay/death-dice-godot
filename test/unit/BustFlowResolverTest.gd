@@ -19,7 +19,7 @@ func test_threshold_glass_cannon_penalty_respects_minimum() -> void:
 	assert_int(_resolver.get_bust_threshold(3, 4, true, false, 3)).is_equal(2)
 
 
-func test_threshold_last_stand_bonus_at_one_life() -> void:
+func test_threshold_last_stand_bonus_at_one_hand() -> void:
 	assert_int(_resolver.get_bust_threshold(4, 4, false, true, 1)).is_equal(6)
 	assert_int(_resolver.get_bust_threshold(4, 4, false, true, 2)).is_equal(4)
 

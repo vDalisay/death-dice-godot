@@ -12,7 +12,7 @@ func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
 
 
 func apply_rest_rewards(heal_lives: int, gold_bonus: int) -> void:
-	GameManager.heal_lives(heal_lives)
+	GameManager.adjust_stage_hand_cap(heal_lives)
 	GameManager.add_gold(gold_bonus)
 
 

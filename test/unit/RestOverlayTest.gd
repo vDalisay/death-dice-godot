@@ -4,7 +4,7 @@ extends GdUnitTestSuite
 const RestOverlayScene: PackedScene = preload("res://Scenes/RestOverlay.tscn")
 
 
-func test_rest_overlay_setup_reports_life_and_gold_changes() -> void:
+func test_rest_overlay_setup_reports_hand_and_gold_changes() -> void:
 	var overlay: ColorRect = RestOverlayScene.instantiate() as ColorRect
 	add_child(overlay)
 	await await_idle_frame()
@@ -27,6 +27,6 @@ func test_rest_overlay_reports_capped_healing() -> void:
 	overlay.call("open", 1, 10, 3, 3)
 	await await_millis(260)
 	var summary_label: Label = overlay.get_node("CenterContainer/Card/MarginContainer/Content/SummaryLabel") as Label
-	assert_str(summary_label.text).contains("No life recovered")
+	assert_str(summary_label.text).contains("No hand recovered")
 	overlay.queue_free()
 	await await_idle_frame()
