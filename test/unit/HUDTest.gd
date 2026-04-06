@@ -4,11 +4,14 @@ extends GdUnitTestSuite
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const HUDScene: PackedScene = preload("res://Scenes/HUD.tscn")
+const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageCatalog.gd")
 
 var _saved_is_seeded_run: bool = false
 var _saved_run_seed_text: String = ""
 var _saved_seed_version: int = 1
 var _saved_rng_stream_states: Dictionary = {}
+var _saved_stage_variant: int = 0
+var _saved_special_stage_id: String = ""
 
 
 func before_test() -> void:
@@ -16,8 +19,12 @@ func before_test() -> void:
 	_saved_run_seed_text = GameManager.run_seed_text
 	_saved_seed_version = GameManager.run_seed_version
 	_saved_rng_stream_states = GameManager.snapshot_rng_stream_states()
+	_saved_stage_variant = GameManager.current_stage_variant
+	_saved_special_stage_id = GameManager.active_special_stage_id
 	GameManager.active_modifiers.clear()
 	GameManager.clear_active_loop_contract()
+	GameManager.clear_special_stage()
+	GameManager.set_current_stage_variant(SpecialStageCatalogScript.Variant.NONE)
 	GameManager.set_held_stop_count(0)
 	GameManager.near_death_banks_this_stage = 0
 	GameManager.near_death_banks_this_run = 0
@@ -26,13 +33,18 @@ func before_test() -> void:
 func after_test() -> void:
 	if _saved_run_seed_text.is_empty():
 		GameManager.clear_active_run_identity()
-		return
-	GameManager.restore_run_identity(
-		_saved_run_seed_text,
-		_saved_is_seeded_run,
-		_saved_seed_version,
-		_saved_rng_stream_states
-	)
+	else:
+		GameManager.restore_run_identity(
+			_saved_run_seed_text,
+			_saved_is_seeded_run,
+			_saved_seed_version,
+			_saved_rng_stream_states
+		)
+	GameManager.set_current_stage_variant(_saved_stage_variant)
+	if _saved_special_stage_id.is_empty():
+		GameManager.clear_special_stage()
+	else:
+		GameManager.enter_special_stage(_saved_special_stage_id)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +123,83 @@ func test_stage_label_format() -> void:
 	await await_idle_frame()
 	hud._refresh_stage_display()
 	assert_str(hud.stage_label.text).contains("ROW")
+
+
+func test_stage_rule_header_defaults_to_normal_rule() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.refresh_stage_rule_header()
+	var rule_label: Label = hud.get_node("TopBar/TopBarMargin/TopBarRow/RuleHeaderLabel") as Label
+	assert_str(rule_label.text).is_equal("RULE: NORMAL")
+	assert_that(rule_label.modulate).is_equal(_UITheme.STAGE_FAMILY_ACCENT_TEXT)
+
+
+func test_stage_rule_header_uses_stage_variant_name() -> void:
+	GameManager.set_current_stage_variant(SpecialStageCatalogScript.Variant.CLEAN_ROOM)
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.refresh_stage_rule_header()
+	var rule_label: Label = hud.get_node("TopBar/TopBarMargin/TopBarRow/RuleHeaderLabel") as Label
+	assert_str(rule_label.text).is_equal("RULE: CLEAN ROOM")
+
+
+func test_stage_rule_header_prefers_active_special_stage() -> void:
+	GameManager.set_current_stage_variant(SpecialStageCatalogScript.Variant.CLEAN_ROOM)
+	GameManager.enter_special_stage("precision_hall")
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.refresh_stage_rule_header()
+	var rule_label: Label = hud.get_node("TopBar/TopBarMargin/TopBarRow/RuleHeaderLabel") as Label
+	assert_str(rule_label.text).is_equal("RULE: PRECISION HALL")
+
+
+func test_feed_row_starts_visible_without_entries() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	assert_bool(hud._feed_row.visible).is_true()
+	assert_int(hud._feed_container.get_child_count()).is_equal(0)
+
+
+func test_push_event_effect_adds_feed_badge() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.push_event_effect("EVENT: Test tag", _UITheme.STATUS_INFO, 2.0)
+	await await_idle_frame()
+	assert_bool(hud._feed_row.visible).is_true()
+	assert_int(hud._feed_container.get_child_count()).is_equal(1)
+	var badge: PanelContainer = hud._feed_container.get_child(0) as PanelContainer
+	var margin: MarginContainer = badge.get_child(0) as MarginContainer
+	var row: HBoxContainer = margin.get_child(0) as HBoxContainer
+	var message_label: Label = row.get_child(1) as Label
+	assert_str(message_label.text).contains("EVENT: Test tag")
+
+
+func test_feed_badge_expires_after_ttl() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.push_event_effect("EVENT: Temp tag", _UITheme.STATUS_INFO, 0.2)
+	await await_idle_frame()
+	assert_int(hud._feed_container.get_child_count()).is_equal(1)
+	await get_tree().create_timer(0.35).timeout
+	await await_idle_frame()
+	assert_int(hud._feed_container.get_child_count()).is_equal(0)
+	assert_bool(hud._feed_row.visible).is_true()
+
+
+func test_play_stage_intro_cards_spawns_overlay_cards() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.play_stage_intro_cards()
+	await await_idle_frame()
+	assert_object(hud._stage_intro_layer).is_not_null()
+	assert_int(hud._stage_intro_layer.get_child_count()).is_equal(2)
 
 
 func test_update_turn_sets_turn_score() -> void:

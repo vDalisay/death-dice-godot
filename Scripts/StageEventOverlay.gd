@@ -283,13 +283,18 @@ func _emit_event_resolved(summary: String, status_color: Color) -> void:
 # ---------------------------------------------------------------------------
 
 func _apply_choice_effects(choice: Dictionary) -> Dictionary:
-	var result: Dictionary = {"gained_dice": []}
+	var result: Dictionary = {
+		"gained_dice": [],
+		"cursed_replacements": [],
+	}
 	for effect_variant: Variant in choice.get("effects", []) as Array:
 		if not (effect_variant is Dictionary):
 			continue
 		var effect_result: Dictionary = _apply_effect(effect_variant as Dictionary)
 		for die_variant: Variant in effect_result.get("gained_dice", []):
 			(result["gained_dice"] as Array).append(die_variant)
+		for replacement_variant: Variant in effect_result.get("cursed_replacements", []):
+			(result["cursed_replacements"] as Array).append(replacement_variant)
 	return result
 
 
@@ -314,8 +319,12 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 			for _count: int in range(int(effect.get("count", 1))):
 				_lose_random_die()
 		EffectType.ADD_CURSED_STOP:
+			var cursed_replacements: Array[Dictionary] = []
 			for _count: int in range(int(effect.get("count", 1))):
-				_add_cursed_stop_to_random_die()
+				var replacement: Dictionary = _add_cursed_stop_to_random_die()
+				if not replacement.is_empty():
+					cursed_replacements.append(replacement)
+			return {"cursed_replacements": cursed_replacements}
 		EffectType.BOOST_TARGETS:
 			GameManager.apply_event_target_multiplier(float(effect.get("multiplier", 1.15)))
 		EffectType.LOSE_LIFE:
@@ -325,8 +334,12 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 		EffectType.LOSE_HEAVY_GOLD:
 			GameManager.remove_gold(int(effect.get("amount", 35)))
 		EffectType.DOUBLE_CURSED_STOP:
-			_add_cursed_stop_to_random_die()
-			_add_cursed_stop_to_random_die()
+			var doubled_replacements: Array[Dictionary] = []
+			for _i: int in 2:
+				var replacement: Dictionary = _add_cursed_stop_to_random_die()
+				if not replacement.is_empty():
+					doubled_replacements.append(replacement)
+			return {"cursed_replacements": doubled_replacements}
 		EffectType.RESET_MOMENTUM:
 			GameManager.reset_momentum()
 		EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER:
@@ -854,12 +867,21 @@ func _build_event_pool() -> Array[Dictionary]:
 func _build_effect_summary(choice: Dictionary, effect_result: Dictionary = {}) -> String:
 	var summary: String = choice.get("summary", "EVENT: bargain resolved") as String
 	var gained_dice: Array[DiceData] = _extract_gained_dice(effect_result)
-	if gained_dice.is_empty():
+	var details: Array[String] = []
+	if not gained_dice.is_empty():
+		var die_names: Array[String] = []
+		for die: DiceData in gained_dice:
+			die_names.append(die.dice_name)
+		details.append("Dice: %s" % ", ".join(die_names))
+	var cursed_replacements: Array[Dictionary] = _extract_cursed_replacements(effect_result)
+	for replacement: Dictionary in cursed_replacements:
+		var die_name: String = replacement.get("die_name", "Die") as String
+		var face_slot: int = int(replacement.get("face_index", 0)) + 1
+		var before_text: String = replacement.get("before_text", "?") as String
+		details.append("Curse: %s f%d %s -> ☠STOP" % [die_name, face_slot, before_text])
+	if details.is_empty():
 		return summary
-	var die_names: Array[String] = []
-	for die: DiceData in gained_dice:
-		die_names.append(die.dice_name)
-	return "%s [%s]" % [summary, ", ".join(die_names)]
+	return "%s [%s]" % [summary, " | ".join(details)]
 
 
 func _boost_number_faces(amount: int) -> void:
@@ -1173,25 +1195,40 @@ func _lose_random_die() -> void:
 	GameManager.dice_pool.remove_at(idx)
 
 
-func _add_cursed_stop_to_random_die() -> void:
+
+func _extract_cursed_replacements(effect_result: Dictionary) -> Array[Dictionary]:
+	var replacements: Array[Dictionary] = []
+	for replacement_variant: Variant in effect_result.get("cursed_replacements", []):
+		if replacement_variant is Dictionary:
+			replacements.append(replacement_variant as Dictionary)
+	return replacements
+
+
+func _add_cursed_stop_to_random_die() -> Dictionary:
 	if GameManager.dice_pool.is_empty():
-		return
+		return {}
 	var die_index: int = GameManager.rng_pick_index("event", GameManager.dice_pool.size())
 	if die_index < 0:
-		return
+		return {}
 	var die: DiceData = GameManager.dice_pool[die_index]
 	var candidates: Array[int] = []
 	for i: int in die.faces.size():
 		if die.faces[i].type != DiceFaceData.FaceType.CURSED_STOP and die.faces[i].type != DiceFaceData.FaceType.STOP:
 			candidates.append(i)
 	if candidates.is_empty():
-		return
+		return {}
 	var target_index: int = GameManager.rng_pick_index("event", candidates.size())
 	if target_index < 0:
-		return
+		return {}
 	var target: int = candidates[target_index]
+	var previous_text: String = die.faces[target].get_display_text()
 	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
 	die.faces[target].value = 0
+	return {
+		"die_name": die.dice_name,
+		"face_index": target,
+		"before_text": previous_text,
+	}
 
 
 func _get_color(key: String) -> Color:

@@ -73,6 +73,24 @@ func test_open_builds_card_nodes_with_buy_button() -> void:
 	assert_str(details_title.text).is_not_empty()
 
 
+func test_open_intro_keeps_first_card_content_visible_without_refresh() -> void:
+	GameManager.reset_run()
+	GameManager.add_gold(100)
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+	panel.open(1, false)
+	await await_idle_frame()
+	await await_idle_frame()
+	await get_tree().create_timer(0.34).timeout
+	assert_int(panel._card_panels.size()).is_greater_equal(1)
+	var first_card: PanelContainer = panel._card_panels[0] as PanelContainer
+	var name_label: Label = first_card.get_node("VBoxContainer/MarginContainer/Content/NameLabel") as Label
+	assert_bool(first_card.visible).is_true()
+	assert_float(first_card.modulate.a).is_greater(0.0)
+	assert_str(name_label.text).is_not_empty()
+
+
 func test_open_separates_bets_from_dice_offers() -> void:
 	GameManager.reset_run()
 	GameManager.add_gold(100)
