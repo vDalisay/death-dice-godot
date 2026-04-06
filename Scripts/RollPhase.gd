@@ -34,13 +34,18 @@ const RISK_TOWER_LIGHT_COUNT: int = 10
 const RISK_TOWER_STOP_DOT_COUNT: int = 4
 const SURFACE_ENTER_DURATION: float = 0.14
 const SURFACE_EXIT_DURATION: float = 0.12
+const STAGE_VARIANT_STATUS_COLOR: Color = Color(0.55, 0.9, 1.0)
+const RUN_OVER_STATUS_COLOR: Color = Color(0.9, 0.2, 0.2)
 
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
 const BUTTON_TWEEN_DURATION: float = 0.08
 const MULTIPLIER_BURST_DURATION: float = 0.42
-const MULTIPLIER_BURST_X_RATIO: float = 0.14
+const MULTIPLIER_BURST_BAR_OFFSET: float = 26.0
 const MULTIPLIER_BURST_Y_JITTER: float = 18.0
+const INTRO_CARD_SLOT_SHAKE_DURATION: float = 0.09
+const INTRO_CARD_RULE_SLOT_SHAKE: float = 1.1
+const INTRO_CARD_TARGET_SLOT_SHAKE: float = 1.6
 const RESUME_SURFACE_TURN: String = "turn"
 const RESUME_SURFACE_STAGE_MAP: String = "stage_map"
 const RESUME_SURFACE_SHOP: String = "shop"
@@ -122,6 +127,8 @@ var _risk_tower_stop_dots: Array[Label] = []
 var _risk_tower_tooltip_text: String = ""
 var _risk_tower_hovered: bool = false
 var _surface_transition_tweens: Dictionary = {}
+var _pending_run_end_snapshot: RunSaveData = null
+var _pending_run_end_prior_bests: Dictionary = {}
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -178,6 +185,7 @@ func _ready() -> void:
 	_set_post_run_buttons_visible(false)
 	_streak_display = StreakDisplayScript.new()
 	hud.attach_streak_display(_streak_display)
+	hud.intro_card_slotted.connect(_on_intro_card_slotted)
 	_screen_shake = ScreenShakeScript.new()
 	add_child(_screen_shake)
 	_screen_shake.setup(_roll_content)
@@ -249,7 +257,7 @@ func _start_new_turn() -> void:
 	dice_keep_locked.fill(false)
 	dice_arena.reset()
 	if turn_number == 1 and _stage_starting_stop_pressure > 0:
-		hud.show_status("PRESSURE UP! Stage starts with %d stop." % _stage_starting_stop_pressure, Color(1.0, 0.62, 0.2))
+		_push_feed_status("PRESSURE UP! Stage starts with %d stop." % _stage_starting_stop_pressure, Color(1.0, 0.62, 0.2))
 	_sync_ui()
 	_persist_active_run_snapshot()
 
@@ -352,7 +360,7 @@ func _on_bank_pressed() -> void:
 	# Side-bets resolve on bank.
 	var heat_payout: int = GameManager.resolve_heat_bet(accumulated_stop_count)
 	if heat_payout > 0:
-		hud.show_status("HEAT BET HIT! +%dg" % heat_payout, Color(1.0, 0.8, 0.2))
+		_push_feed_status("HEAT BET HIT! +%dg" % heat_payout, Color(1.0, 0.8, 0.2))
 
 	var even_count: int = 0
 	var odd_count: int = 0
@@ -371,11 +379,11 @@ func _on_bank_pressed() -> void:
 	var had_even_odd_bet: bool = GameManager.even_odd_bet_wager > 0
 	var eo_result: int = GameManager.resolve_even_odd_bet(even_count, odd_count)
 	if eo_result > 0:
-		hud.show_status("EVEN/ODD WIN! +%dg" % eo_result, Color(0.95, 0.85, 0.2))
+		_push_feed_status("EVEN/ODD WIN! +%dg" % eo_result, Color(0.95, 0.85, 0.2))
 	elif eo_result < 0:
-		hud.show_status("EVEN/ODD LOST", Color(1.0, 0.4, 0.4))
+		_push_feed_status("EVEN/ODD LOST", Color(1.0, 0.4, 0.4))
 	elif had_even_odd_bet and even_count == odd_count and (even_count + odd_count) > 0:
-		hud.show_status("EVEN/ODD PUSH (tie)", Color(0.6, 0.9, 1.0))
+		_push_feed_status("EVEN/ODD PUSH (tie)", Color(0.6, 0.9, 1.0))
 	# Gambler's Rush: +1g per survived stop.
 	if GameManager.has_modifier(RunModifier.ModifierType.GAMBLERS_RUSH) and accumulated_stop_count > 0:
 		var rush_gold: int = accumulated_stop_count
@@ -398,7 +406,7 @@ func _on_bank_pressed() -> void:
 		if _screen_overlay and _screen_overlay.has_method("flash_jackpot"):
 			_screen_overlay.flash_jackpot()
 		_spawn_jackpot_confetti()
-		hud.show_status("JACKPOT! +%dg bonus!" % jackpot_gold, Color(1.0, 0.85, 0.0))
+		_push_feed_status("JACKPOT! +%dg bonus!" % jackpot_gold, Color(1.0, 0.85, 0.0))
 	var mult: int = _get_turn_multiplier()
 	var status_parts: Array[String] = []
 	var contract_status: String = ""
@@ -450,11 +458,11 @@ func _on_bank_pressed() -> void:
 		status_parts.append(evolution_status)
 	status_parts.append("Banked %d points%s!  Total: %d" % [banked, mult_text, GameManager.total_score])
 	if not is_jackpot:
-		hud.show_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
+		_push_feed_status(" | ".join(status_parts), Color(0.3, 0.9, 0.3))
 	SFXManager.play_bank()
 	# Personal best turn score check.
 	if GameManager.register_turn_score(banked):
-		hud.show_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
+		_push_feed_status("NEW BEST TURN! %d pts" % banked, Color(1.0, 0.85, 0.0))
 		SFXManager.play_personal_best()
 	if banked >= 50:
 		_shake_screen(SHAKE_BIG_BANK, 0.2)
@@ -462,7 +470,9 @@ func _on_bank_pressed() -> void:
 	# Per-die score count-up followed by cascade checkpoints.
 	var anim_duration: float = _play_bank_cascade_animation(old_total, GameManager.total_score, mult, streak_mult)
 	_sync_buttons()
-	if will_clear_stage or _pending_stage_clear_overlay:
+	if _has_pending_run_end_sequence():
+		_schedule_pending_run_end_sequence(anim_duration)
+	elif will_clear_stage or _pending_stage_clear_overlay:
 		_schedule_deferred_stage_clear(anim_duration)
 	else:
 		# Auto-advance to next turn after counting animation finishes.
@@ -535,7 +545,7 @@ func _reroll_selected_dice() -> void:
 	_reroll_count += 1
 	var special_reroll_status: String = GameManager.apply_special_stage_reroll_bonus(_reroll_count)
 	if special_reroll_status != "":
-		hud.show_status(special_reroll_status, GameManager.get_active_special_stage_color())
+		_push_feed_status(special_reroll_status, GameManager.get_active_special_stage_color())
 	# Lock all currently-kept dice permanently before rerolling.
 	for i: int in GameManager.dice_pool.size():
 		if dice_keep[i] and not dice_keep_locked[i]:
@@ -659,7 +669,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			turn_state = TurnState.BANKED
 			bank_streak = 0
 			_update_streak_display()
-			hud.show_status("INSURANCE TRIGGERED! Bust canceled; turn score forfeited.", Color(0.4, 0.8, 1.0))
+			_push_feed_status("INSURANCE TRIGGERED! Bust canceled; turn score forfeited.", Color(0.4, 0.8, 1.0))
 			SFXManager.play_close_call()
 			_sync_buttons()
 			_schedule_auto_advance()
@@ -668,7 +678,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				turn_state = TurnState.BANKED
 				bank_streak = 0
 				_update_streak_display()
-				hud.show_status("GUARDIAN ANGEL! Bust absorbed — turn score forfeited.", Color(0.4, 0.8, 1.0))
+				_push_feed_status("GUARDIAN ANGEL! Bust absorbed — turn score forfeited.", Color(0.4, 0.8, 1.0))
 				SFXManager.play_close_call()
 				_sync_buttons()
 				_schedule_auto_advance()
@@ -688,12 +698,12 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if turn_state == TurnState.BUST:
 		pass  # Bust overlay handles messaging.
 	elif is_immune and effective_stops >= threshold:
-		hud.show_status("CLOSE CALL! Turn %d — no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
+		_push_feed_status("CLOSE CALL! Turn %d — no bust this time." % turn_number, Color(1.0, 0.6, 0.0))
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
-		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
+		_push_feed_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
 		SFXManager.play_close_call()
 	elif effective_stops == 0 and rolled_indices.size() > 0:
-		hud.show_status("CLEAN ROLL! No stops!", Color(0.3, 1.0, 0.3))
+		_push_feed_status("CLEAN ROLL! No stops!", Color(0.3, 1.0, 0.3))
 		SFXManager.play_clean_roll()
 
 	var roll_stop_count: int = _count_stops_in(rolled_indices)
@@ -702,7 +712,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		_shake_screen(SHAKE_CURSED_STOP if has_cursed else SHAKE_STOP, 0.12 if has_cursed else 0.1)
 	var shielded: int = _get_roll_resolution_service().absorbed_stop_count(roll_stop_count, shield_count)
 	if shielded > 0:
-		hud.show_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
+		_push_feed_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
 		for i: int in GameManager.dice_pool.size():
 			var shield_face: DiceFaceData = current_results[i]
 			if shield_face != null and shield_face.type == DiceFaceData.FaceType.SHIELD:
@@ -881,9 +891,12 @@ func _apply_bust_outcome(effective_stops: int) -> void:
 	var insurance_payout: int = GameManager.resolve_insurance_bet()
 	AchievementManager.on_bust()
 	SFXManager.play_bust()
-	_show_bust_overlay(effective_stops)
+	if _has_pending_run_end_sequence():
+		_show_pending_run_end_sequence(effective_stops)
+	else:
+		_show_bust_overlay(effective_stops)
 	if insurance_payout > 0:
-		hud.show_status("Insurance paid out: +%dg" % insurance_payout, Color(0.25, 0.95, 0.6))
+		_push_feed_status("Insurance paid out: +%dg" % insurance_payout, Color(0.25, 0.95, 0.6))
 	_sync_buttons()
 	_schedule_auto_advance()
 
@@ -980,7 +993,7 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 
 	if chain_depth > 0:
 		SFXManager.play_explode(chain_depth)
-		hud.show_status("CHAIN x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
+		_push_feed_status("CHAIN x%d!" % chain_depth, Color(1.0, 0.5, 0.0))
 
 	_check_roll_combos()
 	_release_roll_animation_lock(POST_ROLL_EFFECT_LOCK_DURATION)
@@ -1182,13 +1195,37 @@ func _sync_ui() -> void:
 
 	match turn_state:
 		TurnState.IDLE:
-			hud.show_status("Press 'Roll All' to begin your turn!")
+			var idle_status: Dictionary = _get_idle_status_context()
+			hud.set_pinned_status(
+				str(idle_status.get("message", "Press 'Roll All' to begin your turn!")),
+				idle_status.get("color", Color.WHITE) as Color
+			)
 		TurnState.ACTIVE:
 			pass
 		TurnState.BUST:
-			hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
+			pass
 		TurnState.BANKED:
 			pass  # Already set in _on_bank_pressed
+
+
+func _get_idle_status_context() -> Dictionary:
+	if GameManager.has_active_special_stage():
+		return {
+			"message": "SPECIAL STAGE: %s" % GameManager.get_active_special_stage_summary(),
+			"color": GameManager.get_active_special_stage_color(),
+			"has_stage_context": true,
+		}
+	if GameManager.has_current_stage_variant():
+		return {
+			"message": GameManager.get_current_stage_variant_hover_text(),
+			"color": STAGE_VARIANT_STATUS_COLOR,
+			"has_stage_context": true,
+		}
+	return {
+		"message": "Press 'Roll All' to begin your turn!",
+		"color": Color.WHITE,
+		"has_stage_context": false,
+	}
 
 
 func _apply_contract_overlay_theme() -> void:
@@ -1335,7 +1372,62 @@ func _on_run_ended() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	hud.show_status("RUN OVER — out of hands!", Color(0.9, 0.2, 0.2))
+	if turn_state == TurnState.BANKED or turn_state == TurnState.BUST:
+		_pending_run_end_snapshot = snapshot
+		_pending_run_end_prior_bests = prior_bests.duplicate(true)
+		return
+	_begin_run_end_sequence(snapshot, prior_bests)
+
+
+func _has_pending_run_end_sequence() -> bool:
+	return _pending_run_end_snapshot != null
+
+
+func _schedule_pending_run_end_sequence(after_delay: float, effective_stops: int = -1) -> void:
+	if not _has_pending_run_end_sequence():
+		return
+	get_tree().create_timer(maxf(after_delay, 0.0)).timeout.connect(_show_pending_run_end_sequence.bind(effective_stops), CONNECT_ONE_SHOT)
+
+
+func _show_pending_run_end_sequence(effective_stops: int = -1) -> void:
+	if not _has_pending_run_end_sequence():
+		return
+	var snapshot: RunSaveData = _pending_run_end_snapshot
+	var prior_bests: Dictionary = _pending_run_end_prior_bests.duplicate(true)
+	_pending_run_end_snapshot = null
+	_pending_run_end_prior_bests.clear()
+	if effective_stops >= 0:
+		_show_bust_overlay(effective_stops, _present_run_end_highlights.bind(snapshot, prior_bests))
+		return
+	_begin_run_end_sequence(snapshot, prior_bests)
+
+
+func _begin_run_end_sequence(snapshot: RunSaveData, prior_bests: Dictionary) -> void:
+	if snapshot == null:
+		return
+	_show_game_over_overlay(_present_run_end_highlights.bind(snapshot, prior_bests))
+
+
+func _show_game_over_overlay(on_finished: Callable = Callable()) -> void:
+	var overlay: ColorRect = _spawn_run_end_overlay(false, on_finished)
+	overlay.call("play", 1)
+	_push_feed_status("RUN OVER — out of hands!", RUN_OVER_STATUS_COLOR)
+
+
+func _spawn_run_end_overlay(should_flash_bust: bool, on_finished: Callable = Callable()) -> ColorRect:
+	_shake_screen(SHAKE_BUST, 0.4)
+	if should_flash_bust and _screen_overlay and _screen_overlay.has_method("flash_bust"):
+		_screen_overlay.flash_bust()
+	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
+	add_child(overlay)
+	if on_finished.is_valid():
+		overlay.connect("finished", on_finished, CONNECT_ONE_SHOT)
+	return overlay
+
+
+func _present_run_end_highlights(snapshot: RunSaveData, prior_bests: Dictionary) -> void:
+	if snapshot == null:
+		return
 	highlights_panel.show_highlights(snapshot, prior_bests)
 
 func _on_highlights_closed() -> void:
@@ -1411,9 +1503,9 @@ func _perform_stage_clear() -> void:
 	var is_loop: bool = GameManager.is_final_stage()
 	GameManager.reset_stage_hands()
 	if contract_status != "":
-		hud.show_status(contract_status, Color(1.0, 0.88, 0.3))
+		_push_feed_status(contract_status, Color(1.0, 0.88, 0.3))
 	if is_loop:
-		hud.show_status(
+		_push_feed_status(
 			"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop, GameManager.current_loop + 1],
 			Color(1.0, 0.85, 0.0))
 	_show_stage_clear_overlay(bonus, surplus, is_loop)
@@ -1475,7 +1567,7 @@ func _on_achievement_unlocked(_key: String, title: String) -> void:
 	add_child(toast)
 	toast.call("show_unlock", title)
 	SFXManager.play_achievement_unlock()
-	hud.show_status("Achievement Unlocked: %s" % title, Color(1.0, 0.85, 0.0))
+	_push_feed_status("Achievement Unlocked: %s" % title, Color(1.0, 0.85, 0.0))
 
 func _sync_buttons() -> void:
 	if not _run_active:
@@ -1633,6 +1725,8 @@ func _show_floating_gold_delta(amount: int) -> void:
 func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: int, streak_multiplier: float) -> float:
 	var anim_duration: float = _play_score_count_animation(old_total, new_total)
 	var checkpoint_tween: Tween = create_tween()
+	if anim_duration > 0.0:
+		checkpoint_tween.tween_interval(anim_duration)
 	if _triggered_combo_ids.size() > 0:
 		checkpoint_tween.tween_callback(
 			_show_hud_status.bind("COMBO BONUS!", _UITheme.ROSE_ACCENT)
@@ -1648,24 +1742,42 @@ func _play_bank_cascade_animation(old_total: int, new_total: int, multiplier: in
 	checkpoint_tween.tween_callback(
 		_show_total_locked_status.bind(new_total)
 	).set_delay(BANK_CASCADE_STEP_DELAY)
-	return anim_duration
+	return _get_bank_cascade_total_duration(anim_duration, multiplier, streak_multiplier)
+
+
+func _get_bank_cascade_total_duration(base_duration: float, multiplier: int, streak_multiplier: float) -> float:
+	var step_count: int = 1
+	if _triggered_combo_ids.size() > 0:
+		step_count += 1
+	if multiplier > 1:
+		step_count += 1
+	if streak_multiplier > 1.0:
+		step_count += 1
+	return base_duration + float(step_count) * BANK_CASCADE_STEP_DELAY
 
 
 func _show_hud_status(message: String, color: Color) -> void:
-	hud.show_status(message, color)
+	_push_feed_status(message, color)
 
 
 func _show_multiplier_status(multiplier: int) -> void:
-	hud.show_status("MULTIPLIER x%d!" % multiplier, _UITheme.SCORE_GOLD)
+	_push_feed_status("MULTIPLIER x%d!" % multiplier, _UITheme.SCORE_GOLD)
 	SFXManager.play_score_tick()
 
 
 func _show_hot_streak_status(streak_multiplier: float) -> void:
-	hud.show_status("HOT STREAK x%.1f!" % streak_multiplier, _UITheme.EXPLOSION_ORANGE)
+	_push_feed_status("HOT STREAK x%.1f!" % streak_multiplier, _UITheme.EXPLOSION_ORANGE)
 
 
 func _show_total_locked_status(new_total: int) -> void:
-	hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
+	_push_feed_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
+
+
+func _push_feed_status(message: String, color: Color) -> void:
+	var trimmed_message: String = message.strip_edges()
+	if trimmed_message.is_empty():
+		return
+	hud.push_event_effect(trimmed_message, color)
 
 
 func _publish_bank_score_feed(
@@ -1711,9 +1823,11 @@ func _burst_vertical_offset(effect_index: int) -> float:
 
 
 func _get_multiplier_vfx_anchor_global_position() -> Vector2:
+	if hud != null and hud.progress_bar != null:
+		return hud.progress_bar.global_position + Vector2(-MULTIPLIER_BURST_BAR_OFFSET, hud.progress_bar.size.y * 0.5)
 	var arena_origin: Vector2 = _arena_viewport_container.global_position
 	var arena_size: Vector2 = _arena_viewport_container.size
-	return arena_origin + Vector2(arena_size.x * MULTIPLIER_BURST_X_RATIO, arena_size.y * 0.5)
+	return arena_origin + Vector2(MULTIPLIER_BURST_BAR_OFFSET, arena_size.y * 0.5)
 
 
 func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_multiplier: bool) -> void:
@@ -1814,12 +1928,8 @@ func _queue_free_if_valid(node: Node) -> void:
 		node.queue_free()
 
 
-func _show_bust_overlay(effective_stops: int) -> void:
-	_shake_screen(SHAKE_BUST, 0.4)
-	if _screen_overlay and _screen_overlay.has_method("flash_bust"):
-		_screen_overlay.flash_bust()
-	var overlay: ColorRect = BustOverlayScene.instantiate() as ColorRect
-	add_child(overlay)
+func _show_bust_overlay(effective_stops: int, on_finished: Callable = Callable()) -> void:
+	var overlay: ColorRect = _spawn_run_end_overlay(true, on_finished)
 	overlay.call("play", 1)
 	hud.show_status("BUST! %d stops — turn score lost!" % effective_stops, Color(0.9, 0.2, 0.2))
 
@@ -1828,6 +1938,14 @@ func _shake_screen(intensity: float, duration: float) -> void:
 	if _screen_shake == null:
 		return
 	_screen_shake.shake(intensity, duration)
+
+
+func _on_intro_card_slotted(card_kind: String) -> void:
+	var intensity: float = INTRO_CARD_RULE_SLOT_SHAKE
+	if card_kind == "target":
+		intensity = INTRO_CARD_TARGET_SLOT_SHAKE
+	_shake_screen(intensity, INTRO_CARD_SLOT_SHAKE_DURATION)
+	SFXManager.play_ui_slot(card_kind == "target")
 
 
 func _add_button_micro_tween(btn: Button) -> void:
@@ -1910,8 +2028,7 @@ func _on_stage_event_resolved(summary: String, status_color: Color, event_overla
 		_active_event_overlay = null
 	_queue_free_if_valid(event_overlay)
 	if summary != "":
-		hud.push_event_effect(summary, status_color)
-		hud.show_status(summary, status_color)
+		_push_feed_status(summary, status_color)
 	_open_stage_map()
 
 
@@ -1945,7 +2062,7 @@ func _open_stage_map() -> void:
 func _on_map_node_selected(row: int, col: int, node: MapNodeData, used_reroute: bool) -> void:
 	if used_reroute:
 		GameManager.use_reroute_token()
-		hud.show_status("REROUTE SPENT! Path broken for this pick.", Color(1.0, 0.72, 0.35))
+		_push_feed_status("REROUTE SPENT! Path broken for this pick.", Color(1.0, 0.72, 0.35))
 	var selected_node: MapNodeData = node
 	if selected_node == null and GameManager.stage_map != null:
 		selected_node = GameManager.stage_map.get_node_at(row, col)
@@ -1975,17 +2092,12 @@ func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: Stri
 	_stage_starting_stop_pressure = GameManager.consume_next_stage_starting_stop_pressure()
 	if special_rule_id != "":
 		GameManager.enter_special_stage(special_rule_id)
-		hud.refresh_stage_rule_header()
-		var special_summary: String = "SPECIAL STAGE: %s" % GameManager.get_active_special_stage_summary()
-		hud.push_event_effect(special_summary, GameManager.get_active_special_stage_color())
-		hud.show_status(special_summary, GameManager.get_active_special_stage_color())
-	elif GameManager.has_current_stage_variant():
-		hud.refresh_stage_rule_header()
-		var variant_summary: String = GameManager.get_current_stage_variant_hover_text()
-		hud.push_event_effect(variant_summary, Color(0.55, 0.9, 1.0))
-		hud.show_status(variant_summary, Color(0.55, 0.9, 1.0))
-	else:
-		hud.refresh_stage_rule_header()
+	hud.refresh_stage_rule_header()
+	var stage_status: Dictionary = _get_idle_status_context()
+	hud.set_pinned_status(
+		str(stage_status.get("message", "Press 'Roll All' to begin your turn!")),
+		stage_status.get("color", Color.WHITE) as Color
+	)
 	hud.play_stage_intro_cards()
 	_set_roll_surface_visible(true, false)
 	_update_streak_display()
@@ -2017,7 +2129,7 @@ func _open_forge_from_map() -> void:
 		_persist_active_run_snapshot()
 	else:
 		# Not enough dice for forge — open map for next node.
-		hud.show_status("Not enough dice to forge (need %d)." % ForgePanel.MIN_DICE_FOR_FORGE, Color(1.0, 0.6, 0.0))
+		_push_feed_status("Not enough dice to forge (need %d)." % ForgePanel.MIN_DICE_FOR_FORGE, Color(1.0, 0.6, 0.0))
 		_open_stage_map()
 
 
@@ -2025,7 +2137,7 @@ func _execute_rest_node() -> void:
 	var lives_before: int = GameManager.lives
 	_stage_flow.apply_rest_rewards(REST_HEAL_LIVES, REST_GOLD_BONUS)
 	var lives_after: int = GameManager.lives
-	hud.show_status("Rested! +%d hand, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
+	_push_feed_status("Rested! +%d hand, +%dg" % [REST_HEAL_LIVES, REST_GOLD_BONUS], Color(0.3, 1.0, 0.3))
 	SFXManager.play_stage_clear()
 	_show_rest_overlay(lives_before, lives_after)
 
@@ -2058,7 +2170,7 @@ func _complete_loop() -> void:
 	_reset_stage_contract_trackers()
 	AchievementManager.on_loop_advanced(GameManager.current_loop)
 	_maybe_apply_curse()
-	hud.show_status(
+	_push_feed_status(
 		"LOOP %d COMPLETE! Entering Loop %d..." % [GameManager.current_loop - 1, GameManager.current_loop],
 		Color(1.0, 0.85, 0.0))
 	_begin_loop_contract_flow(ContractContinuation.OPEN_STAGE_MAP)
@@ -2092,7 +2204,7 @@ func _maybe_apply_curse() -> void:
 	var target: int = candidates[target_index]
 	die.faces[target].type = DiceFaceData.FaceType.CURSED_STOP
 	die.faces[target].value = 0
-	hud.show_status("CURSED! %s gained a ☠STOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
+	_push_feed_status("CURSED! %s gained a ☠STOP face!" % die.dice_name, Color(0.6, 0.0, 0.6))
 
 # ---------------------------------------------------------------------------
 # Archetype picker
@@ -2145,7 +2257,7 @@ func _resume_active_run() -> void:
 
 func _begin_loop_contract_flow(continuation: int) -> void:
 	var offer_count: int = 4 if SaveManager.has_permanent_upgrade("contract_scout") else 3
-	var offers: Array[LoopContractDataType] = LoopContractCatalogScript.get_offers_for_loop(GameManager.current_loop, offer_count)
+	var offers: Array[LoopContractDataType] = LoopContractCatalogScript.get_random_offers_for_loop(GameManager.current_loop, offer_count)
 	if offers.is_empty():
 		_continue_after_contract_selection(continuation)
 		return
@@ -2173,7 +2285,7 @@ func _apply_selected_loop_contract(contract_id: String, continuation: int) -> vo
 	GameManager.activate_loop_contract(contract_id)
 	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(contract_id)
 	if contract != null:
-		hud.show_status("Loop Contract: %s" % contract.display_name, Color(0.35, 0.92, 1.0))
+		_push_feed_status("Loop Contract: %s" % contract.display_name, Color(0.35, 0.92, 1.0))
 	_continue_after_contract_selection(continuation)
 
 

@@ -12,6 +12,8 @@ var _saved_seed_version: int = 1
 var _saved_rng_stream_states: Dictionary = {}
 var _saved_stage_variant: int = 0
 var _saved_special_stage_id: String = ""
+var _saved_total_score: int = 0
+var _saved_stage_target_score: int = 0
 
 
 func before_test() -> void:
@@ -21,6 +23,8 @@ func before_test() -> void:
 	_saved_rng_stream_states = GameManager.snapshot_rng_stream_states()
 	_saved_stage_variant = GameManager.current_stage_variant
 	_saved_special_stage_id = GameManager.active_special_stage_id
+	_saved_total_score = GameManager.total_score
+	_saved_stage_target_score = GameManager.stage_target_score
 	GameManager.active_modifiers.clear()
 	GameManager.clear_active_loop_contract()
 	GameManager.clear_special_stage()
@@ -45,6 +49,8 @@ func after_test() -> void:
 		GameManager.clear_special_stage()
 	else:
 		GameManager.enter_special_stage(_saved_special_stage_id)
+	GameManager.total_score = _saved_total_score
+	GameManager.stage_target_score = _saved_stage_target_score
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +206,74 @@ func test_play_stage_intro_cards_spawns_overlay_cards() -> void:
 	await await_idle_frame()
 	assert_object(hud._stage_intro_layer).is_not_null()
 	assert_int(hud._stage_intro_layer.get_child_count()).is_equal(2)
+	assert_float(hud._rule_header_label.modulate.a).is_less(0.01)
+	assert_float(hud.target_label.modulate.a).is_less(0.01)
+
+
+func test_rule_intro_card_restores_resident_header_after_docking() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._ensure_stage_intro_layer()
+	hud._hide_intro_resident_label("rule")
+	var rule_card: PanelContainer = hud._build_intro_card("RULE", "NORMAL", hud._get_rule_header_display_color())
+	hud._stage_intro_layer.add_child(rule_card)
+	hud._animate_intro_card(
+		rule_card,
+		hud._get_rule_intro_anchor_center(),
+		hud.get_viewport_rect().size * 0.5 + Vector2(0.0, -HUD.INTRO_CARD_SPLIT_Y),
+		0.0,
+		"rule"
+	)
+	await get_tree().create_timer(_intro_card_round_trip_duration()).timeout
+	await await_idle_frame()
+	assert_float(hud._rule_header_label.modulate.a).is_greater_equal(0.99)
+
+
+func test_target_intro_card_restores_goal_score_after_docking() -> void:
+	GameManager.stage_target_score = 142
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._refresh_stage_display()
+	hud._ensure_stage_intro_layer()
+	hud._hide_intro_resident_label("target")
+	var target_card: PanelContainer = hud._build_intro_card("TARGET", str(GameManager.stage_target_score), _UITheme.SCORE_GOLD)
+	hud._stage_intro_layer.add_child(target_card)
+	hud._animate_intro_card(
+		target_card,
+		hud._get_target_intro_anchor_center(),
+		hud.get_viewport_rect().size * 0.5 + Vector2(0.0, HUD.INTRO_CARD_SPLIT_Y),
+		0.0,
+		"target"
+	)
+	await get_tree().create_timer(_intro_card_round_trip_duration()).timeout
+	await await_idle_frame()
+	assert_float(hud.target_label.modulate.a).is_greater_equal(0.99)
+
+
+func test_rule_intro_anchor_aligns_to_rule_header_left_edge() -> void:
+	GameManager.set_current_stage_variant(SpecialStageCatalogScript.Variant.CLEAN_ROOM)
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.refresh_stage_rule_header()
+	await await_idle_frame()
+	var anchor: Vector2 = hud._get_rule_intro_anchor_center()
+	var expected_x: float = hud._rule_header_label.global_position.x + HUD.INTRO_CARD_SIZE.x * HUD.INTRO_CARD_RETURN_SCALE.x * 0.5
+	assert_float(absf(anchor.x - expected_x)).is_less(0.1)
+
+
+func test_target_intro_anchor_aligns_to_target_label_right_edge() -> void:
+	GameManager.stage_target_score = 142
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._refresh_stage_display()
+	await await_idle_frame()
+	var anchor: Vector2 = hud._get_target_intro_anchor_center()
+	var expected_x: float = hud.target_label.global_position.x + hud.target_label.size.x - HUD.INTRO_CARD_SIZE.x * HUD.INTRO_CARD_RETURN_SCALE.x * 0.5
+	assert_float(absf(anchor.x - expected_x)).is_less(0.1)
 
 
 func test_update_turn_sets_turn_score() -> void:
@@ -207,7 +281,7 @@ func test_update_turn_sets_turn_score() -> void:
 	add_child(hud)
 	await await_idle_frame()
 	hud.update_turn(42, 1, 3)
-	assert_str(hud.turn_score_label.text).is_equal("+42")
+	assert_str(hud.turn_score_label.text).is_equal("BANK +42")
 
 
 func test_update_turn_does_not_override_hands_label() -> void:
@@ -271,12 +345,25 @@ func test_seed_copy_button_disabled_when_seed_missing() -> void:
 	assert_bool(hud._seed_copy_button.disabled).is_true()
 
 
+func _intro_card_round_trip_duration() -> float:
+	return HUD.INTRO_CARD_TRAVEL_DURATION * 2.0 + HUD.INTRO_CARD_TYPE_DURATION + HUD.INTRO_CARD_HOLD_DURATION + HUD.INTRO_CARD_SLOT_COMPRESS_DURATION + HUD.INTRO_CARD_SLOT_SETTLE_DURATION + HUD.INTRO_CARD_SLOT_HOLD_DURATION + HUD.INTRO_CARD_FADE_DURATION + 0.2
+
+
 func test_score_label_total_format() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
 	hud._on_score_changed(150)
-	assert_str(hud.score_label.text).is_equal("Total: 150")
+	assert_str(hud.score_label.text).is_equal("150")
+
+
+func test_target_goalpost_uses_numeric_label() -> void:
+	GameManager.stage_target_score = 88
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._refresh_stage_display()
+	assert_str(hud.target_label.text).is_equal("88")
 
 
 func test_progress_bar_lerps_when_score_increases() -> void:
@@ -318,7 +405,7 @@ func test_score_feedback_defers_score_signal_until_finished() -> void:
 	hud.begin_score_feedback(0, 80, false)
 	hud._on_score_changed(80)
 	assert_bool(hud.is_score_feedback_active()).is_true()
-	assert_str(hud.score_label.text).is_equal("Total: 0")
+	assert_str(hud.score_label.text).is_equal("0")
 	assert_float(hud.progress_bar.value).is_equal(0.0)
 	hud.finish_score_feedback()
 	await get_tree().process_frame
@@ -326,8 +413,79 @@ func test_score_feedback_defers_score_signal_until_finished() -> void:
 		await hud._score_tween.finished
 	if hud._progress_tween and hud._progress_tween.is_valid():
 		await hud._progress_tween.finished
-	assert_str(hud.score_label.text).is_equal("Total: 80")
+	assert_str(hud.score_label.text).is_equal("80")
 	assert_float(hud.progress_bar.value).is_equal(80.0)
+
+
+func test_recent_bank_chunk_appears_after_score_feedback_resolves() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.begin_score_feedback(0, 40, false)
+	hud.finish_score_feedback()
+	await get_tree().create_timer(0.25).timeout
+	assert_bool(hud._recent_bank_chunk.visible).is_true()
+	assert_int(hud._recent_bank_amount).is_equal(40)
+
+
+func test_recent_bank_chunk_tooltip_shows_exact_amount() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.begin_score_feedback(0, 40, false)
+	hud.finish_score_feedback()
+	await get_tree().create_timer(0.25).timeout
+	hud._on_recent_bank_chunk_hovered()
+	assert_bool(hud._chunk_tooltip.visible).is_true()
+	assert_str(hud._chunk_tooltip_label.text).is_equal("Last bank: +40")
+
+
+func test_recent_bank_chunk_matches_progress_bar_height_and_centering() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._set_progress_bar_thickness(26.0)
+	hud._recent_bank_amount = 40
+	hud._show_recent_bank_chunk(0, 40, HUD.OverflowState.NONE)
+	await get_tree().process_frame
+	assert_float(hud._recent_bank_chunk.size.y).is_equal(hud.progress_bar.size.y)
+	assert_float(absf(hud._recent_bank_chunk.position.y - hud.progress_bar.position.y)).is_less(0.1)
+	var top_padding: float = hud._recent_bank_chunk.position.y
+	var bottom_padding: float = hud.progress_track.size.y - (hud._recent_bank_chunk.position.y + hud._recent_bank_chunk.size.y)
+	assert_float(absf(top_padding - bottom_padding)).is_less(0.1)
+
+
+func test_overflow_crack_state_activates_when_bank_exceeds_target() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.begin_score_feedback(0, 110, false)
+	hud.finish_score_feedback()
+	await get_tree().create_timer(0.25).timeout
+	assert_int(hud._current_overflow_state).is_equal(HUD.OverflowState.CRACK)
+	assert_bool(hud._overflow_tip.visible).is_true()
+
+
+func test_overflow_break_state_spawns_droplets() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.begin_score_feedback(0, 130, false)
+	hud.finish_score_feedback()
+	await get_tree().create_timer(0.32).timeout
+	assert_int(hud._current_overflow_state).is_equal(HUD.OverflowState.BREAK)
+	assert_bool(hud._overflow_tip.visible).is_true()
+	assert_int(hud._overflow_fx_layer.get_child_count()).is_greater(0)
 
 
 func test_reroll_score_feedback_thickens_then_deflates_progress_bar() -> void:
@@ -452,8 +610,22 @@ func test_flash_combo_updates_status_text() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
+	hud.set_pinned_status("SPECIAL STAGE: PRECISION HALL", _UITheme.ACTION_CYAN)
 	var combo: RollCombo = RollCombo.make("power_pair", "Power Pair", {}, Color(0.95, 0.5, 0.8))
 	hud.set_active_combos([combo])
 	hud.flash_combo(combo.display_name, combo.flash_color, combo.combo_id)
-	assert_str(hud.status_label.text).contains("COMBO")
-	assert_str(hud.status_label.text).contains("Power Pair")
+	assert_str(hud.status_label.text).is_equal("SPECIAL STAGE: PRECISION HALL")
+	assert_int(hud._feed_entries.size()).is_equal(1)
+	assert_str(str(hud._feed_entries[0].get("category", ""))).is_equal("COMBO")
+	assert_str(str(hud._feed_entries[0].get("message", ""))).contains("Power Pair")
+
+
+func test_feed_event_does_not_override_pinned_status() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud.set_pinned_status("SPECIAL STAGE: PRECISION HALL", _UITheme.ACTION_CYAN)
+	hud.push_event_effect("CLEAN ROLL! No stops!", _UITheme.SUCCESS_GREEN)
+	assert_str(hud.status_label.text).is_equal("SPECIAL STAGE: PRECISION HALL")
+	assert_int(hud._feed_entries.size()).is_equal(1)
+	assert_str(str(hud._feed_entries[0].get("message", ""))).contains("CLEAN ROLL")

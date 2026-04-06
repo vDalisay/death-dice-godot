@@ -52,17 +52,37 @@ static func get_by_id(contract_id: String) -> LoopContractDataType:
 	return null
 
 
-static func get_offers_for_loop(loop_number: int, offer_count: int = 3) -> Array[LoopContractDataType]:
-	var offer_ids: Array[String] = []
+static func get_pool_ids_for_loop(loop_number: int) -> Array[String]:
 	if loop_number <= 1:
-		offer_ids = ["safe_hands", "one_more_time", "dead_close", "even_flow"]
-	elif loop_number == 2:
-		offer_ids = ["comeback", "third_spin", "shield_line", "clean_finish"]
-	else:
-		offer_ids = ["pressure_player", "third_spin", "exact_heat", "clean_finish"]
+		return ["safe_hands", "one_more_time", "dead_close", "even_flow", "clean_finish"]
+	if loop_number == 2:
+		return ["comeback", "third_spin", "shield_line", "clean_finish"]
+	return ["pressure_player", "third_spin", "exact_heat", "clean_finish"]
+
+
+static func get_pool_for_loop(loop_number: int) -> Array[LoopContractDataType]:
+	return _contracts_from_ids(get_pool_ids_for_loop(loop_number))
+
+
+static func get_offers_for_loop(loop_number: int, offer_count: int = 3) -> Array[LoopContractDataType]:
+	return _contracts_from_ids(get_pool_ids_for_loop(loop_number), offer_count)
+
+
+static func get_random_offers_for_loop(loop_number: int, offer_count: int = 3, stream_name: String = "contract") -> Array[LoopContractDataType]:
+	var shuffled_variants: Array = GameManager.rng_shuffle_copy(stream_name, get_pool_ids_for_loop(loop_number))
+	var shuffled_ids: Array[String] = []
+	for contract_id_variant: Variant in shuffled_variants:
+		var contract_id: String = str(contract_id_variant)
+		if shuffled_ids.has(contract_id):
+			continue
+		shuffled_ids.append(contract_id)
+	return _contracts_from_ids(shuffled_ids, offer_count)
+
+
+static func _contracts_from_ids(contract_ids: Array[String], offer_count: int = -1) -> Array[LoopContractDataType]:
 	var offers: Array[LoopContractDataType] = []
-	for contract_id: String in offer_ids:
-		if offers.size() >= offer_count:
+	for contract_id: String in contract_ids:
+		if offer_count >= 0 and offers.size() >= offer_count:
 			break
 		var contract: LoopContractDataType = get_by_id(contract_id)
 		if contract != null:

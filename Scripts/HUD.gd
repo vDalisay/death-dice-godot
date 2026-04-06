@@ -1,6 +1,8 @@
 class_name HUD
 extends VBoxContainer
 ## Observes GameManager and RollPhase signals. Renders labels only — no game logic.
+
+signal intro_card_slotted(card_kind: String)
 ## Redesigned as a compact 3-zone dashboard with themed panels and risk pips.
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
@@ -14,6 +16,7 @@ const SCORE_COUNT_DURATION: float = 0.5
 const SCORE_STEP_DURATION: float = 0.18
 const SCORE_TRANSFER_DURATION: float = 0.34
 const SCORE_TRANSFER_ARC_HEIGHT: float = 44.0
+const SCORE_DIAL_TRAVEL_DISTANCE: float = 46.0
 const GOLD_FLOAT_DURATION: float = 1.0
 const GOLD_COUNT_DURATION: float = 0.35
 const PROGRESS_LERP_DURATION: float = 0.4
@@ -41,6 +44,19 @@ const INTRO_CARD_SPLIT_Y: float = 18.0
 const INTRO_CARD_TARGET_Y_OFFSET: float = -6.0
 const INTRO_CARD_SIZE: Vector2 = Vector2(360.0, 132.0)
 const INTRO_CARD_RETURN_SCALE: Vector2 = Vector2(0.52, 0.52)
+const INTRO_CARD_SLOT_COMPRESS_DURATION: float = 0.07
+const INTRO_CARD_SLOT_SETTLE_DURATION: float = 0.1
+const INTRO_CARD_SLOT_HOLD_DURATION: float = 0.14
+const INTRO_CARD_SLOT_SQUASH_SCALE: Vector2 = Vector2(0.48, 0.58)
+const RECENT_BANK_CHUNK_MIN_WIDTH: float = 8.0
+const RECENT_BANK_CHUNK_GROW_DURATION: float = 0.24
+const RECENT_BANK_CHUNK_HOLD_DURATION: float = 0.9
+const RECENT_BANK_CHUNK_FADE_DURATION: float = 0.22
+const RECENT_BANK_OVERFLOW_DRAIN_DURATION: float = 0.55
+const OVERFLOW_BREAK_THRESHOLD_RATIO: float = 1.2
+const OVERFLOW_DROPLET_COUNT: int = 10
+
+enum OverflowState { NONE, CRACK, BREAK }
 
 # -- Top bar labels --
 @onready var stage_label: Label      = $TopBar/TopBarMargin/TopBarRow/StageLabel
@@ -56,15 +72,24 @@ const INTRO_CARD_RETURN_SCALE: Vector2 = Vector2(0.52, 0.52)
 @onready var _modifier_tooltip: PanelContainer = $ModifierTooltip
 @onready var _modifier_tooltip_name_label: Label = $ModifierTooltip/MarginContainer/TooltipVBox/TooltipNameLabel
 @onready var _modifier_tooltip_desc_label: Label = $ModifierTooltip/MarginContainer/TooltipVBox/TooltipDescLabel
+@onready var _chunk_tooltip: PanelContainer = $ChunkTooltip
+@onready var _chunk_tooltip_label: Label = $ChunkTooltip/MarginContainer/ChunkTooltipLabel
 @onready var _feed_row: CenterContainer = $FeedRow
 @onready var _feed_title: Label = $FeedRow/FeedLane/FeedTitle
 @onready var _feed_container: HBoxContainer = $FeedRow/FeedLane/FeedContainer
 
 # -- Score row --
-@onready var turn_score_label: Label   = $ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox/TurnScoreLabel
-@onready var score_label: Label        = $ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox/ScoreLabel
-@onready var target_label: Label       = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/TargetLabel
-@onready var progress_bar: ProgressBar = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressBar
+@onready var turn_score_label: Label   = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/TurnScoreLabel
+@onready var _score_dial_clip: Control = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/ScoreDialClip
+@onready var score_label: Label        = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/ScoreDialClip/ScoreLabel
+@onready var _score_incoming_label: Label = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/ScoreDialClip/ScoreIncomingLabel
+@onready var _target_caption_label: Label = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TargetVBox/TargetCaptionLabel
+@onready var target_label: Label       = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TargetVBox/TargetLabel
+@onready var progress_track: Control   = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack
+@onready var progress_bar: ProgressBar = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/ProgressBar
+@onready var _recent_bank_chunk: PanelContainer = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/RecentBankChunk
+@onready var _chunk_hit_area: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/RecentBankChunk/ChunkHitArea
+@onready var _overflow_tip: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/OverflowTip
 @onready var progress_hint_label: Label = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressHintLabel
 @onready var _streak_slot: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot
 
@@ -84,15 +109,16 @@ const INTRO_CARD_RETURN_SCALE: Vector2 = Vector2(0.52, 0.52)
 
 # -- Panel refs for styling --
 @onready var _top_bar: PanelContainer        = $TopBar
-@onready var _turn_score_panel: PanelContainer = $ScoreRow/TurnScorePanel
+@onready var _turn_score_panel: PanelContainer = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel
 @onready var _progress_panel: PanelContainer   = $ScoreRow/ProgressPanel
 
 var _score_tween: Tween = null
+var _recent_bank_chunk_tween: Tween = null
+var _overflow_drain_tween: Tween = null
 var _progress_tween: Tween = null
 var _progress_pulse_tween: Tween = null
 var _progress_hit_tween: Tween = null
 var _progress_thickness_tween: Tween = null
-var _combo_flash_tween: Tween = null
 var _gold_tween: Tween = null
 var _displayed_gold: int = -1
 var _modifier_badges: Array[PanelContainer] = []
@@ -102,6 +128,7 @@ var _progress_bar_base_size: Vector2 = Vector2.ZERO
 var _progress_bar_thickness_bonus: float = 0.0
 var _score_feedback_active: bool = false
 var _score_feedback_is_reroll: bool = false
+var _score_feedback_start_total: int = 0
 var _score_feedback_display_total: int = 0
 var _score_feedback_pending_total: int = -1
 var _last_bust_odds: float = 0.0
@@ -113,16 +140,33 @@ var _seed_row: HBoxContainer = null
 var _seed_copy_button: Button = null
 var _feed_entries: Array[Dictionary] = []
 var _feed_entry_counter: int = 0
+var _pinned_status_text: String = ""
+var _pinned_status_color: Color = Color.WHITE
 var _stage_intro_layer: Control = null
+var _overflow_fx_layer: Control = null
+var _intro_hidden_resident_labels: Dictionary = {}
+var _intro_resident_label_modulates: Dictionary = {}
+var _recent_bank_amount: int = 0
+var _current_overflow_state: int = OverflowState.NONE
+var _overflow_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
 func _ready() -> void:
 	_cache_modifier_badges()
 	_create_seed_label()
 	_ensure_stage_intro_layer()
+	_ensure_overflow_fx_layer()
 	_apply_theme_styling()
 	_contract_progress_service = ContractProgressServiceScript.new()
 	_progress_bar_base_size = progress_bar.custom_minimum_size
+	_overflow_rng.randomize()
+	_chunk_hit_area.focus_mode = Control.FOCUS_ALL
+	_chunk_hit_area.mouse_entered.connect(_on_recent_bank_chunk_hovered)
+	_chunk_hit_area.mouse_exited.connect(_on_recent_bank_chunk_unhovered)
+	_chunk_hit_area.focus_entered.connect(_on_recent_bank_chunk_hovered)
+	_chunk_hit_area.focus_exited.connect(_on_recent_bank_chunk_unhovered)
+	_hide_recent_bank_chunk(true)
+	_set_overflow_visual_state(OverflowState.NONE)
 	_update_feed_visibility()
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.hands_changed.connect(_on_lives_changed)
@@ -156,16 +200,26 @@ func _ready() -> void:
 	set_active_combos([])
 	_refresh_progress_display()
 	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
+	_set_total_score_label(float(GameManager.total_score))
 	_score_feedback_display_total = GameManager.total_score
 
 
 func _process(_delta: float) -> void:
 	_prune_expired_feed_entries()
+	if _score_tween == null or not _score_tween.is_valid():
+		_layout_score_dial_labels()
+	_update_progress_overlay_layout()
 	if _stage_intro_layer == null or not is_instance_valid(_stage_intro_layer):
+		if _overflow_fx_layer != null and is_instance_valid(_overflow_fx_layer):
+			var fallback_viewport_size: Vector2 = get_viewport_rect().size
+			if _overflow_fx_layer.size != fallback_viewport_size:
+				_overflow_fx_layer.size = fallback_viewport_size
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
 	if _stage_intro_layer.size != viewport_size:
 		_stage_intro_layer.size = viewport_size
+	if _overflow_fx_layer != null and is_instance_valid(_overflow_fx_layer) and _overflow_fx_layer.size != viewport_size:
+		_overflow_fx_layer.size = viewport_size
 
 
 # ---------------------------------------------------------------------------
@@ -207,20 +261,48 @@ func _apply_theme_styling() -> void:
 	# Turn score panel (HERO element)
 	_turn_score_panel.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_CARD, 2))
-	turn_score_label.add_theme_font_override("font", _UITheme.font_stats())
-	turn_score_label.add_theme_font_size_override("font_size", 40)
-	turn_score_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	turn_score_label.add_theme_font_override("font", _UITheme.font_mono())
+	turn_score_label.add_theme_font_size_override("font_size", 16)
+	turn_score_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 	score_label.add_theme_font_override("font", _UITheme.font_stats())
-	score_label.add_theme_font_size_override("font_size", 18)
+	score_label.add_theme_font_size_override("font_size", 52)
 	score_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	score_label.add_theme_color_override("font_outline_color", Color("#06070C"))
+	score_label.add_theme_constant_override("outline_size", 6)
+	score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_score_incoming_label.add_theme_font_override("font", _UITheme.font_stats())
+	_score_incoming_label.add_theme_font_size_override("font_size", 52)
+	_score_incoming_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_score_incoming_label.add_theme_color_override("font_outline_color", Color("#06070C"))
+	_score_incoming_label.add_theme_constant_override("outline_size", 6)
+	_score_incoming_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_target_caption_label.add_theme_font_override("font", _UITheme.font_mono())
+	_target_caption_label.add_theme_font_size_override("font_size", 15)
+	_target_caption_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 
 	# Progress panel
 	_progress_panel.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_CARD, 1))
 	target_label.add_theme_font_override("font", _UITheme.font_stats())
-	target_label.add_theme_font_size_override("font_size", 18)
+	target_label.add_theme_font_size_override("font_size", 32)
+	target_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	target_label.add_theme_color_override("font_outline_color", Color("#06070C"))
+	target_label.add_theme_constant_override("outline_size", 4)
 	progress_hint_label.add_theme_font_size_override("font_size", 16)
 	progress_hint_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
+	_recent_bank_chunk.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_semantic_frame_panel(Color(_UITheme.SCORE_GOLD, 0.5), Color(_UITheme.SCORE_GOLD, 0.92), _UITheme.CORNER_RADIUS_BADGE, 1)
+	)
+	_chunk_tooltip.add_theme_stylebox_override("panel",
+		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1))
+	_chunk_tooltip_label.add_theme_font_override("font", _UITheme.font_body())
+	_chunk_tooltip_label.add_theme_font_size_override("font_size", 13)
+	_chunk_tooltip_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
+	for child: Node in _overflow_tip.get_children():
+		var crack_line: ColorRect = child as ColorRect
+		if crack_line != null:
+			crack_line.color = _UITheme.SCORE_GOLD
 
 	# Info row
 	lives_label.add_theme_font_size_override("font_size", 18)
@@ -298,7 +380,7 @@ func _on_seed_copy_pressed() -> void:
 	if seed_text.is_empty():
 		return
 	DisplayServer.clipboard_set(seed_text)
-	show_status("Seed copied.", _UITheme.ACTION_CYAN)
+	push_event_effect("Seed copied.", _UITheme.ACTION_CYAN)
 
 
 func _cache_modifier_badges() -> void:
@@ -326,7 +408,7 @@ func update_turn(
 	_risk_details: String = "",
 	reroll_ev: float = 0.0
 ) -> void:
-	turn_score_label.text = "+%d" % turn_score
+	turn_score_label.text = "BANK +%d" % turn_score
 	_last_bust_odds = bust_odds
 	var juicy_danger: bool = _is_juicy_danger(stop_count, bust_threshold, bust_odds, turn_score)
 	_refresh_risk_meta(stop_count, bust_threshold, shield_count, reroll_ev, juicy_danger)
@@ -350,16 +432,35 @@ func push_score_causality_tag(label: String, value_text: String, status_color: C
 	_push_feed_tag("SCORE", detail.strip_edges(), status_color, ttl_seconds)
 
 
+func push_combo_effect(combo_name: String, status_color: Color = _UITheme.ROSE_ACCENT, ttl_seconds: float = FEED_TAG_TTL_SECONDS) -> void:
+	var label_text: String = combo_name.strip_edges()
+	if label_text.is_empty():
+		return
+	_push_feed_tag("COMBO", label_text, status_color, ttl_seconds)
+
+
+func set_pinned_status(message: String, colour: Color = Color.WHITE) -> void:
+	_pinned_status_text = message
+	_pinned_status_color = colour
+	_apply_pinned_status()
+
+
+func restore_pinned_status() -> void:
+	_apply_pinned_status()
+
+
 func play_stage_intro_cards() -> void:
 	_ensure_stage_intro_layer()
 	_clear_stage_intro_cards()
 	var rule_text: String = _extract_rule_label_text(_rule_header_label.text)
 	var target_text: String = str(GameManager.stage_target_score)
 	var center: Vector2 = get_viewport_rect().size * 0.5
-	var rule_start: Vector2 = center + Vector2(0.0, -INTRO_CARD_SPLIT_Y)
-	var target_start: Vector2 = center + Vector2(0.0, INTRO_CARD_SPLIT_Y)
-	var rule_anchor: Vector2 = _get_label_anchor_center(_rule_header_label, INTRO_CARD_TARGET_Y_OFFSET)
-	var target_anchor: Vector2 = _get_label_anchor_center(target_label, INTRO_CARD_TARGET_Y_OFFSET)
+	var rule_popup_center: Vector2 = center + Vector2(0.0, -INTRO_CARD_SPLIT_Y)
+	var target_popup_center: Vector2 = center + Vector2(0.0, INTRO_CARD_SPLIT_Y)
+	var rule_anchor: Vector2 = _get_rule_intro_anchor_center()
+	var target_anchor: Vector2 = _get_target_intro_anchor_center()
+	_hide_intro_resident_label("rule")
+	_hide_intro_resident_label("target")
 	var rule_card: PanelContainer = _build_intro_card("RULE", rule_text, _get_rule_header_display_color())
 	var target_card: PanelContainer = _build_intro_card("TARGET", target_text, _UITheme.SCORE_GOLD)
 	target_card.visible = false
@@ -367,15 +468,21 @@ func play_stage_intro_cards() -> void:
 	_stage_intro_layer.add_child(target_card)
 	_animate_intro_card(
 		rule_card,
-		rule_start,
 		rule_anchor,
+		rule_popup_center,
 		0.0,
-		Callable(self, "_animate_intro_card").bind(target_card, target_start, target_anchor, INTRO_CARD_SEQUENCE_GAP)
+		"rule",
+		Callable(self, "_animate_intro_card").bind(target_card, target_anchor, target_popup_center, INTRO_CARD_SEQUENCE_GAP, "target")
 	)
 
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.text     = message
 	status_label.modulate = colour
+
+
+func _apply_pinned_status() -> void:
+	status_label.scale = Vector2.ONE
+	show_status(_pinned_status_text, _pinned_status_color)
 
 
 func attach_streak_display(display: Control) -> void:
@@ -389,14 +496,7 @@ func attach_streak_display(display: Control) -> void:
 
 
 func flash_combo(combo_name: String, colour: Color, combo_id: String = "") -> void:
-	show_status("COMBO: %s!" % combo_name, colour)
-	status_label.pivot_offset = status_label.size * 0.5
-	if _combo_flash_tween != null and _combo_flash_tween.is_valid():
-		_combo_flash_tween.kill()
-	status_label.scale = Vector2.ONE
-	_combo_flash_tween = create_tween()
-	_combo_flash_tween.tween_property(status_label, "scale", Vector2(1.1, 1.1), 0.12)
-	_combo_flash_tween.tween_property(status_label, "scale", Vector2.ONE, 0.18)
+	push_combo_effect(combo_name, colour)
 	if not combo_id.is_empty():
 		_pulse_combo_badge(combo_id)
 
@@ -467,11 +567,14 @@ func animate_score_count(old_value: int, new_value: int) -> void:
 func begin_score_feedback(start_total: int, final_total: int, is_reroll_bank: bool) -> void:
 	_score_feedback_active = true
 	_score_feedback_is_reroll = is_reroll_bank
+	_score_feedback_start_total = start_total
 	_score_feedback_display_total = start_total
 	_score_feedback_pending_total = final_total
 	_progress_bar_thickness_bonus = 0.0
 	_stop_progress_tween()
 	_stop_progress_thickness_tween()
+	_hide_recent_bank_chunk(true)
+	_set_overflow_visual_state(OverflowState.NONE)
 	_set_total_score_label(float(start_total))
 	_set_progress_bar_value(_score_to_progress_value(start_total))
 	_set_progress_bar_thickness(_progress_bar_base_size.y)
@@ -517,10 +620,14 @@ func finish_score_feedback() -> void:
 	if not _score_feedback_active:
 		return
 	_score_feedback_active = false
+	var final_total: int = maxi(_score_feedback_pending_total, _score_feedback_display_total)
+	var recent_bank_delay: float = 0.0
 	if _score_feedback_pending_total > _score_feedback_display_total:
 		_animate_score_label_between(_score_feedback_display_total, _score_feedback_pending_total, SCORE_STEP_DURATION)
 		_animate_progress_bar_to(_score_to_progress_value(_score_feedback_pending_total), SCORE_STEP_DURATION)
 		_score_feedback_display_total = _score_feedback_pending_total
+		recent_bank_delay = SCORE_STEP_DURATION
+	_queue_recent_bank_feedback(_score_feedback_start_total, final_total, recent_bank_delay)
 	_schedule_progress_deflate()
 	_score_feedback_is_reroll = false
 
@@ -529,7 +636,10 @@ func reset_score_feedback_visuals(animated: bool = true) -> void:
 	_score_feedback_active = false
 	_score_feedback_is_reroll = false
 	_score_feedback_pending_total = -1
+	_score_feedback_start_total = GameManager.total_score
 	_stop_progress_tween()
+	_hide_recent_bank_chunk(true)
+	_set_overflow_visual_state(OverflowState.NONE)
 	if animated and progress_bar.custom_minimum_size.y > _progress_bar_base_size.y:
 		_schedule_progress_deflate()
 	else:
@@ -550,15 +660,61 @@ func is_score_feedback_active() -> bool:
 func _animate_score_label_between(old_value: int, new_value: int, duration: float) -> void:
 	if _score_tween and _score_tween.is_valid():
 		_score_tween.kill()
-	_score_tween = create_tween()
-	_score_tween.tween_method(
-		_set_total_score_label,
-		float(old_value), float(new_value), duration
-	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	if old_value == new_value:
+		_set_total_score_label(float(new_value))
+		return
+	_layout_score_dial_labels()
+	score_label.text = str(old_value)
+	_score_incoming_label.text = str(new_value)
+	var rest_y: float = _get_score_dial_rest_y()
+	score_label.position = Vector2(0.0, rest_y)
+	_score_incoming_label.position = Vector2(0.0, rest_y + SCORE_DIAL_TRAVEL_DISTANCE)
+	score_label.modulate = Color.WHITE
+	_score_incoming_label.modulate = Color(1.0, 1.0, 1.0, 0.25)
+	_score_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_score_tween.tween_property(score_label, "position:y", rest_y - SCORE_DIAL_TRAVEL_DISTANCE, duration)
+	_score_tween.parallel().tween_property(score_label, "modulate:a", 0.18, duration * 0.9)
+	_score_tween.parallel().tween_property(_score_incoming_label, "position:y", rest_y, duration)
+	_score_tween.parallel().tween_property(_score_incoming_label, "modulate:a", 1.0, duration * 0.65)
+	_score_tween.tween_callback(_commit_score_dial_value.bind(new_value))
 
 
 func _set_total_score_label(value: float) -> void:
-	score_label.text = "Total: %d" % int(value)
+	var snapped_value: int = int(value)
+	score_label.text = str(snapped_value)
+	_score_incoming_label.text = str(snapped_value)
+	score_label.modulate = Color.WHITE
+	_score_incoming_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_layout_score_dial_labels()
+
+
+func _commit_score_dial_value(new_value: int) -> void:
+	score_label.text = str(new_value)
+	_score_incoming_label.text = str(new_value)
+	score_label.modulate = Color.WHITE
+	_score_incoming_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_layout_score_dial_labels()
+	_score_tween = null
+
+
+func _layout_score_dial_labels() -> void:
+	if _score_dial_clip == null:
+		return
+	var dial_width: float = maxf(_score_dial_clip.size.x, _score_dial_clip.custom_minimum_size.x)
+	var dial_height: float = maxf(_score_dial_clip.size.y, _score_dial_clip.custom_minimum_size.y)
+	var label_height: float = maxf(score_label.get_combined_minimum_size().y, 52.0)
+	score_label.size = Vector2(dial_width, label_height)
+	_score_incoming_label.size = Vector2(dial_width, label_height)
+	if _score_tween == null or not _score_tween.is_valid():
+		var rest_y: float = _get_score_dial_rest_y(dial_height, label_height)
+		score_label.position = Vector2(0.0, rest_y)
+		_score_incoming_label.position = Vector2(0.0, rest_y + SCORE_DIAL_TRAVEL_DISTANCE)
+
+
+func _get_score_dial_rest_y(dial_height: float = -1.0, label_height: float = -1.0) -> float:
+	var resolved_dial_height: float = dial_height if dial_height >= 0.0 else maxf(_score_dial_clip.size.y, _score_dial_clip.custom_minimum_size.y)
+	var resolved_label_height: float = label_height if label_height >= 0.0 else maxf(maxf(score_label.size.y, score_label.get_combined_minimum_size().y), 52.0)
+	return (resolved_dial_height - resolved_label_height) * 0.5
 
 
 func show_floating_gold(amount: int) -> void:
@@ -595,11 +751,26 @@ func _ensure_stage_intro_layer() -> void:
 	add_child(_stage_intro_layer)
 
 
+func _ensure_overflow_fx_layer() -> void:
+	if _overflow_fx_layer != null and is_instance_valid(_overflow_fx_layer):
+		return
+	_overflow_fx_layer = Control.new()
+	_overflow_fx_layer.name = "OverflowFxLayer"
+	_overflow_fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overflow_fx_layer.top_level = true
+	_overflow_fx_layer.z_index = 210
+	_overflow_fx_layer.global_position = Vector2.ZERO
+	_overflow_fx_layer.size = get_viewport_rect().size
+	add_child(_overflow_fx_layer)
+
+
 func _clear_stage_intro_cards() -> void:
 	if _stage_intro_layer == null or not is_instance_valid(_stage_intro_layer):
+		_restore_all_intro_resident_labels()
 		return
 	for child: Node in _stage_intro_layer.get_children():
 		child.queue_free()
+	_restore_all_intro_resident_labels()
 
 
 func _build_intro_card(title_text: String, body_text: String, accent: Color) -> PanelContainer:
@@ -646,9 +817,10 @@ func _build_intro_card(title_text: String, body_text: String, accent: Color) -> 
 
 func _animate_intro_card(
 	card: PanelContainer,
-	start_center: Vector2,
-	end_center: Vector2,
+	home_center: Vector2,
+	popup_center: Vector2,
 	delay: float,
+	card_kind: String = "",
 	on_complete: Callable = Callable()
 ) -> void:
 	if card == null or not is_instance_valid(card):
@@ -659,27 +831,110 @@ func _animate_intro_card(
 	var card_size: Vector2 = card.custom_minimum_size
 	card.size = card_size
 	card.pivot_offset = card_size * 0.5
-	card.global_position = start_center - card_size * 0.5
+	var home_position: Vector2 = home_center - card_size * 0.5
+	var popup_position: Vector2 = popup_center - card_size * 0.5
+	card.global_position = home_position
 	card.visible = false
 	card.modulate.a = 0.0
-	card.scale = Vector2(0.68, 0.68)
+	card.scale = INTRO_CARD_RETURN_SCALE
 	body.visible_characters = 0
-	var end_position: Vector2 = end_center - card_size * 0.5
 	var tween: Tween = card.create_tween()
 	tween.tween_interval(delay)
 	tween.tween_callback(func() -> void:
 		card.visible = true
 	)
 	tween.tween_property(card, "modulate:a", 1.0, INTRO_CARD_POP_DURATION)
-	tween.parallel().tween_property(card, "scale", Vector2.ONE, INTRO_CARD_POP_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(card, "global_position", popup_position, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(card, "scale", Vector2.ONE, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "visible_characters", body.text.length(), INTRO_CARD_TYPE_DURATION).set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_interval(INTRO_CARD_HOLD_DURATION)
-	tween.tween_property(card, "global_position", end_position, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	tween.parallel().tween_property(card, "scale", INTRO_CARD_RETURN_SCALE, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.parallel().tween_property(card, "modulate:a", 0.0, INTRO_CARD_FADE_DURATION).set_delay(maxf(0.0, INTRO_CARD_TRAVEL_DURATION - INTRO_CARD_FADE_DURATION * 0.5))
+	tween.tween_property(card, "global_position", home_position, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_property(card, "scale", INTRO_CARD_RETURN_SCALE, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_callback(_emit_intro_card_slot.bind(card_kind))
+	tween.tween_property(card, "scale", INTRO_CARD_SLOT_SQUASH_SCALE, INTRO_CARD_SLOT_COMPRESS_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(card, "scale", INTRO_CARD_RETURN_SCALE, INTRO_CARD_SLOT_SETTLE_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_interval(INTRO_CARD_SLOT_HOLD_DURATION)
+	tween.tween_property(card, "modulate:a", 0.0, INTRO_CARD_FADE_DURATION)
+	tween.tween_callback(_restore_intro_resident_label.bind(card_kind))
 	if on_complete.is_valid():
 		tween.tween_callback(on_complete)
 	tween.tween_callback(card.queue_free)
+
+
+func _emit_intro_card_slot(card_kind: String) -> void:
+	if card_kind.is_empty():
+		return
+	intro_card_slotted.emit(card_kind)
+
+
+func _hide_intro_resident_label(card_kind: String) -> void:
+	var label: Label = _get_intro_resident_label(card_kind)
+	if label == null:
+		return
+	_intro_hidden_resident_labels[card_kind] = true
+	_intro_resident_label_modulates[card_kind] = label.modulate
+	var hidden_modulate: Color = label.modulate
+	hidden_modulate.a = 0.0
+	label.modulate = hidden_modulate
+
+
+func _restore_intro_resident_label(card_kind: String) -> void:
+	var label: Label = _get_intro_resident_label(card_kind)
+	if label == null:
+		return
+	_intro_hidden_resident_labels.erase(card_kind)
+	if _intro_resident_label_modulates.has(card_kind):
+		label.modulate = _intro_resident_label_modulates.get(card_kind, label.modulate) as Color
+		_intro_resident_label_modulates.erase(card_kind)
+		return
+	var visible_modulate: Color = label.modulate
+	visible_modulate.a = 1.0
+	label.modulate = visible_modulate
+
+
+func _restore_all_intro_resident_labels() -> void:
+	_restore_intro_resident_label("rule")
+	_restore_intro_resident_label("target")
+
+
+func _sync_intro_resident_label_hidden_state(card_kind: String) -> void:
+	if not bool(_intro_hidden_resident_labels.get(card_kind, false)):
+		return
+	var label: Label = _get_intro_resident_label(card_kind)
+	if label == null:
+		return
+	_intro_resident_label_modulates[card_kind] = label.modulate
+	var hidden_modulate: Color = label.modulate
+	hidden_modulate.a = 0.0
+	label.modulate = hidden_modulate
+
+
+func _get_intro_resident_label(card_kind: String) -> Label:
+	if card_kind == "rule":
+		return _rule_header_label
+	if card_kind == "target":
+		return target_label
+	return null
+
+
+func _get_rule_intro_anchor_center() -> Vector2:
+	return _get_intro_card_anchor_center(_rule_header_label, false, INTRO_CARD_TARGET_Y_OFFSET)
+
+
+func _get_target_intro_anchor_center() -> Vector2:
+	return _get_intro_card_anchor_center(target_label, true, INTRO_CARD_TARGET_Y_OFFSET)
+
+
+func _get_intro_card_anchor_center(anchor_control: Control, align_right_edge: bool, y_offset: float = 0.0) -> Vector2:
+	if anchor_control == null:
+		return get_viewport_rect().size * 0.5
+	var scaled_width: float = INTRO_CARD_SIZE.x * INTRO_CARD_RETURN_SCALE.x
+	var anchor_rect := Rect2(anchor_control.global_position, anchor_control.size)
+	var center_x: float = anchor_rect.position.x + scaled_width * 0.5
+	if align_right_edge:
+		center_x = anchor_rect.position.x + anchor_rect.size.x - scaled_width * 0.5
+	var center_y: float = anchor_rect.position.y + anchor_rect.size.y * 0.5 + y_offset
+	return Vector2(center_x, center_y)
 
 
 func _get_label_anchor_center(label: Label, y_offset: float = 0.0) -> Vector2:
@@ -879,8 +1134,9 @@ func _on_score_changed(new_total: int) -> void:
 		_score_feedback_pending_total = new_total
 		return
 	_score_feedback_display_total = new_total
-	score_label.text = "Total: %d" % new_total
+	_set_total_score_label(float(new_total))
 	_refresh_progress_display()
+	_set_overflow_visual_state(_resolve_overflow_state(new_total))
 
 func _on_lives_changed(new_lives: int) -> void:
 	lives_label.text = "HANDS: %d" % new_lives
@@ -957,10 +1213,10 @@ func _on_stage_advanced(_new_stage: int) -> void:
 	_refresh_contract_display()
 
 func _on_run_ended() -> void:
-	show_status("RUN OVER — out of lives!", _UITheme.DANGER_RED)
+	restore_pinned_status()
 
 func _on_stage_cleared() -> void:
-	show_status("STAGE CLEARED!", _UITheme.SUCCESS_GREEN)
+	restore_pinned_status()
 
 func _on_loop_advanced(_new_loop: int) -> void:
 	_near_death_banks = GameManager.near_death_banks_this_stage
@@ -989,7 +1245,8 @@ func _refresh_stage_display() -> void:
 	var row_display: int = mini(GameManager.current_row + 1, row_count)
 	var mode_text: String = " [%s]" % GameManager.get_run_mode_name().to_upper() if GameManager.run_mode == GameManager.RunMode.GAUNTLET else ""
 	stage_label.text = "ROW %d/%d%s%s" % [row_display, row_count, loop_text, mode_text]
-	target_label.text = "Target: %d" % GameManager.stage_target_score
+	target_label.text = str(GameManager.stage_target_score)
+	_sync_intro_resident_label_hidden_state("target")
 
 
 func _refresh_stage_rule_header() -> void:
@@ -998,13 +1255,16 @@ func _refresh_stage_rule_header() -> void:
 	if GameManager.has_active_special_stage():
 		_rule_header_label.text = "RULE: %s" % GameManager.get_active_special_stage_name().to_upper()
 		_rule_header_label.modulate = _bright_rule_color(GameManager.get_active_special_stage_color())
+		_sync_intro_resident_label_hidden_state("rule")
 		return
 	if GameManager.has_current_stage_variant():
 		_rule_header_label.text = "RULE: %s" % GameManager.get_current_stage_variant_name().to_upper()
 		_rule_header_label.modulate = _bright_rule_color(_UITheme.ACTION_CYAN)
+		_sync_intro_resident_label_hidden_state("rule")
 		return
 	_rule_header_label.text = RULE_HEADER_NORMAL
 	_rule_header_label.modulate = _UITheme.STAGE_FAMILY_ACCENT_TEXT
+	_sync_intro_resident_label_hidden_state("rule")
 
 
 func _get_rule_header_display_color() -> Color:
@@ -1050,6 +1310,7 @@ func _stop_progress_tween() -> void:
 
 func _set_progress_bar_value(value: float) -> void:
 	progress_bar.value = value
+	_update_progress_overlay_layout()
 	_update_progress_state(value / 100.0)
 
 
@@ -1063,6 +1324,7 @@ func _score_to_progress_value(score_total: int) -> float:
 
 
 func _get_progress_hit_position(progress_value: float) -> Vector2:
+	_sync_progress_bar_layout()
 	var ratio: float = clampf(progress_value / 100.0, 0.06, 1.0)
 	var fill_width: float = maxf(progress_bar.size.x, progress_bar.custom_minimum_size.x)
 	return progress_bar.global_position + Vector2(fill_width * ratio, progress_bar.size.y * 0.5)
@@ -1093,6 +1355,7 @@ func _play_progress_hit(score_value: int) -> void:
 		var growth: float = minf(PROGRESS_THICKEN_STEP + float(score_value) * 0.08, PROGRESS_THICKEN_STEP * 2.0)
 		_progress_bar_thickness_bonus = minf(_progress_bar_thickness_bonus + growth, PROGRESS_THICKEN_CAP)
 		_animate_progress_bar_thickness(_progress_bar_base_size.y + _progress_bar_thickness_bonus, PROGRESS_THICKEN_GROW_DURATION)
+	_update_progress_overlay_layout()
 
 
 func _animate_progress_bar_thickness(target_height: float, duration: float) -> void:
@@ -1104,6 +1367,7 @@ func _animate_progress_bar_thickness(target_height: float, duration: float) -> v
 
 func _set_progress_bar_thickness(height: float) -> void:
 	progress_bar.custom_minimum_size = Vector2(_progress_bar_base_size.x, height)
+	_update_progress_overlay_layout()
 
 
 func _schedule_progress_deflate() -> void:
@@ -1172,6 +1436,215 @@ func _stop_progress_pulse() -> void:
 	_progress_pulse_tween = null
 	progress_bar.modulate = Color.WHITE
 	_restore_progress_panel_style()
+
+
+func _queue_recent_bank_feedback(start_total: int, final_total: int, delay: float) -> void:
+	_hide_recent_bank_chunk(true)
+	_recent_bank_amount = maxi(final_total - start_total, 0)
+	var state: int = _resolve_overflow_state(final_total)
+	if _recent_bank_amount <= 0:
+		_set_overflow_visual_state(state)
+		return
+	if delay <= 0.0:
+		_show_recent_bank_chunk(start_total, final_total, state)
+		return
+	_recent_bank_chunk_tween = create_tween()
+	_recent_bank_chunk_tween.tween_interval(delay)
+	_recent_bank_chunk_tween.tween_callback(_show_recent_bank_chunk.bind(start_total, final_total, state))
+
+
+func _show_recent_bank_chunk(start_total: int, final_total: int, overflow_state: int) -> void:
+	if _recent_bank_amount <= 0:
+		return
+	_sync_progress_bar_layout()
+	var target_value: float = maxf(float(GameManager.stage_target_score), 1.0)
+	var start_ratio: float = clampf(float(start_total) / target_value, 0.0, OVERFLOW_BREAK_THRESHOLD_RATIO)
+	var end_ratio: float = clampf(float(final_total) / target_value, 0.0, OVERFLOW_BREAK_THRESHOLD_RATIO)
+	var track_width: float = _get_progress_track_width()
+	var bar_rect: Rect2 = _get_progress_bar_display_rect()
+	var start_x: float = minf(start_ratio, 1.0) * track_width
+	var end_x: float = end_ratio * track_width
+	var chunk_width: float = maxf(end_x - start_x, RECENT_BANK_CHUNK_MIN_WIDTH)
+	_recent_bank_chunk.position = Vector2(start_x, bar_rect.position.y)
+	_recent_bank_chunk.size = Vector2(RECENT_BANK_CHUNK_MIN_WIDTH, bar_rect.size.y)
+	_recent_bank_chunk.visible = true
+	_recent_bank_chunk.modulate = Color.WHITE
+	_apply_recent_bank_chunk_style(overflow_state)
+	_set_overflow_visual_state(overflow_state)
+	if overflow_state == OverflowState.BREAK and end_x > track_width:
+		_spawn_overflow_droplets()
+	if _recent_bank_chunk_tween != null and _recent_bank_chunk_tween.is_valid():
+		_recent_bank_chunk_tween.kill()
+	_recent_bank_chunk_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	_recent_bank_chunk_tween.tween_property(_recent_bank_chunk, "size:x", chunk_width, RECENT_BANK_CHUNK_GROW_DURATION)
+	if overflow_state == OverflowState.BREAK and end_x > track_width:
+		_recent_bank_chunk_tween.tween_callback(_animate_recent_bank_overflow_drain.bind(start_x, chunk_width, maxf(track_width - start_x, RECENT_BANK_CHUNK_MIN_WIDTH)))
+	else:
+		_recent_bank_chunk_tween.tween_callback(_schedule_recent_bank_chunk_fade)
+
+
+func _apply_recent_bank_chunk_style(overflow_state: int) -> void:
+	var fill: Color = Color(_UITheme.SCORE_GOLD, 0.55)
+	var border: Color = Color(_UITheme.SCORE_GOLD, 0.95)
+	if overflow_state == OverflowState.CRACK:
+		fill = Color(_UITheme.EXPLOSION_ORANGE, 0.58)
+		border = Color(_UITheme.EXPLOSION_ORANGE, 0.96)
+	elif overflow_state == OverflowState.BREAK:
+		fill = Color(_UITheme.ACTION_CYAN, 0.6)
+		border = Color(_UITheme.ACTION_CYAN, 0.96)
+	_recent_bank_chunk.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_semantic_frame_panel(fill, border, _UITheme.CORNER_RADIUS_BADGE, 1)
+	)
+
+
+func _schedule_recent_bank_chunk_fade() -> void:
+	if _recent_bank_chunk_tween != null and _recent_bank_chunk_tween.is_valid():
+		_recent_bank_chunk_tween.kill()
+	_recent_bank_chunk_tween = create_tween()
+	_recent_bank_chunk_tween.tween_interval(RECENT_BANK_CHUNK_HOLD_DURATION)
+	_recent_bank_chunk_tween.tween_property(_recent_bank_chunk, "modulate:a", 0.0, RECENT_BANK_CHUNK_FADE_DURATION)
+	_recent_bank_chunk_tween.tween_callback(_hide_recent_bank_chunk.bind(true))
+
+
+func _animate_recent_bank_overflow_drain(_start_x: float, _start_width: float, capped_width: float) -> void:
+	if _overflow_drain_tween != null and _overflow_drain_tween.is_valid():
+		_overflow_drain_tween.kill()
+	_overflow_drain_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	_overflow_drain_tween.tween_interval(0.18)
+	_overflow_drain_tween.tween_property(_recent_bank_chunk, "size:x", capped_width, RECENT_BANK_OVERFLOW_DRAIN_DURATION)
+	_overflow_drain_tween.parallel().tween_property(_recent_bank_chunk, "modulate:a", 0.0, RECENT_BANK_OVERFLOW_DRAIN_DURATION * 0.8).set_delay(RECENT_BANK_OVERFLOW_DRAIN_DURATION * 0.2)
+	_overflow_drain_tween.tween_callback(_hide_recent_bank_chunk.bind(true))
+
+
+func _hide_recent_bank_chunk(immediate: bool) -> void:
+	if _recent_bank_chunk_tween != null and _recent_bank_chunk_tween.is_valid():
+		_recent_bank_chunk_tween.kill()
+	_recent_bank_chunk_tween = null
+	if _overflow_drain_tween != null and _overflow_drain_tween.is_valid():
+		_overflow_drain_tween.kill()
+	_overflow_drain_tween = null
+	_recent_bank_chunk.visible = false
+	_recent_bank_chunk.modulate = Color.WHITE
+	if immediate:
+		_recent_bank_amount = 0
+	_on_recent_bank_chunk_unhovered()
+
+
+func _on_recent_bank_chunk_hovered() -> void:
+	if not _recent_bank_chunk.visible or _recent_bank_amount <= 0:
+		return
+	_chunk_tooltip_label.text = "Last bank: +%d" % _recent_bank_amount
+	_chunk_tooltip.visible = true
+	_position_chunk_tooltip(Rect2(_recent_bank_chunk.global_position, _recent_bank_chunk.size))
+
+
+func _on_recent_bank_chunk_unhovered() -> void:
+	_chunk_tooltip.visible = false
+
+
+func _position_chunk_tooltip(anchor_rect: Rect2) -> void:
+	if not _chunk_tooltip.visible:
+		return
+	var tooltip_size: Vector2 = _chunk_tooltip.get_combined_minimum_size()
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var pad: float = 8.0
+	var x: float = clampf(
+		anchor_rect.position.x + anchor_rect.size.x * 0.5 - tooltip_size.x * 0.5,
+		pad,
+		viewport_size.x - tooltip_size.x - pad
+	)
+	var above_y: float = anchor_rect.position.y - tooltip_size.y - 10.0
+	var below_y: float = anchor_rect.position.y + anchor_rect.size.y + 10.0
+	var y: float = above_y
+	if y < pad:
+		y = minf(below_y, viewport_size.y - tooltip_size.y - pad)
+	_chunk_tooltip.global_position = Vector2(x, y)
+
+
+func _resolve_overflow_state(score_total: int) -> int:
+	var safe_target: int = maxi(GameManager.stage_target_score, 1)
+	var ratio: float = float(score_total) / float(safe_target)
+	if ratio >= OVERFLOW_BREAK_THRESHOLD_RATIO:
+		return OverflowState.BREAK
+	if ratio > 1.0:
+		return OverflowState.CRACK
+	return OverflowState.NONE
+
+
+func _set_overflow_visual_state(state: int) -> void:
+	_current_overflow_state = state
+	_overflow_tip.visible = state != OverflowState.NONE
+	if not _overflow_tip.visible:
+		return
+	var crack_color: Color = _UITheme.EXPLOSION_ORANGE if state == OverflowState.CRACK else _UITheme.ACTION_CYAN
+	for child: Node in _overflow_tip.get_children():
+		var crack_line: ColorRect = child as ColorRect
+		if crack_line != null:
+			crack_line.color = crack_color
+	_update_progress_overlay_layout()
+
+
+func _update_progress_overlay_layout() -> void:
+	if progress_track == null or progress_bar == null:
+		return
+	_sync_progress_bar_layout()
+	var bar_rect: Rect2 = _get_progress_bar_display_rect()
+	if _overflow_tip != null and _overflow_tip.visible:
+		var tip_local_x: float = _get_progress_track_width() - 6.0
+		var tip_y: float = bar_rect.position.y + (bar_rect.size.y - _overflow_tip.size.y) * 0.5
+		_overflow_tip.position = Vector2(tip_local_x, tip_y)
+	if _recent_bank_chunk.visible:
+		_recent_bank_chunk.position.y = bar_rect.position.y
+		_recent_bank_chunk.size.y = bar_rect.size.y
+		_position_chunk_tooltip(Rect2(_recent_bank_chunk.global_position, _recent_bank_chunk.size))
+
+
+func _sync_progress_bar_layout() -> void:
+	if progress_track == null or progress_bar == null:
+		return
+	var bar_height: float = _get_progress_bar_display_height()
+	var bar_offset_top: float = _get_progress_bar_vertical_offset()
+	progress_bar.offset_left = 0.0
+	progress_bar.offset_right = 0.0
+	progress_bar.offset_top = bar_offset_top
+	progress_bar.offset_bottom = bar_offset_top + bar_height
+
+
+func _get_progress_bar_display_rect() -> Rect2:
+	return Rect2(Vector2(0.0, _get_progress_bar_vertical_offset()), Vector2(_get_progress_track_width(), _get_progress_bar_display_height()))
+
+
+func _get_progress_bar_display_height() -> float:
+	return maxf(progress_bar.custom_minimum_size.y, _progress_bar_base_size.y)
+
+
+func _get_progress_bar_vertical_offset() -> float:
+	var track_height: float = maxf(progress_track.size.y, progress_track.custom_minimum_size.y)
+	return floorf((track_height - _get_progress_bar_display_height()) * 0.5)
+
+
+func _get_progress_track_width() -> float:
+	return maxf(maxf(progress_bar.size.x, progress_track.size.x), progress_track.custom_minimum_size.x)
+
+
+func _spawn_overflow_droplets() -> void:
+	if _overflow_fx_layer == null or not is_instance_valid(_overflow_fx_layer):
+		return
+	var tip_position: Vector2 = progress_bar.global_position + Vector2(_get_progress_track_width(), progress_bar.size.y * 0.5)
+	for _index: int in OVERFLOW_DROPLET_COUNT:
+		var droplet := ColorRect.new()
+		var droplet_size: float = _overflow_rng.randf_range(3.0, 7.0)
+		droplet.color = Color(0.54, 0.9, 1.0, _overflow_rng.randf_range(0.72, 0.96))
+		droplet.size = Vector2(droplet_size, droplet_size)
+		droplet.position = tip_position + Vector2(_overflow_rng.randf_range(-4.0, 6.0), _overflow_rng.randf_range(-2.0, 6.0))
+		droplet.rotation = _overflow_rng.randf_range(-0.4, 0.4)
+		_overflow_fx_layer.add_child(droplet)
+		var drift: Vector2 = Vector2(_overflow_rng.randf_range(14.0, 42.0), _overflow_rng.randf_range(18.0, 78.0))
+		var droplet_tween: Tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		droplet_tween.tween_property(droplet, "position", droplet.position + drift, _overflow_rng.randf_range(0.28, 0.52))
+		droplet_tween.parallel().tween_property(droplet, "modulate:a", 0.0, _overflow_rng.randf_range(0.24, 0.5))
+		droplet_tween.tween_callback(droplet.queue_free)
 
 
 func _refresh_modifier_display() -> void:

@@ -76,33 +76,72 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ScoreRow" type="HBoxContainer" parent="."]
+[node name="ScoreRow" type="VBoxContainer" parent="."]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TurnScorePanel" type="PanelContainer" parent="ScoreRow"]
+[node name="ScoreObjectiveCenter" type="CenterContainer" parent="ScoreRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(200, 0)
+size_flags_horizontal = 3
 
-[node name="TurnScoreMargin" type="MarginContainer" parent="ScoreRow/TurnScorePanel"]
+[node name="TurnScorePanel" type="PanelContainer" parent="ScoreRow/ScoreObjectiveCenter"]
 layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_bottom = 8
+custom_minimum_size = Vector2(520, 0)
 
-[node name="TurnScoreVBox" type="VBoxContainer" parent="ScoreRow/TurnScorePanel/TurnScoreMargin"]
+[node name="TurnScoreMargin" type="MarginContainer" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel"]
 layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="ScoreObjectiveRow" type="HBoxContainer" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="TurnScoreVBox" type="VBoxContainer" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow"]
+layout_mode = 2
+size_flags_horizontal = 3
 alignment = 1
+theme_override_constants/separation = 4
 
-[node name="TurnScoreLabel" type="Label" parent="ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox"]
+[node name="TurnScoreLabel" type="Label" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox"]
 layout_mode = 2
-text = "+0"
+text = "BANK +0"
 horizontal_alignment = 1
 
-[node name="ScoreLabel" type="Label" parent="ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox"]
+[node name="ScoreDialClip" type="Control" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox"]
+clip_contents = true
+custom_minimum_size = Vector2(280, 64)
 layout_mode = 2
-text = "Total: 0"
+
+[node name="ScoreLabel" type="Label" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/ScoreDialClip"]
+layout_mode = 0
+text = "0"
+horizontal_alignment = 1
+
+[node name="ScoreIncomingLabel" type="Label" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/ScoreDialClip"]
+layout_mode = 0
+text = "0"
+horizontal_alignment = 1
+
+[node name="GoalDivider" type="VSeparator" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(2, 72)
+
+[node name="TargetVBox" type="VBoxContainer" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="TargetCaptionLabel" type="Label" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TargetVBox"]
+layout_mode = 2
+text = "GOAL"
+horizontal_alignment = 1
+
+[node name="TargetLabel" type="Label" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TargetVBox"]
+layout_mode = 2
+text = "30"
 horizontal_alignment = 1
 
 [node name="ProgressPanel" type="PanelContainer" parent="ScoreRow"]
@@ -119,10 +158,6 @@ theme_override_constants/margin_bottom = 8
 [node name="ProgressVBox" type="VBoxContainer" parent="ScoreRow/ProgressPanel/ProgressMargin"]
 layout_mode = 2
 
-[node name="TargetLabel" type="Label" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
-layout_mode = 2
-text = "Target: 30"
-
 [node name="ProgressContentRow" type="HBoxContainer" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -131,15 +166,91 @@ theme_override_constants/separation = 8
 layout_mode = 2
 custom_minimum_size = Vector2(96, 62)
 
-[node name="ProgressBar" type="ProgressBar" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
+[node name="ProgressTrack" type="Control" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 18)
 size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 28)
+
+[node name="ProgressBar" type="ProgressBar" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 18.0
+grow_horizontal = 2
+custom_minimum_size = Vector2(0, 18)
 show_percentage = false
 max_value = 100.0
 
+[node name="RecentBankChunk" type="PanelContainer" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack"]
+visible = false
+layout_mode = 0
+offset_top = -4.0
+offset_bottom = 22.0
+mouse_filter = 0
+focus_mode = 2
+
+[node name="ChunkHitArea" type="Control" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/RecentBankChunk"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="OverflowTip" type="Control" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack"]
+visible = false
+layout_mode = 0
+offset_left = -6.0
+offset_top = -8.0
+offset_right = 18.0
+offset_bottom = 18.0
+mouse_filter = 2
+
+[node name="CrackLineA" type="ColorRect" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/OverflowTip"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 5.0
+offset_right = 14.0
+offset_bottom = 7.0
+rotation = 0.6
+
+[node name="CrackLineB" type="ColorRect" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/OverflowTip"]
+layout_mode = 0
+offset_left = 7.0
+offset_top = 8.0
+offset_right = 17.0
+offset_bottom = 10.0
+rotation = -0.45
+
+[node name="CrackLineC" type="ColorRect" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/OverflowTip"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 3.0
+offset_right = 18.0
+offset_bottom = 5.0
+rotation = 1.1
+
 [node name="ProgressHintLabel" type="Label" parent="ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox"]
 layout_mode = 2
+
+[node name="ChunkTooltip" type="PanelContainer" parent="."]
+visible = false
+top_level = true
+z_index = 102
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="ChunkTooltip"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="ChunkTooltipLabel" type="Label" parent="ChunkTooltip/MarginContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+autowrap_mode = 3
 
 [node name="InfoRow" type="HBoxContainer" parent="."]
 layout_mode = 2
