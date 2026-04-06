@@ -1,5 +1,5 @@
 extends ColorRect
-## Random Event overlay — player picks a Blessing or a Curse.
+## Random Event overlay — player picks between three bargains.
 ## Instantiated at runtime by RollPhase when visiting a RANDOM_EVENT node.
 
 signal event_resolved(summary: String, status_color: Color)
@@ -7,8 +7,8 @@ signal event_resolved(summary: String, status_color: Color)
 const _UITheme := preload("res://Scripts/UITheme.gd")
 
 const BACKDROP_ALPHA: float = 0.72
-const CARD_WIDTH: int = 280
-const CARD_HEIGHT: int = 220
+const CARD_WIDTH: int = 228
+const CARD_HEIGHT: int = 248
 const FACE_GRID_COLUMNS: int = 3
 const RESULT_CARD_WIDTH: int = 220
 const RESULT_CARD_HEIGHT: int = 260
@@ -20,47 +20,25 @@ const RESULT_CLOSE_DELAY: float = 0.2
 # ---------------------------------------------------------------------------
 
 enum EffectType {
-	BOOST_NUMBERS,       # +1 to all NUMBER faces this loop
-	GAIN_RANDOM_DICE,    # Gain 2 random dice
-	FREE_BUST,           # Next bust is free (absorb 1)
-	BOOST_SHIELDS,       # All SHIELD faces gain +1 value
-	GAIN_GOLD,           # +30g immediately
-	LOSE_DIE,            # Lose 1 random die
-	ADD_CURSED_STOP,     # Random die gets CURSED_STOP face
-	BOOST_TARGETS,       # All targets +15% this loop
-	LOSE_LIFE,           # Lose 1 hand
-	LOSE_GOLD,           # -20g (clamped to 0)
-	GAIN_LUCK,           # +3 LUCK immediately
-	GAIN_REROUTE,        # Gain 1 reroute token
-	LOSE_HEAVY_GOLD,     # -35g (clamped to 0)
-	DOUBLE_CURSED_STOP,  # Two random dice gain CURSED_STOP
+	BOOST_NUMBERS,
+	GAIN_RANDOM_DICE,
+	FREE_BUST,
+	BOOST_SHIELDS,
+	GAIN_GOLD,
+	LOSE_DIE,
+	ADD_CURSED_STOP,
+	BOOST_TARGETS,
+	LOSE_LIFE,
+	LOSE_GOLD,
+	GAIN_LUCK,
+	GAIN_REROUTE,
+	LOSE_HEAVY_GOLD,
+	DOUBLE_CURSED_STOP,
 }
 
-const BLESSINGS: Array[Dictionary] = [
-	{"type": EffectType.BOOST_NUMBERS, "name": "Empowered Dice", "icon": "✨", "desc": "+1 to all NUMBER faces this loop", "color_key": "SCORE_GOLD"},
-	{"type": EffectType.GAIN_RANDOM_DICE, "name": "Lucky Find", "icon": "🎲", "desc": "Gain 2 random dice", "color_key": "SUCCESS_GREEN"},
-	{"type": EffectType.FREE_BUST, "name": "Guardian Angel", "icon": "🛡", "desc": "Next bust this loop is free", "color_key": "ACTION_CYAN"},
-	{"type": EffectType.BOOST_SHIELDS, "name": "Fortify", "icon": "🛡", "desc": "+1 to all SHIELD faces this loop", "color_key": "ACTION_CYAN"},
-	{"type": EffectType.GAIN_GOLD, "name": "Treasure Trove", "icon": "💰", "desc": "+30g immediately", "color_key": "SCORE_GOLD"},
-]
-
-const PRESTIGE_BLESSINGS: Array[Dictionary] = [
-	{"type": EffectType.GAIN_LUCK, "name": "Loaded Constellation", "icon": "☄", "desc": "+3 LUCK immediately", "color_key": "ACTION_CYAN"},
-	{"type": EffectType.GAIN_REROUTE, "name": "Thread the Needle", "icon": "🧭", "desc": "Gain 1 reroute token for this run", "color_key": "SUCCESS_GREEN"},
-]
-
-const CURSES: Array[Dictionary] = [
-	{"type": EffectType.LOSE_DIE, "name": "Sacrifice", "icon": "💀", "desc": "Lose 1 random die", "color_key": "DANGER_RED"},
-	{"type": EffectType.ADD_CURSED_STOP, "name": "Hex", "icon": "☠", "desc": "A random die gains a Cursed Stop", "color_key": "NEON_PURPLE"},
-	{"type": EffectType.BOOST_TARGETS, "name": "Harder Stages", "icon": "📈", "desc": "All targets +15% this loop", "color_key": "EXPLOSION_ORANGE"},
-	{"type": EffectType.LOSE_LIFE, "name": "Blood Price", "icon": "❤", "desc": "Lose 1 hand", "color_key": "DANGER_RED"},
-	{"type": EffectType.LOSE_GOLD, "name": "Pickpocket", "icon": "💸", "desc": "-20g", "color_key": "SCORE_GOLD"},
-]
-
-const PRESTIGE_CURSES: Array[Dictionary] = [
-	{"type": EffectType.LOSE_HEAVY_GOLD, "name": "Skull Tax", "icon": "🪙", "desc": "-35g", "color_key": "SCORE_GOLD"},
-	{"type": EffectType.DOUBLE_CURSED_STOP, "name": "Grave Static", "icon": "☠", "desc": "Two random dice gain a Cursed Stop", "color_key": "NEON_PURPLE"},
-]
+const CHOICE_SAFE: String = "SAFE VALUE"
+const CHOICE_BARGAIN: String = "BARGAIN"
+const CHOICE_PREMIUM: String = "HIGH RISK"
 
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
 @onready var _flavor_label: Label = $CenterContainer/Card/MarginContainer/Content/FlavorLabel
@@ -68,8 +46,7 @@ const PRESTIGE_CURSES: Array[Dictionary] = [
 @onready var _card_panel: PanelContainer = $CenterContainer/Card
 @onready var _content: VBoxContainer = $CenterContainer/Card/MarginContainer/Content
 
-var _blessing: Dictionary = {}
-var _curse: Dictionary = {}
+var _current_event: Dictionary = {}
 var _choice_cards: Array[PanelContainer] = []
 var _resolved: bool = false
 var _continue_button: Button = null
@@ -98,19 +75,9 @@ func open() -> void:
 	_resolved = false
 	_pending_summary = ""
 	_pending_status_color = _UITheme.STATUS_NEUTRAL
-	_title_label.text = "RANDOM EVENT"
-	_flavor_label.text = "Choose your fate..."
 	_prepare_choice_surface()
-	var blessing_pool: Array[Dictionary] = _build_blessing_pool()
-	var curse_pool: Array[Dictionary] = _build_curse_pool()
-	var blessing_index: int = GameManager.rng_pick_index("event", blessing_pool.size())
-	var curse_index: int = GameManager.rng_pick_index("event", curse_pool.size())
-	if blessing_index < 0:
-		blessing_index = 0
-	if curse_index < 0:
-		curse_index = 0
-	_blessing = blessing_pool[blessing_index].duplicate()
-	_curse = curse_pool[curse_index].duplicate()
+	_current_event = _pick_event_definition()
+	_apply_event_copy(_current_event)
 	_build_choice_cards()
 	_play_intro_animation()
 
@@ -119,23 +86,25 @@ func open_from_resume(snapshot: Dictionary) -> void:
 	_resolved = false
 	_pending_summary = ""
 	_pending_status_color = _UITheme.STATUS_NEUTRAL
-	_title_label.text = "RANDOM EVENT"
-	_flavor_label.text = "Choose your fate..."
 	_prepare_choice_surface()
-	_blessing = (snapshot.get("blessing", {}) as Dictionary).duplicate(true)
-	_curse = (snapshot.get("curse", {}) as Dictionary).duplicate(true)
-	if _blessing.is_empty() or _curse.is_empty():
+	_current_event = (snapshot.get("current_event", {}) as Dictionary).duplicate(true)
+	if _current_event.is_empty():
 		open()
 		return
+	_apply_event_copy(_current_event)
 	_build_choice_cards()
 	_play_intro_animation()
 
 
 func build_resume_snapshot() -> Dictionary:
 	return {
-		"blessing": _blessing.duplicate(true),
-		"curse": _curse.duplicate(true),
+		"current_event": _current_event.duplicate(true),
 	}
+
+
+func _apply_event_copy(event_data: Dictionary) -> void:
+	_title_label.text = event_data.get("title", "RANDOM EVENT") as String
+	_flavor_label.text = event_data.get("flavor", "Choose your bargain.") as String
 
 
 func _prepare_choice_surface() -> void:
@@ -144,13 +113,11 @@ func _prepare_choice_surface() -> void:
 
 
 func _build_choice_cards() -> void:
-	# Build two choice cards.
-	var blessing_card: PanelContainer = _build_choice_card(_blessing, true)
-	var curse_card: PanelContainer = _build_choice_card(_curse, false)
-	_choice_row.add_child(blessing_card)
-	_choice_row.add_child(curse_card)
-	_choice_cards.append(blessing_card)
-	_choice_cards.append(curse_card)
+	for choice_index: int in (_current_event.get("choices", []) as Array).size():
+		var choice: Dictionary = ((_current_event.get("choices", []) as Array)[choice_index] as Dictionary).duplicate(true)
+		var choice_card: PanelContainer = _build_choice_card(choice, choice_index)
+		_choice_row.add_child(choice_card)
+		_choice_cards.append(choice_card)
 
 
 func _play_intro_animation() -> void:
@@ -170,12 +137,12 @@ func _play_intro_animation() -> void:
 # Card building
 # ---------------------------------------------------------------------------
 
-func _build_choice_card(event: Dictionary, is_blessing: bool) -> PanelContainer:
+func _build_choice_card(choice: Dictionary, choice_index: int) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 
-	var accent: Color = _get_color(event.get("color_key", "BRIGHT_TEXT") as String)
-	var border_color: Color = _UITheme.SUCCESS_GREEN if is_blessing else _UITheme.DANGER_RED
+	var accent: Color = _get_color(choice.get("color_key", "BRIGHT_TEXT") as String)
+	var border_color: Color = _choice_border_color(choice)
 	card.add_theme_stylebox_override(
 		"panel",
 		_UITheme.make_semantic_frame_panel(_UITheme.SURFACE_ASH, border_color, 12, 3)
@@ -193,9 +160,9 @@ func _build_choice_card(event: Dictionary, is_blessing: bool) -> PanelContainer:
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	margin.add_child(vbox)
 
-	# Category label (BLESSING / CURSE).
+	# Category label.
 	var cat_label := Label.new()
-	cat_label.text = "BLESSING" if is_blessing else "CURSE"
+	cat_label.text = choice.get("category", CHOICE_SAFE) as String
 	cat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cat_label.add_theme_font_override("font", _UITheme.font_display())
 	cat_label.add_theme_font_size_override("font_size", 11)
@@ -204,29 +171,38 @@ func _build_choice_card(event: Dictionary, is_blessing: bool) -> PanelContainer:
 
 	# Icon.
 	var icon_label := Label.new()
-	icon_label.text = event.get("icon", "?") as String
+	icon_label.text = choice.get("icon", "?") as String
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.add_theme_font_size_override("font_size", 36)
 	vbox.add_child(icon_label)
 
-	# Event name.
+	# Choice name.
 	var name_label := Label.new()
-	name_label.text = event.get("name", "") as String
+	name_label.text = choice.get("name", "") as String
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.add_theme_font_override("font", _UITheme.font_stats())
 	name_label.add_theme_font_size_override("font_size", 16)
 	name_label.add_theme_color_override("font_color", accent)
 	vbox.add_child(name_label)
 
-	# Description.
 	var desc_label := Label.new()
-	desc_label.text = event.get("desc", "") as String
+	desc_label.text = _build_choice_description(choice)
 	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_label.add_theme_font_override("font", _UITheme.font_body())
 	desc_label.add_theme_font_size_override("font_size", 13)
 	desc_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 	vbox.add_child(desc_label)
+
+	var hint_text: String = _choice_hint(choice)
+	if not hint_text.is_empty():
+		var hint_label := Label.new()
+		hint_label.text = hint_text
+		hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint_label.add_theme_font_override("font", _UITheme.font_mono())
+		hint_label.add_theme_font_size_override("font_size", 11)
+		hint_label.add_theme_color_override("font_color", border_color)
+		vbox.add_child(hint_label)
 
 	# Choose button.
 	var btn := Button.new()
@@ -235,7 +211,7 @@ func _build_choice_card(event: Dictionary, is_blessing: bool) -> PanelContainer:
 	btn.add_theme_font_override("font", _UITheme.font_display())
 	btn.add_theme_font_size_override("font_size", 12)
 	btn.focus_mode = Control.FOCUS_NONE
-	btn.pressed.connect(_on_choice_made.bind(is_blessing))
+	btn.pressed.connect(_on_choice_made.bind(choice_index))
 	vbox.add_child(btn)
 
 	return card
@@ -245,16 +221,16 @@ func _build_choice_card(event: Dictionary, is_blessing: bool) -> PanelContainer:
 # Selection handling
 # ---------------------------------------------------------------------------
 
-func _on_choice_made(chose_blessing: bool) -> void:
+func _on_choice_made(choice_index: int) -> void:
 	if _resolved:
 		return
 	_resolved = true
 
-	var chosen_event: Dictionary = _blessing if chose_blessing else _curse
-	var chosen_idx: int = 0 if chose_blessing else 1
-	var effect_result: Dictionary = _apply_effect(chosen_event)
-	var summary: String = _build_effect_summary(chosen_event, effect_result)
-	var status_color: Color = _UITheme.SUCCESS_GREEN if chose_blessing else _UITheme.DANGER_RED
+	var choices: Array = _current_event.get("choices", []) as Array
+	var chosen_choice: Dictionary = (choices[choice_index] as Dictionary).duplicate(true)
+	var effect_result: Dictionary = _apply_choice_effects(chosen_choice)
+	var summary: String = _build_effect_summary(chosen_choice, effect_result)
+	var status_color: Color = _choice_status_color(chosen_choice)
 	_pending_summary = summary
 	_pending_status_color = status_color
 	_disable_choice_buttons()
@@ -262,7 +238,7 @@ func _on_choice_made(chose_blessing: bool) -> void:
 	# Animate: chosen card scales up, other fades out.
 	for i: int in _choice_cards.size():
 		var card: PanelContainer = _choice_cards[i]
-		if i == chosen_idx:
+		if i == choice_index:
 			var tw: Tween = create_tween()
 			tw.tween_property(card, "scale", Vector2(1.06, 1.06), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		else:
@@ -272,7 +248,7 @@ func _on_choice_made(chose_blessing: bool) -> void:
 	if _has_gained_dice_result(effect_result):
 		var result_tween: Tween = create_tween()
 		result_tween.tween_interval(RESULT_TRANSITION_DELAY)
-		result_tween.tween_callback(_show_reward_result.bind(chosen_event, effect_result))
+		result_tween.tween_callback(_show_reward_result.bind(chosen_choice, effect_result))
 		return
 
 	_queue_close(summary, status_color)
@@ -294,99 +270,267 @@ func _emit_event_resolved(summary: String, status_color: Color) -> void:
 # Effect application
 # ---------------------------------------------------------------------------
 
-func _apply_effect(event: Dictionary) -> Dictionary:
-	var effect_type: EffectType = event.get("type", EffectType.GAIN_GOLD) as EffectType
+func _apply_choice_effects(choice: Dictionary) -> Dictionary:
+	var result: Dictionary = {"gained_dice": []}
+	for effect_variant: Variant in choice.get("effects", []) as Array:
+		if not (effect_variant is Dictionary):
+			continue
+		var effect_result: Dictionary = _apply_effect(effect_variant as Dictionary)
+		for die_variant: Variant in effect_result.get("gained_dice", []):
+			(result["gained_dice"] as Array).append(die_variant)
+	return result
+
+
+func _apply_effect(effect: Dictionary) -> Dictionary:
+	var effect_type: EffectType = effect.get("type", EffectType.GAIN_GOLD) as EffectType
 	match effect_type:
 		EffectType.BOOST_NUMBERS:
-			_boost_number_faces(1)
+			_boost_number_faces(int(effect.get("amount", 1)))
 		EffectType.GAIN_RANDOM_DICE:
-			return {"gained_dice": _gain_random_dice(2)}
+			return {"gained_dice": _gain_random_dice(int(effect.get("count", 1)))}
 		EffectType.FREE_BUST:
 			GameManager.set_event_free_bust(true)
 		EffectType.BOOST_SHIELDS:
-			_boost_shield_faces(1)
+			_boost_shield_faces(int(effect.get("amount", 1)))
 		EffectType.GAIN_GOLD:
-			GameManager.add_gold(30)
+			GameManager.add_gold(int(effect.get("amount", 30)))
 		EffectType.GAIN_LUCK:
-			GameManager.add_luck(3)
+			GameManager.add_luck(int(effect.get("amount", 3)))
 		EffectType.GAIN_REROUTE:
-			GameManager.prestige_reroute_uses += 1
+			GameManager.prestige_reroute_uses += int(effect.get("amount", 1))
 		EffectType.LOSE_DIE:
-			_lose_random_die()
+			for _count: int in range(int(effect.get("count", 1))):
+				_lose_random_die()
 		EffectType.ADD_CURSED_STOP:
-			_add_cursed_stop_to_random_die()
+			for _count: int in range(int(effect.get("count", 1))):
+				_add_cursed_stop_to_random_die()
 		EffectType.BOOST_TARGETS:
-			GameManager.apply_event_target_multiplier(1.15)
+			GameManager.apply_event_target_multiplier(float(effect.get("multiplier", 1.15)))
 		EffectType.LOSE_LIFE:
-			GameManager.adjust_stage_hand_cap(-1)
+			GameManager.adjust_stage_hand_cap(-int(effect.get("amount", 1)))
 		EffectType.LOSE_GOLD:
-			GameManager.remove_gold(20)
+			GameManager.remove_gold(int(effect.get("amount", 20)))
 		EffectType.LOSE_HEAVY_GOLD:
-			GameManager.remove_gold(35)
+			GameManager.remove_gold(int(effect.get("amount", 35)))
 		EffectType.DOUBLE_CURSED_STOP:
 			_add_cursed_stop_to_random_die()
 			_add_cursed_stop_to_random_die()
 	return {}
 
 
-func _build_blessing_pool() -> Array[Dictionary]:
-	var blessing_pool: Array[Dictionary] = BLESSINGS.duplicate(true)
-	if SaveManager.has_prestige_unlock("new_events"):
-		for event: Dictionary in PRESTIGE_BLESSINGS:
-			blessing_pool.append(event.duplicate())
-	return blessing_pool
+func _pick_event_definition() -> Dictionary:
+	var event_pool: Array[Dictionary] = _build_event_pool()
+	var event_index: int = GameManager.rng_pick_index("event", event_pool.size())
+	if event_index < 0:
+		event_index = 0
+	return (event_pool[event_index] as Dictionary).duplicate(true)
 
 
-func _build_curse_pool() -> Array[Dictionary]:
-	var curse_pool: Array[Dictionary] = CURSES.duplicate(true)
-	if SaveManager.has_prestige_unlock("new_events"):
-		for event: Dictionary in PRESTIGE_CURSES:
-			curse_pool.append(event.duplicate())
-	return curse_pool
+func _build_event_pool() -> Array[Dictionary]:
+	return [
+		{
+			"title": "THE COLLECTOR",
+			"flavor": "A lacquered broker offers clean money, blood money, and one dangerous gift.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Take the Cash",
+					"icon": "💰",
+					"color_key": "SCORE_GOLD",
+					"upside": "+20g now",
+					"downside": "No extra risk",
+					"summary": "EVENT: The Collector paid 20g",
+					"hint_type": "low_gold",
+					"effects": [{"type": EffectType.GAIN_GOLD, "amount": 20}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Sell a Die",
+					"icon": "🗡",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "+55g immediately",
+					"downside": "Lose 1 random die",
+					"summary": "EVENT: The Collector bought a die for 55g",
+					"hint_type": "wide_pool",
+					"effects": [
+						{"type": EffectType.LOSE_DIE, "count": 1},
+						{"type": EffectType.GAIN_GOLD, "amount": 55},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Take the Marked Prize",
+					"icon": "🎲",
+					"color_key": "ACTION_CYAN",
+					"upside": "+1 random die",
+					"downside": "Next stage target +12%",
+					"summary": "EVENT: The Collector marked your next stage for a premium die",
+					"hint_type": "thin_pool",
+					"effects": [
+						{"type": EffectType.GAIN_RANDOM_DICE, "count": 1},
+						{"type": EffectType.BOOST_TARGETS, "multiplier": 1.12},
+					],
+				},
+			],
+		},
+		{
+			"title": "BLOOD TOLL",
+			"flavor": "The house cashier smiles like a surgeon and slides over three receipts.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Hold the Line",
+					"icon": "🛡",
+					"color_key": "ACTION_CYAN",
+					"upside": "Next bust this loop is free",
+					"downside": "No extra payout",
+					"summary": "EVENT: The house granted a free bust",
+					"hint_type": "fragile_run",
+					"effects": [{"type": EffectType.FREE_BUST}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Bleed for Safety",
+					"icon": "❤",
+					"color_key": "DANGER_RED",
+					"upside": "+40g and next bust free",
+					"downside": "Lose 1 hand",
+					"summary": "EVENT: You paid a hand for 40g and a free bust",
+					"hint_type": "high_hands",
+					"effects": [
+						{"type": EffectType.LOSE_LIFE, "amount": 1},
+						{"type": EffectType.GAIN_GOLD, "amount": 40},
+						{"type": EffectType.FREE_BUST},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Cut Deep",
+					"icon": "☄",
+					"color_key": "NEON_PURPLE",
+					"upside": "+2 LUCK and +25g",
+					"downside": "Lose 1 hand",
+					"summary": "EVENT: Blood Toll traded a hand for LUCK and gold",
+					"hint_type": "fortune_build",
+					"effects": [
+						{"type": EffectType.LOSE_LIFE, "amount": 1},
+						{"type": EffectType.GAIN_LUCK, "amount": 2},
+						{"type": EffectType.GAIN_GOLD, "amount": 25},
+					],
+				},
+			],
+		},
+		{
+			"title": "CROOKED SHRINE",
+			"flavor": "The altar promises luck, provided you stop asking where it came from.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Pocket the Charm",
+					"icon": "🍀",
+					"color_key": "SUCCESS_GREEN",
+					"upside": "+1 LUCK",
+					"downside": "No added drawback",
+					"summary": "EVENT: The shrine granted 1 LUCK",
+					"hint_type": "fortune_build",
+					"effects": [{"type": EffectType.GAIN_LUCK, "amount": 1}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Feed the Idol",
+					"icon": "📈",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "+4 LUCK",
+					"downside": "All stage targets this loop +10%",
+					"summary": "EVENT: The shrine traded a harder loop for 4 LUCK",
+					"hint_type": "fortune_build",
+					"effects": [
+						{"type": EffectType.BOOST_TARGETS, "multiplier": 1.10},
+						{"type": EffectType.GAIN_LUCK, "amount": 4},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Take the Hex",
+					"icon": "☠",
+					"color_key": "NEON_PURPLE",
+					"upside": "+5 LUCK and +20g",
+					"downside": "A random die gains a Cursed Stop",
+					"summary": "EVENT: The shrine cursed a die for luck and gold",
+					"hint_type": "fortune_build",
+					"effects": [
+						{"type": EffectType.ADD_CURSED_STOP, "count": 1},
+						{"type": EffectType.GAIN_LUCK, "amount": 5},
+						{"type": EffectType.GAIN_GOLD, "amount": 20},
+					],
+				},
+			],
+		},
+		{
+			"title": "SHIELD CHAPEL",
+			"flavor": "A candlelit bunker offers sanctuary, but every wall demands a price.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Take Cover",
+					"icon": "🛡",
+					"color_key": "ACTION_CYAN",
+					"upside": "+1 to all SHIELD faces this loop",
+					"downside": "No bonus beyond defense",
+					"summary": "EVENT: The chapel reinforced your SHIELD faces",
+					"hint_type": "shield_build",
+					"effects": [{"type": EffectType.BOOST_SHIELDS, "amount": 1}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Turtle Up",
+					"icon": "⛨",
+					"color_key": "ACTION_CYAN",
+					"upside": "+2 to all SHIELD faces this loop",
+					"downside": "-1 to all NUMBER faces this loop",
+					"summary": "EVENT: The chapel traded offense for stronger shields",
+					"hint_type": "shield_build",
+					"effects": [
+						{"type": EffectType.BOOST_NUMBERS, "amount": -1},
+						{"type": EffectType.BOOST_SHIELDS, "amount": 2},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "War Fund",
+					"icon": "💰",
+					"color_key": "SCORE_GOLD",
+					"upside": "+20g and +1 to all SHIELD faces this loop",
+					"downside": "Next stage target +12%",
+					"summary": "EVENT: The chapel bankrolled a harder stage",
+					"hint_type": "shield_build",
+					"effects": [
+						{"type": EffectType.BOOST_TARGETS, "multiplier": 1.12},
+						{"type": EffectType.BOOST_SHIELDS, "amount": 1},
+						{"type": EffectType.GAIN_GOLD, "amount": 20},
+					],
+				},
+			],
+		},
+	]
 
 
-func _build_effect_summary(event: Dictionary, effect_result: Dictionary = {}) -> String:
-	var effect_type: EffectType = event.get("type", EffectType.GAIN_GOLD) as EffectType
-	match effect_type:
-		EffectType.BOOST_NUMBERS:
-			return "EVENT: all NUMBER faces gain +1 this loop"
-		EffectType.GAIN_RANDOM_DICE:
-			var gained_dice: Array[DiceData] = _extract_gained_dice(effect_result)
-			if gained_dice.size() >= 2:
-				return "EVENT: gained %s and %s" % [gained_dice[0].dice_name, gained_dice[1].dice_name]
-			return "EVENT: gained 2 random dice"
-		EffectType.FREE_BUST:
-			return "EVENT: next bust this loop is free"
-		EffectType.BOOST_SHIELDS:
-			return "EVENT: all SHIELD faces gain +1 this loop"
-		EffectType.GAIN_GOLD:
-			return "EVENT: gained 30g"
-		EffectType.LOSE_DIE:
-			return "EVENT: lost 1 random die"
-		EffectType.ADD_CURSED_STOP:
-			return "EVENT: a random die gained a Cursed Stop"
-		EffectType.BOOST_TARGETS:
-			return "EVENT: stage targets increased by 15% this loop"
-		EffectType.LOSE_LIFE:
-			return "EVENT: lost 1 hand"
-		EffectType.LOSE_GOLD:
-			return "EVENT: lost 20g"
-		EffectType.GAIN_LUCK:
-			return "EVENT: gained 3 LUCK"
-		EffectType.GAIN_REROUTE:
-			return "EVENT: gained 1 reroute token"
-		EffectType.LOSE_HEAVY_GOLD:
-			return "EVENT: paid 35g in Skull Tax"
-		EffectType.DOUBLE_CURSED_STOP:
-			return "EVENT: two dice gained Cursed Stops"
-	return "EVENT: %s" % (event.get("name", "Unknown") as String)
+func _build_effect_summary(choice: Dictionary, effect_result: Dictionary = {}) -> String:
+	var summary: String = choice.get("summary", "EVENT: bargain resolved") as String
+	var gained_dice: Array[DiceData] = _extract_gained_dice(effect_result)
+	if gained_dice.is_empty():
+		return summary
+	var die_names: Array[String] = []
+	for die: DiceData in gained_dice:
+		die_names.append(die.dice_name)
+	return "%s [%s]" % [summary, ", ".join(die_names)]
 
 
 func _boost_number_faces(amount: int) -> void:
 	for die: DiceData in GameManager.dice_pool:
 		for face: DiceFaceData in die.faces:
 			if face.type == DiceFaceData.FaceType.NUMBER:
-				face.value += amount
+				face.value = maxi(0, face.value + amount)
 
 
 func _boost_shield_faces(amount: int) -> void:
@@ -394,6 +538,72 @@ func _boost_shield_faces(amount: int) -> void:
 		for face: DiceFaceData in die.faces:
 			if face.type == DiceFaceData.FaceType.SHIELD:
 				face.value += amount
+
+
+func _build_choice_description(choice: Dictionary) -> String:
+	return "UP: %s\nDOWN: %s" % [
+		choice.get("upside", "") as String,
+		choice.get("downside", "") as String,
+	]
+
+
+func _choice_border_color(choice: Dictionary) -> Color:
+	match choice.get("category", CHOICE_SAFE) as String:
+		CHOICE_SAFE:
+			return _UITheme.SUCCESS_GREEN
+		CHOICE_BARGAIN:
+			return _UITheme.SCORE_GOLD
+		CHOICE_PREMIUM:
+			return _UITheme.EXPLOSION_ORANGE
+	return _UITheme.FRAME_DEFAULT
+
+
+func _choice_status_color(choice: Dictionary) -> Color:
+	return _choice_border_color(choice)
+
+
+func _choice_hint(choice: Dictionary) -> String:
+	match choice.get("hint_type", "") as String:
+		"shield_build":
+			if _has_shield_faces():
+				return "GOOD WITH SHIELDS"
+		"fortune_build":
+			if _has_luck_synergy():
+				return "GOOD WITH LUCK"
+		"low_gold":
+			if GameManager.gold <= 20:
+				return "GOOD IF LOW GOLD"
+		"wide_pool":
+			if GameManager.dice_pool.size() >= 7:
+				return "GOOD WITH EXTRA DICE"
+		"thin_pool":
+			if GameManager.dice_pool.size() <= 4:
+				return "GOOD IF POOL IS THIN"
+		"fragile_run":
+			if GameManager.hands <= 2:
+				return "GOOD IF YOU'RE HURT"
+		"high_hands":
+			if GameManager.hands >= 4:
+				return "GOOD IF YOU HAVE HANDS TO SPARE"
+	return ""
+
+
+func _has_shield_faces() -> bool:
+	for die: DiceData in GameManager.dice_pool:
+		for face: DiceFaceData in die.faces:
+			if face.type == DiceFaceData.FaceType.SHIELD:
+				return true
+	return false
+
+
+func _has_luck_synergy() -> bool:
+	if GameManager.luck > 0:
+		return true
+	for die: DiceData in GameManager.dice_pool:
+		for face: DiceFaceData in die.faces:
+			if face.type == DiceFaceData.FaceType.LUCK:
+				return true
+	return false
 
 
 func _gain_random_dice(count: int) -> Array[DiceData]:

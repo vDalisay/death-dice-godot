@@ -1,5 +1,5 @@
 extends GdUnitTestSuite
-## Unit tests for StageEventOverlay effects and GameManager event flags.
+## Unit tests for StageEventOverlay bargain events and GameManager event flags.
 
 const StageEventScript: GDScript = preload("res://Scripts/StageEventOverlay.gd")
 const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
@@ -107,7 +107,7 @@ func test_gain_random_dice() -> void:
 func test_gain_random_dice_summary_lists_awarded_dice() -> void:
 	var gained_dice: Array[DiceData] = [DiceData.make_standard_d6(), DiceData.make_blank_canvas_d6()]
 	var summary: String = _overlay._build_effect_summary(
-		{"type": StageEventScript.EffectType.GAIN_RANDOM_DICE},
+		{"summary": "EVENT: The Collector marked your next stage for a premium die"},
 		{"gained_dice": gained_dice}
 	)
 	assert_str(summary).contains(gained_dice[0].dice_name)
@@ -209,55 +209,99 @@ func test_lose_gold_clamps_to_zero() -> void:
 # Overlay data selection
 # ---------------------------------------------------------------------------
 
-func test_blessings_and_curses_arrays_non_empty() -> void:
-	assert_bool(_overlay.BLESSINGS.size() > 0).is_true()
-	assert_bool(_overlay.CURSES.size() > 0).is_true()
+func test_event_pool_is_non_empty() -> void:
+	var event_pool: Array[Dictionary] = _overlay._build_event_pool()
+	assert_bool(event_pool.size() > 0).is_true()
 
 
-func test_each_blessing_has_required_keys() -> void:
-	for b: Dictionary in _overlay.BLESSINGS:
-		assert_bool(b.has("type")).is_true()
-		assert_bool(b.has("name")).is_true()
-		assert_bool(b.has("desc")).is_true()
-		assert_bool(b.has("icon")).is_true()
+func test_each_event_has_three_choices() -> void:
+	for event_data: Dictionary in _overlay._build_event_pool():
+		assert_bool(event_data.has("title")).is_true()
+		assert_bool(event_data.has("flavor")).is_true()
+		assert_bool(event_data.has("choices")).is_true()
+		assert_int((event_data.get("choices", []) as Array).size()).is_equal(3)
 
 
-func test_each_curse_has_required_keys() -> void:
-	for c: Dictionary in _overlay.CURSES:
-		assert_bool(c.has("type")).is_true()
-		assert_bool(c.has("name")).is_true()
-		assert_bool(c.has("desc")).is_true()
-		assert_bool(c.has("icon")).is_true()
+func test_each_choice_has_required_keys() -> void:
+	for event_data: Dictionary in _overlay._build_event_pool():
+		for choice: Dictionary in event_data.get("choices", []) as Array[Dictionary]:
+			assert_bool(choice.has("category")).is_true()
+			assert_bool(choice.has("name")).is_true()
+			assert_bool(choice.has("icon")).is_true()
+			assert_bool(choice.has("upside")).is_true()
+			assert_bool(choice.has("downside")).is_true()
+			assert_bool(choice.has("effects")).is_true()
+			assert_bool(not (choice.get("upside", "") as String).is_empty()).is_true()
+			assert_bool(not (choice.get("effects", []) as Array).is_empty()).is_true()
+
+
+func test_choice_description_uses_trade_language() -> void:
+	var description: String = _overlay._build_choice_description({
+		"upside": "+20g now",
+		"downside": "Lose 1 random die",
+	})
+	assert_str(description).contains("UP: +20g now")
+	assert_str(description).contains("DOWN: Lose 1 random die")
 
 
 func test_gain_random_dice_choice_waits_for_result_continue() -> void:
 	var overlay: ColorRect = auto_free(StageEventScene.instantiate()) as ColorRect
 	add_child(overlay)
 	await await_idle_frame()
-	var blessing_event: Dictionary = {
-		"type": StageEventScript.EffectType.GAIN_RANDOM_DICE,
-		"name": "Lucky Find",
-		"icon": "🎲",
-		"desc": "Gain 2 random dice",
-		"color_key": "SUCCESS_GREEN",
+	var event_data: Dictionary = {
+		"title": "THE COLLECTOR",
+		"flavor": "A lacquered broker offers clean money and one dangerous gift.",
+		"choices": [
+			{
+				"category": StageEventScript.CHOICE_PREMIUM,
+				"name": "Take the Marked Prize",
+				"icon": "🎲",
+				"color_key": "ACTION_CYAN",
+				"upside": "+1 random die",
+				"downside": "Next stage target +12%",
+				"summary": "EVENT: The Collector marked your next stage for a premium die",
+				"effects": [
+					{"type": StageEventScript.EffectType.GAIN_RANDOM_DICE, "count": 1},
+					{"type": StageEventScript.EffectType.BOOST_TARGETS, "multiplier": 1.12},
+				],
+			},
+			{
+				"category": StageEventScript.CHOICE_SAFE,
+				"name": "Take the Cash",
+				"icon": "💰",
+				"color_key": "SCORE_GOLD",
+				"upside": "+20g now",
+				"downside": "No extra risk",
+				"summary": "EVENT: The Collector paid 20g",
+				"effects": [{"type": StageEventScript.EffectType.GAIN_GOLD, "amount": 20}],
+			},
+			{
+				"category": StageEventScript.CHOICE_BARGAIN,
+				"name": "Sell a Die",
+				"icon": "🗡",
+				"color_key": "EXPLOSION_ORANGE",
+				"upside": "+55g immediately",
+				"downside": "Lose 1 random die",
+				"summary": "EVENT: The Collector bought a die for 55g",
+				"effects": [
+					{"type": StageEventScript.EffectType.LOSE_DIE, "count": 1},
+					{"type": StageEventScript.EffectType.GAIN_GOLD, "amount": 55},
+				],
+			},
+		],
 	}
-	var curse_event: Dictionary = {
-		"type": StageEventScript.EffectType.LOSE_GOLD,
-		"name": "Pickpocket",
-		"icon": "💸",
-		"desc": "-20g",
-		"color_key": "SCORE_GOLD",
-	}
-	overlay.set("_blessing", blessing_event)
-	overlay.set("_curse", curse_event)
-	var blessing_card: PanelContainer = overlay.call("_build_choice_card", blessing_event, true) as PanelContainer
-	var curse_card: PanelContainer = overlay.call("_build_choice_card", curse_event, false) as PanelContainer
+	overlay.set("_current_event", event_data)
+	overlay.call("_apply_event_copy", event_data)
+	var premium_card: PanelContainer = overlay.call("_build_choice_card", (event_data["choices"] as Array)[0], 0) as PanelContainer
+	var safe_card: PanelContainer = overlay.call("_build_choice_card", (event_data["choices"] as Array)[1], 1) as PanelContainer
+	var bargain_card: PanelContainer = overlay.call("_build_choice_card", (event_data["choices"] as Array)[2], 2) as PanelContainer
 	var choice_row: HBoxContainer = overlay.get_node("CenterContainer/Card/MarginContainer/Content/ChoiceRow") as HBoxContainer
-	choice_row.add_child(blessing_card)
-	choice_row.add_child(curse_card)
-	overlay.set("_choice_cards", [blessing_card, curse_card])
+	choice_row.add_child(premium_card)
+	choice_row.add_child(safe_card)
+	choice_row.add_child(bargain_card)
+	overlay.set("_choice_cards", [premium_card, safe_card, bargain_card])
 	monitor_signals(overlay, false)
-	overlay.call("_on_choice_made", true)
+	overlay.call("_on_choice_made", 0)
 	await get_tree().create_timer(0.75).timeout
 	assert_signal(overlay).is_not_emitted("event_resolved")
 	var continue_button: Button = overlay.get("_continue_button") as Button
