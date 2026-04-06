@@ -1,5 +1,5 @@
 extends GdUnitTestSuite
-## Unit tests for StageEventOverlay effects and GameManager event flags.
+## Unit tests for StageEventOverlay bargain events and GameManager event flags.
 
 const StageEventScript: GDScript = preload("res://Scripts/StageEventOverlay.gd")
 const StageEventScene: PackedScene = preload("res://Scenes/StageEventOverlay.tscn")
@@ -12,6 +12,14 @@ var _orig_dice_pool: Array[DiceData] = []
 var _orig_gold: int = 0
 var _orig_lives: int = 0
 var _orig_stage_target: int = 0
+var _orig_next_stage_target_multiplier: float = 1.0
+var _orig_next_stage_first_bank_gold_multiplier: float = 1.0
+var _orig_next_stage_clear_gold_multiplier: float = 1.0
+var _orig_next_stage_starting_stop_pressure: int = 0
+var _orig_next_reward_rarity_bonus: int = 0
+var _orig_next_route_restriction: int = 0
+var _orig_next_map_row_reveal: bool = false
+var _orig_run_stop_shards: int = 0
 
 
 func before_test() -> void:
@@ -23,6 +31,14 @@ func before_test() -> void:
 	_orig_gold = GameManager.gold
 	_orig_lives = GameManager.lives
 	_orig_stage_target = GameManager.stage_target_score
+	_orig_next_stage_target_multiplier = GameManager.event_next_stage_target_multiplier
+	_orig_next_stage_first_bank_gold_multiplier = GameManager.event_next_stage_first_bank_gold_multiplier
+	_orig_next_stage_clear_gold_multiplier = GameManager.event_next_stage_clear_gold_multiplier
+	_orig_next_stage_starting_stop_pressure = GameManager.event_next_stage_starting_stop_pressure
+	_orig_next_reward_rarity_bonus = GameManager.event_next_reward_rarity_bonus
+	_orig_next_route_restriction = GameManager.event_next_route_restriction
+	_orig_next_map_row_reveal = GameManager.event_next_map_row_reveal
+	_orig_run_stop_shards = GameManager.current_run_stop_shards
 
 
 func after_test() -> void:
@@ -33,6 +49,14 @@ func after_test() -> void:
 	GameManager.stage_target_score = _orig_stage_target
 	GameManager.event_free_bust = false
 	GameManager.event_target_multiplier = 1.0
+	GameManager.event_next_stage_target_multiplier = _orig_next_stage_target_multiplier
+	GameManager.event_next_stage_first_bank_gold_multiplier = _orig_next_stage_first_bank_gold_multiplier
+	GameManager.event_next_stage_clear_gold_multiplier = _orig_next_stage_clear_gold_multiplier
+	GameManager.event_next_stage_starting_stop_pressure = _orig_next_stage_starting_stop_pressure
+	GameManager.event_next_reward_rarity_bonus = _orig_next_reward_rarity_bonus
+	GameManager.event_next_route_restriction = _orig_next_route_restriction as GameManager.NextRouteRestriction
+	GameManager.event_next_map_row_reveal = _orig_next_map_row_reveal
+	GameManager.current_run_stop_shards = _orig_run_stop_shards
 
 
 # ---------------------------------------------------------------------------
@@ -42,22 +66,57 @@ func after_test() -> void:
 func test_event_flags_default_values() -> void:
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 func test_reset_event_flags() -> void:
 	_gm.event_free_bust = true
 	_gm.event_target_multiplier = 1.15
+	_gm.event_next_stage_target_multiplier = 1.2
+	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
+	_gm.event_next_stage_clear_gold_multiplier = 2.0
+	_gm.event_next_stage_starting_stop_pressure = 1
+	_gm.event_next_reward_rarity_bonus = 1
+	_gm.event_next_route_restriction = _gm.NextRouteRestriction.NO_HARD
+	_gm.event_next_map_row_reveal = true
 	_gm._reset_event_flags()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 func test_reset_run_clears_event_flags() -> void:
 	_gm.event_free_bust = true
 	_gm.event_target_multiplier = 1.15
+	_gm.event_next_stage_target_multiplier = 1.2
+	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
+	_gm.event_next_stage_clear_gold_multiplier = 2.0
+	_gm.event_next_stage_starting_stop_pressure = 1
+	_gm.event_next_reward_rarity_bonus = 1
+	_gm.event_next_route_restriction = _gm.NextRouteRestriction.STANDARD_ONLY
+	_gm.event_next_map_row_reveal = true
 	_gm.reset_run()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +166,7 @@ func test_gain_random_dice() -> void:
 func test_gain_random_dice_summary_lists_awarded_dice() -> void:
 	var gained_dice: Array[DiceData] = [DiceData.make_standard_d6(), DiceData.make_blank_canvas_d6()]
 	var summary: String = _overlay._build_effect_summary(
-		{"type": StageEventScript.EffectType.GAIN_RANDOM_DICE},
+		{"summary": "EVENT: The Collector marked your next stage for a premium die"},
 		{"gained_dice": gained_dice}
 	)
 	assert_str(summary).contains(gained_dice[0].dice_name)
@@ -165,6 +224,80 @@ func test_boost_targets_sets_multiplier() -> void:
 	assert_int(GameManager.stage_target_score).is_equal(115)
 
 
+func test_set_next_stage_target_multiplier_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER, "multiplier": 1.2})
+	assert_float(GameManager.event_next_stage_target_multiplier).is_equal(1.2)
+
+
+func test_set_next_stage_first_bank_gold_multiplier_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_FIRST_BANK_GOLD_MULTIPLIER, "multiplier": 1.35})
+	assert_float(GameManager.event_next_stage_first_bank_gold_multiplier).is_equal(1.35)
+
+
+func test_set_next_stage_clear_gold_multiplier_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER, "multiplier": 2.0})
+	assert_float(GameManager.event_next_stage_clear_gold_multiplier).is_equal(2.0)
+
+
+func test_gain_stop_shards_adds_to_run_total() -> void:
+	GameManager.current_run_stop_shards = 0
+	_overlay._apply_effect({"type": StageEventScript.EffectType.GAIN_STOP_SHARDS, "amount": 25})
+	assert_int(GameManager.current_run_stop_shards).is_equal(25)
+
+
+func test_set_next_stage_starting_stop_pressure_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_STARTING_STOP_PRESSURE, "amount": 1})
+	assert_int(GameManager.event_next_stage_starting_stop_pressure).is_equal(1)
+
+
+func test_set_next_reward_rarity_bonus_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_REWARD_RARITY_BONUS, "amount": 1})
+	assert_int(GameManager.event_next_reward_rarity_bonus).is_equal(1)
+
+
+func test_set_next_route_restriction_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_ROUTE_RESTRICTION, "restriction": GameManager.NextRouteRestriction.STANDARD_ONLY})
+	assert_int(GameManager.event_next_route_restriction).is_equal(GameManager.NextRouteRestriction.STANDARD_ONLY)
+
+
+func test_set_next_map_row_reveal_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_MAP_ROW_REVEAL, "enabled": true})
+	assert_bool(GameManager.event_next_map_row_reveal).is_true()
+
+
+func test_heal_if_not_full_else_gold_heals_when_hurt() -> void:
+	GameManager.stage_hand_cap = 5
+	GameManager.hands = 3
+	var before_gold: int = GameManager.gold
+	_overlay._apply_effect({"type": StageEventScript.EffectType.HEAL_IF_NOT_FULL_ELSE_GOLD, "heal": 1, "gold": 15})
+	assert_int(GameManager.hands).is_equal(4)
+	assert_int(GameManager.gold).is_equal(before_gold)
+
+
+func test_heal_if_not_full_else_gold_pays_gold_when_full() -> void:
+	GameManager.stage_hand_cap = 5
+	GameManager.hands = 5
+	var before_gold: int = GameManager.gold
+	_overlay._apply_effect({"type": StageEventScript.EffectType.HEAL_IF_NOT_FULL_ELSE_GOLD, "heal": 1, "gold": 15})
+	assert_int(GameManager.hands).is_equal(5)
+	assert_int(GameManager.gold).is_equal(before_gold + 15)
+
+
+func test_gain_random_die_of_rarity_adds_blue_die() -> void:
+	var before_size: int = GameManager.dice_pool.size()
+	var result: Dictionary = _overlay._apply_effect({"type": StageEventScript.EffectType.GAIN_RANDOM_DIE_OF_RARITY, "rarity": DiceData.Rarity.BLUE})
+	assert_int(GameManager.dice_pool.size()).is_equal(before_size + 1)
+	var gained_dice: Array = result.get("gained_dice", []) as Array
+	assert_int(gained_dice.size()).is_equal(1)
+	assert_int((gained_dice[0] as DiceData).rarity).is_equal(DiceData.Rarity.BLUE)
+
+
+func test_reset_momentum_effect_sets_momentum_to_zero() -> void:
+	GameManager.momentum = 3
+	_overlay._apply_effect({"type": StageEventScript.EffectType.RESET_MOMENTUM})
+	assert_int(GameManager.momentum).is_equal(0)
+
+
 func test_lose_life_decrements() -> void:
 	GameManager.reset_stage_hands()
 	_overlay._apply_effect({"type": 8})
@@ -209,55 +342,99 @@ func test_lose_gold_clamps_to_zero() -> void:
 # Overlay data selection
 # ---------------------------------------------------------------------------
 
-func test_blessings_and_curses_arrays_non_empty() -> void:
-	assert_bool(_overlay.BLESSINGS.size() > 0).is_true()
-	assert_bool(_overlay.CURSES.size() > 0).is_true()
+func test_event_pool_is_non_empty() -> void:
+	var event_pool: Array[Dictionary] = _overlay._build_event_pool()
+	assert_bool(event_pool.size() > 0).is_true()
 
 
-func test_each_blessing_has_required_keys() -> void:
-	for b: Dictionary in _overlay.BLESSINGS:
-		assert_bool(b.has("type")).is_true()
-		assert_bool(b.has("name")).is_true()
-		assert_bool(b.has("desc")).is_true()
-		assert_bool(b.has("icon")).is_true()
+func test_each_event_has_three_choices() -> void:
+	for event_data: Dictionary in _overlay._build_event_pool():
+		assert_bool(event_data.has("title")).is_true()
+		assert_bool(event_data.has("flavor")).is_true()
+		assert_bool(event_data.has("choices")).is_true()
+		assert_int((event_data.get("choices", []) as Array).size()).is_equal(3)
 
 
-func test_each_curse_has_required_keys() -> void:
-	for c: Dictionary in _overlay.CURSES:
-		assert_bool(c.has("type")).is_true()
-		assert_bool(c.has("name")).is_true()
-		assert_bool(c.has("desc")).is_true()
-		assert_bool(c.has("icon")).is_true()
+func test_each_choice_has_required_keys() -> void:
+	for event_data: Dictionary in _overlay._build_event_pool():
+		for choice: Dictionary in event_data.get("choices", []) as Array[Dictionary]:
+			assert_bool(choice.has("category")).is_true()
+			assert_bool(choice.has("name")).is_true()
+			assert_bool(choice.has("icon")).is_true()
+			assert_bool(choice.has("upside")).is_true()
+			assert_bool(choice.has("downside")).is_true()
+			assert_bool(choice.has("effects")).is_true()
+			assert_bool(not (choice.get("upside", "") as String).is_empty()).is_true()
+			assert_bool(not (choice.get("effects", []) as Array).is_empty()).is_true()
+
+
+func test_choice_description_uses_trade_language() -> void:
+	var description: String = _overlay._build_choice_description({
+		"upside": "+20g now",
+		"downside": "Lose 1 random die",
+	})
+	assert_str(description).contains("UP: +20g now")
+	assert_str(description).contains("DOWN: Lose 1 random die")
 
 
 func test_gain_random_dice_choice_waits_for_result_continue() -> void:
 	var overlay: ColorRect = auto_free(StageEventScene.instantiate()) as ColorRect
 	add_child(overlay)
 	await await_idle_frame()
-	var blessing_event: Dictionary = {
-		"type": StageEventScript.EffectType.GAIN_RANDOM_DICE,
-		"name": "Lucky Find",
-		"icon": "🎲",
-		"desc": "Gain 2 random dice",
-		"color_key": "SUCCESS_GREEN",
+	var event_data: Dictionary = {
+		"title": "THE COLLECTOR",
+		"flavor": "A lacquered broker offers clean money and one dangerous gift.",
+		"choices": [
+			{
+				"category": StageEventScript.CHOICE_PREMIUM,
+				"name": "Take the Marked Prize",
+				"icon": "🎲",
+				"color_key": "ACTION_CYAN",
+				"upside": "+1 random die",
+				"downside": "Next stage target +12%",
+				"summary": "EVENT: The Collector marked your next stage for a premium die",
+				"effects": [
+					{"type": StageEventScript.EffectType.GAIN_RANDOM_DICE, "count": 1},
+					{"type": StageEventScript.EffectType.BOOST_TARGETS, "multiplier": 1.12},
+				],
+			},
+			{
+				"category": StageEventScript.CHOICE_SAFE,
+				"name": "Take the Cash",
+				"icon": "💰",
+				"color_key": "SCORE_GOLD",
+				"upside": "+20g now",
+				"downside": "No extra risk",
+				"summary": "EVENT: The Collector paid 20g",
+				"effects": [{"type": StageEventScript.EffectType.GAIN_GOLD, "amount": 20}],
+			},
+			{
+				"category": StageEventScript.CHOICE_BARGAIN,
+				"name": "Sell a Die",
+				"icon": "🗡",
+				"color_key": "EXPLOSION_ORANGE",
+				"upside": "+55g immediately",
+				"downside": "Lose 1 random die",
+				"summary": "EVENT: The Collector bought a die for 55g",
+				"effects": [
+					{"type": StageEventScript.EffectType.LOSE_DIE, "count": 1},
+					{"type": StageEventScript.EffectType.GAIN_GOLD, "amount": 55},
+				],
+			},
+		],
 	}
-	var curse_event: Dictionary = {
-		"type": StageEventScript.EffectType.LOSE_GOLD,
-		"name": "Pickpocket",
-		"icon": "💸",
-		"desc": "-20g",
-		"color_key": "SCORE_GOLD",
-	}
-	overlay.set("_blessing", blessing_event)
-	overlay.set("_curse", curse_event)
-	var blessing_card: PanelContainer = overlay.call("_build_choice_card", blessing_event, true) as PanelContainer
-	var curse_card: PanelContainer = overlay.call("_build_choice_card", curse_event, false) as PanelContainer
+	overlay.set("_current_event", event_data)
+	overlay.call("_apply_event_copy", event_data)
+	var premium_card: PanelContainer = overlay.call("_build_choice_card", (event_data["choices"] as Array)[0], 0) as PanelContainer
+	var safe_card: PanelContainer = overlay.call("_build_choice_card", (event_data["choices"] as Array)[1], 1) as PanelContainer
+	var bargain_card: PanelContainer = overlay.call("_build_choice_card", (event_data["choices"] as Array)[2], 2) as PanelContainer
 	var choice_row: HBoxContainer = overlay.get_node("CenterContainer/Card/MarginContainer/Content/ChoiceRow") as HBoxContainer
-	choice_row.add_child(blessing_card)
-	choice_row.add_child(curse_card)
-	overlay.set("_choice_cards", [blessing_card, curse_card])
+	choice_row.add_child(premium_card)
+	choice_row.add_child(safe_card)
+	choice_row.add_child(bargain_card)
+	overlay.set("_choice_cards", [premium_card, safe_card, bargain_card])
 	monitor_signals(overlay, false)
-	overlay.call("_on_choice_made", true)
+	overlay.call("_on_choice_made", 0)
 	await get_tree().create_timer(0.75).timeout
 	assert_signal(overlay).is_not_emitted("event_resolved")
 	var continue_button: Button = overlay.get("_continue_button") as Button

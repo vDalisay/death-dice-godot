@@ -23,7 +23,7 @@ grow_vertical = 2
 
 [node name="Card" type="PanelContainer" parent="CenterContainer"]
 layout_mode = 2
-custom_minimum_size = Vector2(700, 380)
+custom_minimum_size = Vector2(980, 420)
 modulate = Color(1, 1, 1, 0)
 
 [node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Card"]

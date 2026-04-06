@@ -4,6 +4,21 @@ extends GdUnitTestSuite
 const StageMapScene: PackedScene = preload("res://Scenes/StageMap.tscn")
 const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
 
+var _saved_route_restriction: int = 0
+var _saved_map_row_reveal: bool = false
+
+
+func before_test() -> void:
+	_saved_route_restriction = int(GameManager.event_next_route_restriction)
+	GameManager.event_next_route_restriction = GameManager.NextRouteRestriction.NONE
+	_saved_map_row_reveal = GameManager.event_next_map_row_reveal
+	GameManager.event_next_map_row_reveal = false
+
+
+func after_test() -> void:
+	GameManager.event_next_route_restriction = _saved_route_restriction as GameManager.NextRouteRestriction
+	GameManager.event_next_map_row_reveal = _saved_map_row_reveal
+
 
 func test_stage_map_scene_has_required_nodes() -> void:
 	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
@@ -145,6 +160,72 @@ func test_special_stage_nodes_show_variant_label_and_hover_copy() -> void:
 	assert_str(hint_label.text).contains("Stage 1 / 7")
 
 
+func test_standard_only_route_restriction_blocks_nonstandard_nodes() -> void:
+	GameManager.event_next_route_restriction = GameManager.NextRouteRestriction.STANDARD_ONLY
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_route_restriction_map()
+	panel.call("open", map, 0, -1)
+	for _i: int in 4:
+		await await_idle_frame()
+	assert_bool(panel.call("_can_reach", 0, 0)).is_true()
+	assert_bool(panel.call("_can_reach", 0, 1)).is_false()
+	assert_bool(panel.call("_can_reach", 0, 2)).is_false()
+	var hint_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel") as Label
+	assert_str(hint_label.text).contains("standard route required")
+
+
+func test_no_hard_route_restriction_allows_shop_but_blocks_special_stage() -> void:
+	GameManager.event_next_route_restriction = GameManager.NextRouteRestriction.NO_HARD
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_route_restriction_map()
+	panel.call("open", map, 0, -1)
+	for _i: int in 4:
+		await await_idle_frame()
+	assert_bool(panel.call("_can_reach", 0, 0)).is_true()
+	assert_bool(panel.call("_can_reach", 0, 1)).is_true()
+	assert_bool(panel.call("_can_reach", 0, 2)).is_false()
+
+
+func test_route_restriction_is_waived_if_row_has_no_valid_targets() -> void:
+	GameManager.event_next_route_restriction = GameManager.NextRouteRestriction.STANDARD_ONLY
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_no_standard_route_map()
+	panel.call("open", map, 0, -1)
+	for _i: int in 4:
+		await await_idle_frame()
+	assert_bool(panel.call("_can_reach", 0, 0)).is_true()
+	assert_bool(panel.call("_can_reach", 0, 1)).is_true()
+
+
+func test_loaded_lantern_reveals_the_next_row_preview() -> void:
+	GameManager.event_next_map_row_reveal = true
+	var panel: PanelContainer = auto_free(StageMapScene.instantiate()) as PanelContainer
+	add_child(panel)
+	await await_idle_frame()
+	var map: StageMapData = _build_lantern_preview_map()
+	panel.call("open", map, 0, -1)
+	for _i: int in 4:
+		await await_idle_frame()
+	assert_bool(panel.get("_next_row_reveal_active")).is_true()
+	var board_label: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox/BoardLabel") as Label
+	var legend_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/LegendLabel") as Label
+	assert_str(board_label.text).contains("LANTERN")
+	assert_str(legend_label.text).contains("row 2")
+	assert_str(legend_label.text).contains("Shop")
+	assert_str(legend_label.text).contains("Lucky Floor")
+	var node_buttons: Array = panel.get("_node_buttons") as Array
+	var future_row_buttons: Array = node_buttons[1] as Array
+	var state_label: Label = (future_row_buttons[0] as Button).get_node("Medallion/StateLabel") as Label
+	assert_str(state_label.text).is_equal("SEEN")
+	assert_bool(GameManager.event_next_map_row_reveal).is_false()
+
+
 func _build_stale_progression_map() -> StageMapData:
 	var map := StageMapData.new()
 	map.rows = [
@@ -189,6 +270,37 @@ func _build_special_preview_map() -> StageMapData:
 	return map
 
 
+func _build_route_restriction_map() -> StageMapData:
+	var map := StageMapData.new()
+	var standard_node: MapNodeData = _make_node([0], false, 0)
+	var shop_node: MapNodeData = _make_shop_node([0], 1)
+	var hard_node: MapNodeData = _make_node([0], false, 2, SpecialStageCatalog.Variant.HOT_TABLE)
+	map.rows = [
+		[standard_node, shop_node, hard_node],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
+func _build_no_standard_route_map() -> StageMapData:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_shop_node([0], 0), _make_special_node([0], "lucky_floor", 1)],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
+func _build_lantern_preview_map() -> StageMapData:
+	var map := StageMapData.new()
+	map.rows = [
+		[_make_node([0, 1], false, 0), _make_node([0, 1], false, 1)],
+		[_make_shop_node([0], 0), _make_node([0], false, 1, SpecialStageCatalog.Variant.LUCKY_FLOOR)],
+		[_make_node([], false, 0)],
+	]
+	return map
+
+
 func _count_lines_from_row_with_color(lines: Array, row_buttons: Array, color: Color) -> int:
 	var count: int = 0
 	var row_start_y: float = ((row_buttons[0] as Button).position.y) + (((row_buttons[0] as Button).size.y) * 0.5)
@@ -218,5 +330,13 @@ func _make_special_node(connections: Array[int], special_rule_id: String, column
 	node.type = MapNodeData.NodeType.SPECIAL_STAGE
 	node.connections = connections.duplicate()
 	node.special_rule_id = special_rule_id
+	node.column = column
+	return node
+
+
+func _make_shop_node(connections: Array[int], column: int = 0) -> MapNodeData:
+	var node := MapNodeData.new()
+	node.type = MapNodeData.NodeType.SHOP
+	node.connections = connections.duplicate()
 	node.column = column
 	return node
