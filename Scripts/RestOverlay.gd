@@ -42,12 +42,12 @@ func _apply_theme_styling() -> void:
 func open(heal_lives: int, gold_bonus: int, lives_before: int, lives_after: int) -> void:
 	var life_gain: int = maxi(0, lives_after - lives_before)
 	_title_label.text = "REST STOP"
-	_summary_label.text = "Recovered %d life and found %dg." % [life_gain, gold_bonus]
+	_summary_label.text = "Recovered %d hand and found %dg." % [life_gain, gold_bonus]
 	if life_gain == 0:
-		_summary_label.text = "No life recovered, but you still found %dg." % gold_bonus
-	_detail_label.text = "Lives: %d -> %d\nNext path opens when you continue." % [lives_before, lives_after]
+		_summary_label.text = "No hand recovered, but you still found %dg." % gold_bonus
+	_detail_label.text = "Hands: %d -> %d\nNext path opens when you continue." % [lives_before, lives_after]
 	if life_gain > 0 and life_gain != heal_lives:
-		_detail_label.text = "Lives: %d -> %d\nHealing capped at max life. Continue when ready." % [lives_before, lives_after]
+		_detail_label.text = "Hands: %d -> %d\nRecovery capped for the next stage. Continue when ready." % [lives_before, lives_after]
 	color = Color(0, 0, 0, 0)
 	_card.modulate.a = 0.0
 	_card.scale = Vector2(CARD_SCALE_START, CARD_SCALE_START)

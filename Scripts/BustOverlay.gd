@@ -36,12 +36,12 @@ func _apply_theme_styling() -> void:
 	_sub_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 
 
-func play(life_loss: int) -> void:
-	var game_over: bool = GameManager.lives <= 0
-	_target_message_text = "GAME OVER" if game_over else "BUST! -%d LIFE" % life_loss
+func play(hand_loss: int) -> void:
+	var game_over: bool = GameManager.hands <= 0
+	_target_message_text = "GAME OVER" if game_over else "BUST! -%d HAND" % hand_loss
 	_message_label.text = build_glitch_text(_target_message_text, 0.0)
 	_message_label.add_theme_color_override("font_color", _UITheme.NEON_PURPLE if game_over else _UITheme.DANGER_RED)
-	_sub_label.text = "Run ended." if game_over else "Your turn score was lost."
+	_sub_label.text = "Stage failed." if game_over else "Your turn score was lost."
 
 	# Let CenterContainer run its layout pass so _card.position is valid.
 	await get_tree().process_frame

@@ -27,9 +27,6 @@ theme_override_constants/separation = 16
 layout_mode = 2
 text = "STAGE 1/5"
 
-[node name="LivesLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
-layout_mode = 2
-
 [node name="TopSpacer" type="Control" parent="TopBar/TopBarMargin/TopBarRow"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -152,32 +149,9 @@ size_flags_horizontal = 3
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="RiskMeter" type="PanelContainer" parent="InfoRow/RiskColumn"]
+[node name="HandsLabel" type="Label" parent="InfoRow/RiskColumn"]
 layout_mode = 2
-mouse_filter = 0
-
-[node name="RiskMeterMargin" type="MarginContainer" parent="InfoRow/RiskColumn/RiskMeter"]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_bottom = 4
-
-[node name="RiskMeterRow" type="HBoxContainer" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="RiskPercentLabel" type="Label" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow"]
-layout_mode = 2
-text = "RISK 0%"
-
-[node name="RiskContainer" type="HBoxContainer" parent="InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="StopLabel" type="Label" parent="InfoRow/RiskColumn"]
-layout_mode = 2
-text = "Stops: 0 / 3"
+text = "HANDS: 0"
 horizontal_alignment = 2
 
 [node name="RiskMetaLabel" type="Label" parent="InfoRow/RiskColumn"]

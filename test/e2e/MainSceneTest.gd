@@ -55,11 +55,74 @@ func test_contract_overlay_is_visible_next_to_arena() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _get_root(runner)
-	var contract_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay") as PanelContainer
-	var contract_text: Label = root.get_node("MarginContainer/VBoxContainer/ArenaViewportContainer/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel") as Label
+	var contract_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ContractOverlay") as PanelContainer
+	var contract_text: Label = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel") as Label
 	assert_object(contract_overlay).is_not_null()
 	assert_bool(contract_overlay.visible).is_true()
 	assert_str(contract_text.text).is_not_empty()
+
+
+func test_risk_tower_overlay_is_visible_next_to_arena() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var risk_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay") as PanelContainer
+	var stop_dots: VBoxContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/StopDotsColumn") as VBoxContainer
+	var risk_percent: Label = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/RiskPercentLabel") as Label
+	assert_object(risk_overlay).is_not_null()
+	assert_bool(risk_overlay.visible).is_true()
+	assert_int(stop_dots.get_child_count()).is_equal(4)
+	assert_str(risk_percent.text).contains("%")
+
+
+func test_risk_tower_stop_dots_reflect_effective_stops() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var stop_dots: VBoxContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay/MarginContainer/VBoxContainer/StopDotsColumn") as VBoxContainer
+	root.turn_state = RollPhase.TurnState.ACTIVE
+	root.accumulated_stop_count = 3
+	root.accumulated_shield_count = 0
+	root._sync_ui()
+	await runner.simulate_frames(1)
+	var lit_count: int = 0
+	for i: int in stop_dots.get_child_count():
+		var dot: Label = stop_dots.get_child(i) as Label
+		if dot.modulate.r > 0.7 and dot.modulate.g < 0.35:
+			lit_count += 1
+	assert_int(lit_count).is_equal(3)
+
+
+func test_risk_tower_hover_shows_risk_tooltip() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var risk_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay") as PanelContainer
+	risk_overlay.mouse_entered.emit()
+	await runner.simulate_frames(1)
+	assert_bool(root.hud._risk_tooltip.visible).is_true()
+	assert_str(root.hud._risk_tooltip_label.text).is_not_empty()
+	risk_overlay.mouse_exited.emit()
+	await runner.simulate_frames(1)
+	assert_bool(root.hud._risk_tooltip.visible).is_false()
+
+
+func test_side_panels_have_spacing_from_dice_tray() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var contract_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ContractOverlay") as PanelContainer
+	var arena_container: SubViewportContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ArenaViewportContainer") as SubViewportContainer
+	var risk_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay") as PanelContainer
+	assert_object(contract_overlay).is_not_null()
+	assert_object(arena_container).is_not_null()
+	assert_object(risk_overlay).is_not_null()
+	var contract_right: float = contract_overlay.global_position.x + contract_overlay.size.x
+	var arena_left: float = arena_container.global_position.x
+	var arena_right: float = arena_container.global_position.x + arena_container.size.x
+	var risk_left: float = risk_overlay.global_position.x
+	assert_float(arena_left - contract_right).is_greater(0.0)
+	assert_float(risk_left - arena_right).is_greater(0.0)
 
 
 func test_bank_button_starts_disabled() -> void:
@@ -107,14 +170,14 @@ func test_hud_shows_correct_lives() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _get_root(runner)
-	assert_int(root.hud.lives_label.text.length()).is_equal(GameManager.lives)
+	assert_str(root.hud.lives_label.text).is_equal("HANDS: %d" % GameManager.lives)
 
 
 func test_hud_shows_correct_target() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _get_root(runner)
-	assert_str(root.hud.target_label.text).contains("30")
+	assert_str(root.hud.target_label.text).contains("18")
 
 
 func test_hud_progress_bar_starts_at_zero() -> void:
@@ -132,13 +195,14 @@ func test_hud_progress_shows_almost_there_near_target() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _get_root(runner)
-	var near_target: int = int(float(GameManager.stage_target_score) * 0.9)
+	var near_target: int = ceili(float(GameManager.stage_target_score) * 0.9)
+	var expected_progress: int = int((float(near_target) / float(GameManager.stage_target_score)) * 100.0)
 	GameManager.total_score = near_target
 	GameManager.score_changed.emit(near_target)
 	assert_object(root.hud._progress_tween).is_not_null()
 	await root.hud._progress_tween.finished
-	assert_str(root.hud.progress_hint_label.text).is_equal("ALMOST THERE")
-	assert_int(int(root.hud.progress_bar.value)).is_greater_equal(90)
+	assert_str(root.hud.progress_hint_label.text).contains("ALMOST THERE")
+	assert_int(int(root.hud.progress_bar.value)).is_greater_equal(expected_progress)
 
 
 func test_banking_adds_score_to_total() -> void:

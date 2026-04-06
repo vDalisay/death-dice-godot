@@ -1,8 +1,6 @@
 extends GdUnitTestSuite
 ## Unit tests for GameManager autoload.
 
-const SpecialStageCatalog := preload("res://Scripts/SpecialStageCatalog.gd")
-
 var _gm: Node
 var _saved_prestige_unlocks: Array[String] = []
 
@@ -22,8 +20,9 @@ func after_test() -> void:
 
 func test_initial_state() -> void:
 	assert_int(_gm.total_score).is_equal(0)
-	assert_int(_gm.lives).is_equal(3)
-	assert_int(_gm.stage_target_score).is_equal(30)
+	assert_int(_gm.hands).is_equal(5)
+	assert_int(_gm.stage_hand_cap).is_equal(5)
+	assert_int(_gm.stage_target_score).is_equal(18)
 	assert_int(_gm.current_stage).is_equal(1)
 	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.NONE)
 	assert_int(_gm.gold).is_equal(0)
@@ -45,58 +44,73 @@ func test_add_score_awards_gold() -> void:
 func test_add_score_emits_score_changed() -> void:
 	monitor_signals(_gm, false)
 	_gm.add_score(42)
-	await assert_signal(_gm).is_emitted("score_changed", [42])
+	assert_signal(_gm).is_emitted("score_changed", [42])
 
 
 func test_add_score_emits_turn_banked() -> void:
 	monitor_signals(_gm, false)
 	_gm.add_score(10)
-	await assert_signal(_gm).is_emitted("turn_banked", [10, 10])
+	assert_signal(_gm).is_emitted("turn_banked", [10, 10])
 
 
 func test_stage_cleared_when_target_reached() -> void:
 	monitor_signals(_gm, false)
-	_gm.add_score(30)
-	await assert_signal(_gm).is_emitted("stage_cleared")
+	_gm.add_score(18)
+	assert_signal(_gm).is_emitted("stage_cleared")
 
 
 func test_stage_not_cleared_below_target() -> void:
 	monitor_signals(_gm, false)
-	_gm.add_score(29)
-	await assert_signal(_gm).is_not_emitted("stage_cleared")
+	_gm.add_score(17)
+	assert_signal(_gm).is_not_emitted("stage_cleared")
 
 
-func test_lose_life_decrements() -> void:
-	_gm.lose_life()
-	assert_int(_gm.lives).is_equal(2)
-	_gm.lose_life()
-	assert_int(_gm.lives).is_equal(1)
+func test_spend_hand_on_bust_decrements() -> void:
+	_gm.spend_hand_on_bust()
+	assert_int(_gm.hands).is_equal(4)
+	_gm.spend_hand_on_bust()
+	assert_int(_gm.hands).is_equal(3)
 
 
-func test_lose_life_emits_signal() -> void:
+func test_spend_hand_on_bust_emits_signal() -> void:
 	monitor_signals(_gm, false)
-	_gm.lose_life()
-	await assert_signal(_gm).is_emitted("lives_changed", [2])
+	_gm.spend_hand_on_bust()
+	assert_signal(_gm).is_emitted("hands_changed", [4])
 
 
-func test_run_ended_on_zero_lives() -> void:
+func test_run_ended_on_zero_hands_after_bust() -> void:
 	monitor_signals(_gm, false)
-	_gm.lose_life()  # 2
-	_gm.lose_life()  # 1
-	_gm.lose_life()  # 0
-	await assert_signal(_gm).is_emitted("run_ended")
+	for _i: int in 5:
+		_gm.spend_hand_on_bust()
+	assert_signal(_gm).is_emitted("run_ended")
 
 
-func test_run_not_ended_with_lives_remaining() -> void:
+func test_run_not_ended_with_hands_remaining() -> void:
 	monitor_signals(_gm, false)
-	_gm.lose_life()  # 2
-	_gm.lose_life()  # 1
-	await assert_signal(_gm).is_not_emitted("run_ended")
+	_gm.spend_hand_on_bust()
+	_gm.spend_hand_on_bust()
+	assert_signal(_gm).is_not_emitted("run_ended")
+
+
+func test_run_ended_when_last_bank_hand_used_without_clear() -> void:
+	_gm.hands = 1
+	monitor_signals(_gm, false)
+	_gm.spend_hand_on_bank(false)
+	assert_int(_gm.hands).is_equal(0)
+	assert_signal(_gm).is_emitted("run_ended")
+
+
+func test_last_bank_hand_can_clear_stage_without_run_end() -> void:
+	_gm.hands = 1
+	monitor_signals(_gm, false)
+	_gm.spend_hand_on_bank(true)
+	assert_int(_gm.hands).is_equal(0)
+	assert_signal(_gm).is_not_emitted("run_ended")
 
 
 func test_reset_run_restores_defaults() -> void:
 	_gm.add_score(300)
-	_gm.lose_life()
+	_gm.spend_hand_on_bust()
 	_gm.current_stage = 3
 	_gm.set_current_stage_variant(SpecialStageCatalog.Variant.HOT_TABLE)
 	_gm.gold = 100
@@ -106,10 +120,11 @@ func test_reset_run_restores_defaults() -> void:
 	_gm.activate_loop_contract("dead_close")
 	_gm.reset_run()
 	assert_int(_gm.total_score).is_equal(0)
-	assert_int(_gm.lives).is_equal(3)
+	assert_int(_gm.hands).is_equal(5)
+	assert_int(_gm.stage_hand_cap).is_equal(5)
 	assert_int(_gm.current_stage).is_equal(1)
 	assert_int(_gm.gold).is_equal(0)
-	assert_int(_gm.stage_target_score).is_equal(30)
+	assert_int(_gm.stage_target_score).is_equal(18)
 	assert_int(_gm.dice_pool.size()).is_equal(6)
 	assert_int(_gm.current_run_exp).is_equal(0)
 	assert_int(_gm.current_run_stop_shards).is_equal(0)
@@ -120,15 +135,15 @@ func test_reset_run_restores_defaults() -> void:
 
 func test_reset_run_emits_signals() -> void:
 	_gm.add_score(10)
-	_gm.lose_life()
+	_gm.spend_hand_on_bust()
 	monitor_signals(_gm, false)
 	_gm.reset_run()
-	await assert_signal(_gm).is_emitted("score_changed", [0])
-	await assert_signal(_gm).is_emitted("lives_changed", [3])
-	await assert_signal(_gm).is_emitted("gold_changed", [0])
-	await assert_signal(_gm).is_emitted("run_exp_changed", [0])
-	await assert_signal(_gm).is_emitted("run_stop_shards_changed", [0])
-	await assert_signal(_gm).is_emitted("stage_advanced", [1])
+	assert_signal(_gm).is_emitted("score_changed", [0])
+	assert_signal(_gm).is_emitted("hands_changed", [5])
+	assert_signal(_gm).is_emitted("gold_changed", [0])
+	assert_signal(_gm).is_emitted("run_exp_changed", [0])
+	assert_signal(_gm).is_emitted("run_stop_shards_changed", [0])
+	assert_signal(_gm).is_emitted("stage_advanced", [1])
 
 
 # ---------------------------------------------------------------------------
@@ -140,14 +155,15 @@ func test_advance_stage_increments() -> void:
 	_gm.advance_stage()
 	assert_int(_gm.current_stage).is_equal(2)
 	assert_int(_gm.total_score).is_equal(0)
-	assert_int(_gm.stage_target_score).is_equal(55)
+	assert_int(_gm.stage_target_score).is_equal(26)
+	assert_int(_gm.hands).is_equal(5)
 
 
 func test_advance_stage_emits_signals() -> void:
 	monitor_signals(_gm, false)
 	_gm.advance_stage()
-	await assert_signal(_gm).is_emitted("stage_advanced", [2])
-	await assert_signal(_gm).is_emitted("score_changed", [0])
+	assert_signal(_gm).is_emitted("stage_advanced", [2])
+	assert_signal(_gm).is_emitted("score_changed", [0])
 
 
 func test_advance_row_updates_current_row_and_previous_col() -> void:
@@ -165,10 +181,10 @@ func test_is_final_stage() -> void:
 
 
 func test_stage_target_scales() -> void:
-	# Stage 1: 30, Stage 2: 55, Stage 3: 80, Stage 4: 105, Stage 5: 130
-	assert_int(_gm._calculate_stage_target(1)).is_equal(30)
-	assert_int(_gm._calculate_stage_target(2)).is_equal(55)
-	assert_int(_gm._calculate_stage_target(5)).is_equal(130)
+	# Stage 1: 18, Stage 2: 26, Stage 3: 34, Stage 4: 42, Stage 5: 52
+	assert_int(_gm._calculate_stage_target(1)).is_equal(18)
+	assert_int(_gm._calculate_stage_target(2)).is_equal(26)
+	assert_int(_gm._calculate_stage_target(5)).is_equal(52)
 
 
 func test_gauntlet_stage_targets_scale_steeper() -> void:
@@ -181,7 +197,7 @@ func test_gauntlet_stage_targets_scale_steeper() -> void:
 func test_set_run_mode_emits_signal() -> void:
 	monitor_signals(_gm, false)
 	_gm.set_run_mode(_gm.RunMode.GAUNTLET)
-	await assert_signal(_gm).is_emitted("run_mode_changed", [_gm.RunMode.GAUNTLET])
+	assert_signal(_gm).is_emitted("run_mode_changed", [_gm.RunMode.GAUNTLET])
 
 
 func test_begin_new_run_sets_seed_identity() -> void:
@@ -221,14 +237,14 @@ func test_add_gold() -> void:
 func test_add_gold_emits_signal() -> void:
 	monitor_signals(_gm, false)
 	_gm.add_gold(25)
-	await assert_signal(_gm).is_emitted("gold_changed", [25])
+	assert_signal(_gm).is_emitted("gold_changed", [25])
 
 
 func test_activate_loop_contract_updates_state() -> void:
 	monitor_signals(_gm, false)
 	_gm.activate_loop_contract("dead_close")
 	assert_str(_gm.active_loop_contract_id).is_equal("dead_close")
-	await assert_signal(_gm).is_emitted("loop_contract_changed", ["dead_close"])
+	assert_signal(_gm).is_emitted("loop_contract_changed", ["dead_close"])
 
 
 func test_register_near_death_bank_increments_counters() -> void:
@@ -236,7 +252,7 @@ func test_register_near_death_bank_increments_counters() -> void:
 	_gm.register_near_death_bank(3, 4)
 	assert_int(_gm.near_death_banks_this_stage).is_equal(1)
 	assert_int(_gm.near_death_banks_this_run).is_equal(1)
-	await assert_signal(_gm).is_emitted("near_death_banked", [3, 4])
+	assert_signal(_gm).is_emitted("near_death_banked", [3, 4])
 
 
 func test_stop_collector_bank_rewards_scale_with_effective_stops() -> void:
@@ -249,12 +265,14 @@ func test_stop_collector_bank_rewards_scale_with_effective_stops() -> void:
 
 func test_last_call_heals_once_per_stage() -> void:
 	_gm.set_archetype(_gm.Archetype.LAST_CALL)
-	_gm.lives = 2
+	_gm.hands = 4
+	_gm.stage_hand_cap = 5
 	var first_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
 	var second_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
 	assert_int(int(first_rewards.get("heal", 0))).is_equal(1)
 	assert_int(int(second_rewards.get("heal", 0))).is_equal(0)
 	_gm.advance_stage()
+	_gm.hands = _gm.stage_hand_cap - 1
 	var next_stage_rewards: Dictionary = _gm.get_archetype_bank_rewards(3, true)
 	assert_int(int(next_stage_rewards.get("heal", 0))).is_equal(1)
 
@@ -343,9 +361,9 @@ func test_momentum_starts_at_zero() -> void:
 	assert_int(_gm.momentum).is_equal(0)
 
 
-func test_momentum_resets_on_lose_life() -> void:
+func test_momentum_resets_on_bust_hand_loss() -> void:
 	_gm.momentum = 3
-	_gm.lose_life()
+	_gm.spend_hand_on_bust()
 	assert_int(_gm.momentum).is_equal(0)
 
 
@@ -367,32 +385,32 @@ func test_momentum_resets_on_run_reset() -> void:
 	assert_int(_gm.momentum).is_equal(0)
 
 
-func test_momentum_changed_emitted_on_lose_life() -> void:
+func test_momentum_changed_emitted_on_bust_hand_loss() -> void:
 	_gm.momentum = 2
 	monitor_signals(_gm, false)
-	_gm.lose_life()
-	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+	_gm.spend_hand_on_bust()
+	assert_signal(_gm).is_emitted("momentum_changed", [0])
 
 
 func test_momentum_changed_emitted_on_advance_stage() -> void:
 	_gm.momentum = 3
 	monitor_signals(_gm, false)
 	_gm.advance_stage()
-	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+	assert_signal(_gm).is_emitted("momentum_changed", [0])
 
 
 func test_momentum_changed_emitted_on_reset_run() -> void:
 	_gm.momentum = 5
 	monitor_signals(_gm, false)
 	_gm.reset_run()
-	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+	assert_signal(_gm).is_emitted("momentum_changed", [0])
 
 
 func test_add_momentum_increments_and_emits() -> void:
 	monitor_signals(_gm, false)
 	_gm.add_momentum(2)
 	assert_int(_gm.momentum).is_equal(2)
-	await assert_signal(_gm).is_emitted("momentum_changed", [2])
+	assert_signal(_gm).is_emitted("momentum_changed", [2])
 
 
 func test_reset_momentum_sets_zero_and_emits() -> void:
@@ -400,7 +418,7 @@ func test_reset_momentum_sets_zero_and_emits() -> void:
 	monitor_signals(_gm, false)
 	_gm.reset_momentum()
 	assert_int(_gm.momentum).is_equal(0)
-	await assert_signal(_gm).is_emitted("momentum_changed", [0])
+	assert_signal(_gm).is_emitted("momentum_changed", [0])
 
 
 # ---------------------------------------------------------------------------
@@ -431,15 +449,24 @@ func test_remove_gold_clamps_and_emits() -> void:
 	monitor_signals(_gm, false)
 	_gm.remove_gold(25)
 	assert_int(_gm.gold).is_equal(0)
-	await assert_signal(_gm).is_emitted("gold_changed", [0])
+	assert_signal(_gm).is_emitted("gold_changed", [0])
 
 
-func test_heal_lives_clamps_and_emits() -> void:
-	_gm.lives = 2
+func test_heal_hands_clamps_and_emits() -> void:
+	_gm.hands = 2
 	monitor_signals(_gm, false)
-	_gm.heal_lives(5)
-	assert_int(_gm.lives).is_equal(_gm.MAX_LIVES)
-	await assert_signal(_gm).is_emitted("lives_changed", [_gm.MAX_LIVES])
+	_gm.heal_hands(5)
+	assert_int(_gm.hands).is_equal(_gm.BASE_STAGE_HANDS)
+	assert_signal(_gm).is_emitted("hands_changed", [_gm.BASE_STAGE_HANDS])
+
+
+func test_adjust_stage_hand_cap_updates_cap_and_hands() -> void:
+	_gm.adjust_stage_hand_cap(1)
+	assert_int(_gm.stage_hand_cap).is_equal(6)
+	assert_int(_gm.hands).is_equal(6)
+	_gm.adjust_stage_hand_cap(-2)
+	assert_int(_gm.stage_hand_cap).is_equal(4)
+	assert_int(_gm.hands).is_equal(4)
 
 
 func test_begin_stage_from_map_updates_stage_and_score() -> void:
@@ -454,9 +481,9 @@ func test_begin_stage_from_map_updates_stage_and_score() -> void:
 	assert_int(_gm.total_stages_cleared).is_equal(1)
 	assert_int(_gm.total_score).is_equal(0)
 	assert_int(_gm.current_stage_variant).is_equal(SpecialStageCatalog.Variant.PRECISION_HALL)
-	await assert_signal(_gm).is_emitted("score_changed", [0])
-	await assert_signal(_gm).is_emitted("stage_variant_changed", [SpecialStageCatalog.Variant.PRECISION_HALL])
-	await assert_signal(_gm).is_emitted("stage_advanced", [2])
+	assert_signal(_gm).is_emitted("score_changed", [0])
+	assert_signal(_gm).is_emitted("stage_variant_changed", [SpecialStageCatalog.Variant.PRECISION_HALL])
+	assert_signal(_gm).is_emitted("stage_advanced", [2])
 
 
 func test_begin_stage_from_map_without_node_clears_variant() -> void:

@@ -107,9 +107,30 @@ func test_constants_are_sensible() -> void:
 func test_arena_centers_in_viewport() -> void:
 	_arena._update_centering()
 	var viewport_size: Vector2 = Vector2(_arena.get_viewport().size)
-	var expected: Vector2 = (viewport_size - Vector2(DiceArena.ARENA_WIDTH, DiceArena.ARENA_HEIGHT)) * 0.5
-	assert_float(_arena.position.x).is_equal(expected.x)
-	assert_float(_arena.position.y).is_equal(expected.y)
+	var fit_scale: float = _arena._calculate_fit_scale(viewport_size)
+	var expected: Vector2 = (viewport_size - Vector2(DiceArena.ARENA_WIDTH, DiceArena.ARENA_HEIGHT) * fit_scale) * 0.5
+	assert_float(_arena.scale.x).is_equal_approx(fit_scale, 0.0001)
+	assert_float(_arena.scale.y).is_equal_approx(fit_scale, 0.0001)
+	assert_float(_arena.position.x).is_equal_approx(expected.x, 0.001)
+	assert_float(_arena.position.y).is_equal_approx(expected.y, 0.001)
+	assert_float(DiceArena.ARENA_WIDTH * _arena.scale.x).is_less_equal(viewport_size.x + 0.1)
+	assert_float(DiceArena.ARENA_HEIGHT * _arena.scale.y).is_less_equal(viewport_size.y + 0.1)
+
+
+func test_arena_scales_down_to_fit_small_viewport() -> void:
+	var subviewport: SubViewport = auto_free(SubViewport.new())
+	subviewport.size = Vector2i(960, 260)
+	add_child(subviewport)
+	var small_arena: DiceArena = auto_free(DiceArena.new())
+	subviewport.add_child(small_arena)
+	await get_tree().process_frame
+
+	small_arena._update_centering()
+
+	assert_float(small_arena.scale.x).is_less(1.0)
+	assert_float(small_arena.scale.y).is_less(1.0)
+	assert_float(DiceArena.ARENA_WIDTH * small_arena.scale.x).is_less_equal(float(subviewport.size.x) + 0.1)
+	assert_float(DiceArena.ARENA_HEIGHT * small_arena.scale.y).is_less_equal(float(subviewport.size.y) + 0.1)
 
 
 func test_throw_dice_spread_avoids_overlap() -> void:

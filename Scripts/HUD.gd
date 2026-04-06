@@ -24,7 +24,6 @@ const PROGRESS_THICKEN_GROW_DURATION: float = 0.1
 const PROGRESS_THICKEN_DEFLATE_DELAY: float = 0.14
 const PROGRESS_THICKEN_DEFLATE_DURATION: float = 0.45
 const ALMOST_THERE_THRESHOLD: float = 0.9
-const RISK_PIP_COUNT: int = 5
 const COMBO_BADGE_HEIGHT: int = 26
 const JUICY_DANGER_MIN: float = 0.6
 const JUICY_DANGER_MAX: float = 0.85
@@ -32,7 +31,6 @@ const JUICY_DANGER_SCORE_FLOOR: int = 12
 
 # -- Top bar labels --
 @onready var stage_label: Label      = $TopBar/TopBarMargin/TopBarRow/StageLabel
-@onready var lives_label: Label      = $TopBar/TopBarMargin/TopBarRow/LivesLabel
 @onready var gold_label: Label       = $TopBar/TopBarMargin/TopBarRow/GoldLabel
 @onready var luck_label: Label       = $TopBar/TopBarMargin/TopBarRow/LuckLabel
 @onready var momentum_label: Label   = $TopBar/TopBarMargin/TopBarRow/MomentumLabel
@@ -54,13 +52,10 @@ const JUICY_DANGER_SCORE_FLOOR: int = 12
 @onready var _streak_slot: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot
 
 # -- Info row --
-@onready var stop_label: Label            = $InfoRow/RiskColumn/StopLabel
+@onready var lives_label: Label           = $InfoRow/RiskColumn/HandsLabel
 @onready var _risk_column: VBoxContainer = $InfoRow/RiskColumn
 @onready var _risk_meta_label: Label = $InfoRow/RiskColumn/RiskMetaLabel
 @onready var _contract_label: Label = $InfoRow/RiskColumn/ContractLabel
-@onready var _risk_meter: PanelContainer = $InfoRow/RiskColumn/RiskMeter
-@onready var _risk_percent_label: Label = $InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskPercentLabel
-@onready var _risk_container: HBoxContainer = $InfoRow/RiskColumn/RiskMeter/RiskMeterMargin/RiskMeterRow/RiskContainer
 @onready var _risk_tooltip: PanelContainer = $RiskTooltip
 @onready var _risk_tooltip_label: Label = $RiskTooltip/MarginContainer/RiskTooltipLabel
 
@@ -83,11 +78,9 @@ var _progress_thickness_tween: Tween = null
 var _combo_flash_tween: Tween = null
 var _gold_tween: Tween = null
 var _displayed_gold: int = -1
-var _risk_pips: Array[Label] = []
 var _modifier_badges: Array[PanelContainer] = []
 var _last_modifier_types: Array[int] = []
 var _combo_badges_by_id: Dictionary = {}
-var _risk_tooltip_text: String = ""
 var _progress_bar_base_size: Vector2 = Vector2.ZERO
 var _progress_bar_thickness_bonus: float = 0.0
 var _score_feedback_active: bool = false
@@ -104,14 +97,13 @@ var _seed_copy_button: Button = null
 
 
 func _ready() -> void:
-	_create_risk_pips()
 	_cache_modifier_badges()
 	_create_seed_label()
 	_apply_theme_styling()
 	_contract_progress_service = ContractProgressServiceScript.new()
 	_progress_bar_base_size = progress_bar.custom_minimum_size
 	GameManager.score_changed.connect(_on_score_changed)
-	GameManager.lives_changed.connect(_on_lives_changed)
+	GameManager.hands_changed.connect(_on_lives_changed)
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.luck_changed.connect(_on_luck_changed)
 	GameManager.momentum_changed.connect(_on_momentum_changed)
@@ -139,8 +131,6 @@ func _ready() -> void:
 	_refresh_contract_display()
 	set_active_combos([])
 	_refresh_progress_display()
-	_risk_meter.mouse_entered.connect(_on_risk_meter_mouse_entered)
-	_risk_meter.mouse_exited.connect(_on_risk_meter_mouse_exited)
 	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
 	_score_feedback_display_total = GameManager.total_score
 
@@ -156,8 +146,6 @@ func _apply_theme_styling() -> void:
 	stage_label.add_theme_font_override("font", _UITheme.font_display())
 	stage_label.add_theme_font_size_override("font_size", 12)
 	stage_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
-	lives_label.add_theme_font_size_override("font_size", 20)
-	lives_label.add_theme_color_override("font_color", _UITheme.DANGER_RED)
 	gold_label.add_theme_font_override("font", _UITheme.font_stats())
 	gold_label.add_theme_font_size_override("font_size", 20)
 	gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
@@ -196,7 +184,8 @@ func _apply_theme_styling() -> void:
 	progress_hint_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 
 	# Info row
-	stop_label.add_theme_font_size_override("font_size", 18)
+	lives_label.add_theme_font_size_override("font_size", 18)
+	lives_label.add_theme_color_override("font_color", _UITheme.DANGER_RED)
 	_risk_meta_label.add_theme_font_override("font", _UITheme.font_mono())
 	_risk_meta_label.add_theme_font_size_override("font_size", 11)
 	_risk_meta_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
@@ -213,11 +202,6 @@ func _apply_theme_styling() -> void:
 		_seed_copy_button.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 		_seed_copy_button.custom_minimum_size = Vector2(24, 20)
 		_seed_copy_button.tooltip_text = "Copy seed"
-	_risk_meter.add_theme_stylebox_override("panel",
-		_UITheme.make_stage_family_panel_style("footer", _UITheme.CORNER_RADIUS_BADGE, 1))
-	_risk_percent_label.add_theme_font_override("font", _UITheme.font_display())
-	_risk_percent_label.add_theme_font_size_override("font_size", 10)
-	_risk_percent_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 	_risk_tooltip.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1))
 	_risk_tooltip_label.add_theme_font_override("font", _UITheme.font_body())
@@ -226,16 +210,6 @@ func _apply_theme_styling() -> void:
 
 	# Status
 	status_label.add_theme_font_size_override("font_size", 18)
-
-
-func _create_risk_pips() -> void:
-	for _i: int in RISK_PIP_COUNT:
-		var pip := Label.new()
-		pip.text = "○"
-		pip.add_theme_font_size_override("font_size", 16)
-		pip.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-		_risk_container.add_child(pip)
-		_risk_pips.append(pip)
 
 
 func _create_seed_label() -> void:
@@ -310,18 +284,12 @@ func update_turn(
 	shield_count: int = 0,
 	_reroll_count: int = 0,
 	bust_odds: float = 0.0,
-	risk_details: String = "",
+	_risk_details: String = "",
 	reroll_ev: float = 0.0
 ) -> void:
 	turn_score_label.text = "+%d" % turn_score
-	var stop_text: String = "STOP: %d/%d" % [stop_count, bust_threshold]
-	if shield_count > 0:
-		stop_text += " [%s×%d]" % [_UITheme.GLYPH_SHIELD, shield_count]
-	stop_label.text = stop_text
-	stop_label.modulate = _UITheme.DANGER_RED if stop_count > 0 else Color.WHITE
 	_last_bust_odds = bust_odds
 	var juicy_danger: bool = _is_juicy_danger(stop_count, bust_threshold, bust_odds, turn_score)
-	_update_risk_meter(bust_odds, risk_details, juicy_danger)
 	_refresh_risk_meta(stop_count, bust_threshold, shield_count, reroll_ev, juicy_danger)
 	_refresh_modifier_display()
 
@@ -531,29 +499,19 @@ func show_floating_gold(amount: int) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Risk Pips
+# Risk Tooltip
 # ---------------------------------------------------------------------------
 
-func _update_risk_meter(bust_odds: float, details: String, juicy_danger: bool = false) -> void:
-	var ratio: float = clampf(bust_odds, 0.0, 1.0)
-	var percent: int = int(round(ratio * 100.0))
-	_risk_percent_label.text = "RISK %d%%" % percent
-	_risk_tooltip_text = details
-	if _risk_tooltip.visible:
-		_risk_tooltip_label.text = _risk_tooltip_text
-		_position_risk_tooltip()
-	_update_risk_pips(ratio)
-	var border_color: Color = _UITheme.SUCCESS_GREEN
-	var border_width: int = 1
-	if juicy_danger:
-		border_color = _UITheme.EXPLOSION_ORANGE
-		border_width = 2
-	if ratio >= 0.66:
-		border_color = _UITheme.DANGER_RED
-	elif ratio >= 0.33:
-		border_color = _UITheme.SCORE_GOLD
-	_risk_meter.add_theme_stylebox_override("panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_BADGE, border_color, border_width))
+func show_risk_tooltip(anchor_rect: Rect2, risk_tooltip_text: String) -> void:
+	if risk_tooltip_text.is_empty():
+		return
+	_risk_tooltip_label.text = risk_tooltip_text
+	_risk_tooltip.visible = true
+	_position_risk_tooltip(anchor_rect)
+
+
+func hide_risk_tooltip() -> void:
+	_risk_tooltip.visible = false
 
 
 func _refresh_risk_meta(
@@ -611,48 +569,19 @@ func _is_juicy_danger(stop_count: int, bust_threshold: int, bust_odds: float, tu
 	)
 
 
-func _update_risk_pips(risk_ratio: float) -> void:
-	var filled: int = ceili(clampf(risk_ratio, 0.0, 1.0) * float(RISK_PIP_COUNT))
-
-	var pip_color: Color = _UITheme.SUCCESS_GREEN
-	if filled >= 4:
-		pip_color = _UITheme.DANGER_RED
-	elif filled >= 3:
-		pip_color = _UITheme.EXPLOSION_ORANGE
-	elif filled >= 2:
-		pip_color = _UITheme.SCORE_GOLD
-
-	for i: int in RISK_PIP_COUNT:
-		_risk_pips[i].text = "●" if i < filled else "○"
-		_risk_pips[i].add_theme_color_override("font_color", pip_color if i < filled else _UITheme.MUTED_TEXT)
-
-
-func _on_risk_meter_mouse_entered() -> void:
-	if _risk_tooltip_text.is_empty():
-		return
-	_risk_tooltip_label.text = _risk_tooltip_text
-	_risk_tooltip.visible = true
-	_position_risk_tooltip()
-
-
-func _on_risk_meter_mouse_exited() -> void:
-	_risk_tooltip.visible = false
-
-
-func _position_risk_tooltip() -> void:
+func _position_risk_tooltip(anchor_rect: Rect2) -> void:
 	if not _risk_tooltip.visible:
 		return
 	var tooltip_size: Vector2 = _risk_tooltip.get_combined_minimum_size()
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var meter_rect: Rect2 = Rect2(_risk_meter.global_position, _risk_meter.size)
 	var pad: float = 8.0
 	var x: float = clampf(
-		meter_rect.position.x + meter_rect.size.x * 0.5 - tooltip_size.x * 0.5,
+		anchor_rect.position.x + anchor_rect.size.x * 0.5 - tooltip_size.x * 0.5,
 		pad,
 		viewport_size.x - tooltip_size.x - pad
 	)
-	var above_y: float = meter_rect.position.y - tooltip_size.y - 10.0
-	var below_y: float = meter_rect.position.y + meter_rect.size.y + 10.0
+	var above_y: float = anchor_rect.position.y - tooltip_size.y - 10.0
+	var below_y: float = anchor_rect.position.y + anchor_rect.size.y + 10.0
 	var y: float = above_y
 	if y < pad:
 		y = minf(below_y, viewport_size.y - tooltip_size.y - pad)
@@ -672,10 +601,7 @@ func _on_score_changed(new_total: int) -> void:
 	_refresh_progress_display()
 
 func _on_lives_changed(new_lives: int) -> void:
-	var hearts: String = ""
-	for _i: int in new_lives:
-		hearts += _UITheme.GLYPH_HEART
-	lives_label.text = hearts if new_lives > 0 else _UITheme.GLYPH_STOP
+	lives_label.text = "HANDS: %d" % new_lives
 
 func _on_gold_changed(new_gold: int) -> void:
 	if _gold_tween and _gold_tween.is_valid():

@@ -28,7 +28,7 @@ enum EffectType {
 	LOSE_DIE,            # Lose 1 random die
 	ADD_CURSED_STOP,     # Random die gets CURSED_STOP face
 	BOOST_TARGETS,       # All targets +15% this loop
-	LOSE_LIFE,           # Lose 1 life
+	LOSE_LIFE,           # Lose 1 hand
 	LOSE_GOLD,           # -20g (clamped to 0)
 	GAIN_LUCK,           # +3 LUCK immediately
 	GAIN_REROUTE,        # Gain 1 reroute token
@@ -53,7 +53,7 @@ const CURSES: Array[Dictionary] = [
 	{"type": EffectType.LOSE_DIE, "name": "Sacrifice", "icon": "💀", "desc": "Lose 1 random die", "color_key": "DANGER_RED"},
 	{"type": EffectType.ADD_CURSED_STOP, "name": "Hex", "icon": "☠", "desc": "A random die gains a Cursed Stop", "color_key": "NEON_PURPLE"},
 	{"type": EffectType.BOOST_TARGETS, "name": "Harder Stages", "icon": "📈", "desc": "All targets +15% this loop", "color_key": "EXPLOSION_ORANGE"},
-	{"type": EffectType.LOSE_LIFE, "name": "Blood Price", "icon": "❤", "desc": "Lose 1 life", "color_key": "DANGER_RED"},
+	{"type": EffectType.LOSE_LIFE, "name": "Blood Price", "icon": "❤", "desc": "Lose 1 hand", "color_key": "DANGER_RED"},
 	{"type": EffectType.LOSE_GOLD, "name": "Pickpocket", "icon": "💸", "desc": "-20g", "color_key": "SCORE_GOLD"},
 ]
 
@@ -318,7 +318,7 @@ func _apply_effect(event: Dictionary) -> Dictionary:
 		EffectType.BOOST_TARGETS:
 			GameManager.apply_event_target_multiplier(1.15)
 		EffectType.LOSE_LIFE:
-			GameManager.lose_life()
+			GameManager.adjust_stage_hand_cap(-1)
 		EffectType.LOSE_GOLD:
 			GameManager.remove_gold(20)
 		EffectType.LOSE_HEAVY_GOLD:
@@ -368,7 +368,7 @@ func _build_effect_summary(event: Dictionary, effect_result: Dictionary = {}) ->
 		EffectType.BOOST_TARGETS:
 			return "EVENT: stage targets increased by 15% this loop"
 		EffectType.LOSE_LIFE:
-			return "EVENT: lost 1 life"
+			return "EVENT: lost 1 hand"
 		EffectType.LOSE_GOLD:
 			return "EVENT: lost 20g"
 		EffectType.GAIN_LUCK:
