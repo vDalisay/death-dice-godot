@@ -16,6 +16,7 @@ var _orig_next_stage_target_multiplier: float = 1.0
 var _orig_next_stage_first_bank_gold_multiplier: float = 1.0
 var _orig_next_stage_clear_gold_multiplier: float = 1.0
 var _orig_next_stage_starting_stop_pressure: int = 0
+var _orig_next_reward_rarity_bonus: int = 0
 var _orig_run_stop_shards: int = 0
 
 
@@ -32,6 +33,7 @@ func before_test() -> void:
 	_orig_next_stage_first_bank_gold_multiplier = GameManager.event_next_stage_first_bank_gold_multiplier
 	_orig_next_stage_clear_gold_multiplier = GameManager.event_next_stage_clear_gold_multiplier
 	_orig_next_stage_starting_stop_pressure = GameManager.event_next_stage_starting_stop_pressure
+	_orig_next_reward_rarity_bonus = GameManager.event_next_reward_rarity_bonus
 	_orig_run_stop_shards = GameManager.current_run_stop_shards
 
 
@@ -47,6 +49,7 @@ func after_test() -> void:
 	GameManager.event_next_stage_first_bank_gold_multiplier = _orig_next_stage_first_bank_gold_multiplier
 	GameManager.event_next_stage_clear_gold_multiplier = _orig_next_stage_clear_gold_multiplier
 	GameManager.event_next_stage_starting_stop_pressure = _orig_next_stage_starting_stop_pressure
+	GameManager.event_next_reward_rarity_bonus = _orig_next_reward_rarity_bonus
 	GameManager.current_run_stop_shards = _orig_run_stop_shards
 
 
@@ -61,6 +64,7 @@ func test_event_flags_default_values() -> void:
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 
 
 func test_reset_event_flags() -> void:
@@ -70,6 +74,7 @@ func test_reset_event_flags() -> void:
 	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
 	_gm.event_next_stage_clear_gold_multiplier = 2.0
 	_gm.event_next_stage_starting_stop_pressure = 1
+	_gm.event_next_reward_rarity_bonus = 1
 	_gm._reset_event_flags()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
@@ -77,6 +82,7 @@ func test_reset_event_flags() -> void:
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 
 
 func test_reset_run_clears_event_flags() -> void:
@@ -86,6 +92,7 @@ func test_reset_run_clears_event_flags() -> void:
 	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
 	_gm.event_next_stage_clear_gold_multiplier = 2.0
 	_gm.event_next_stage_starting_stop_pressure = 1
+	_gm.event_next_reward_rarity_bonus = 1
 	_gm.reset_run()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
@@ -93,6 +100,7 @@ func test_reset_run_clears_event_flags() -> void:
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +232,20 @@ func test_gain_stop_shards_adds_to_run_total() -> void:
 func test_set_next_stage_starting_stop_pressure_sets_flag() -> void:
 	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_STARTING_STOP_PRESSURE, "amount": 1})
 	assert_int(GameManager.event_next_stage_starting_stop_pressure).is_equal(1)
+
+
+func test_set_next_reward_rarity_bonus_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_REWARD_RARITY_BONUS, "amount": 1})
+	assert_int(GameManager.event_next_reward_rarity_bonus).is_equal(1)
+
+
+func test_gain_random_die_of_rarity_adds_blue_die() -> void:
+	var before_size: int = GameManager.dice_pool.size()
+	var result: Dictionary = _overlay._apply_effect({"type": StageEventScript.EffectType.GAIN_RANDOM_DIE_OF_RARITY, "rarity": DiceData.Rarity.BLUE})
+	assert_int(GameManager.dice_pool.size()).is_equal(before_size + 1)
+	var gained_dice: Array = result.get("gained_dice", []) as Array
+	assert_int(gained_dice.size()).is_equal(1)
+	assert_int((gained_dice[0] as DiceData).rarity).is_equal(DiceData.Rarity.BLUE)
 
 
 func test_reset_momentum_effect_sets_momentum_to_zero() -> void:

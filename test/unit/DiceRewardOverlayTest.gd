@@ -99,6 +99,16 @@ func test_pick_die_has_faces() -> void:
 		assert_int(die.faces.size()).is_greater(0)
 
 
+func test_apply_rarity_bonus_clamps_to_purple() -> void:
+	var upgraded: DiceData.Rarity = OverlayScript._apply_rarity_bonus(DiceData.Rarity.BLUE, 2)
+	assert_int(upgraded).is_equal(DiceData.Rarity.PURPLE)
+
+
+func test_apply_rarity_bonus_increases_by_one_tier() -> void:
+	var upgraded: DiceData.Rarity = OverlayScript._apply_rarity_bonus(DiceData.Rarity.GREEN, 1)
+	assert_int(upgraded).is_equal(DiceData.Rarity.BLUE)
+
+
 # ---------------------------------------------------------------------------
 # Rarity name
 # ---------------------------------------------------------------------------

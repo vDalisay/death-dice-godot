@@ -475,16 +475,25 @@ func test_consume_next_stage_starting_stop_pressure_applies_once() -> void:
 	assert_int(_gm.consume_next_stage_starting_stop_pressure()).is_equal(0)
 
 
+func test_consume_next_reward_rarity_bonus_applies_once() -> void:
+	_gm.set_next_reward_rarity_bonus(1)
+	assert_int(_gm.consume_next_reward_rarity_bonus()).is_equal(1)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.consume_next_reward_rarity_bonus()).is_equal(0)
+
+
 func test_reset_run_clears_pending_next_stage_event_flags() -> void:
 	_gm.set_next_stage_target_multiplier(1.2)
 	_gm.set_next_stage_first_bank_gold_multiplier(1.35)
 	_gm.set_next_stage_clear_gold_multiplier(2.0)
 	_gm.set_next_stage_starting_stop_pressure(1)
+	_gm.set_next_reward_rarity_bonus(1)
 	_gm.reset_run()
 	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
+	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 
 
 func test_remove_gold_clamps_and_emits() -> void:

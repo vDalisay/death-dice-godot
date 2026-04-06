@@ -5,6 +5,7 @@ extends ColorRect
 signal event_resolved(summary: String, status_color: Color)
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
+const DiceRewardOverlayScript: GDScript = preload("res://Scripts/DiceRewardOverlay.gd")
 
 const BACKDROP_ALPHA: float = 0.72
 const CARD_WIDTH: int = 228
@@ -40,6 +41,8 @@ enum EffectType {
 	SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER,
 	GAIN_STOP_SHARDS,
 	SET_NEXT_STAGE_STARTING_STOP_PRESSURE,
+	SET_NEXT_REWARD_RARITY_BONUS,
+	GAIN_RANDOM_DIE_OF_RARITY,
 }
 
 const CHOICE_SAFE: String = "SAFE VALUE"
@@ -333,6 +336,10 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 			GameManager.add_run_stop_shards(int(effect.get("amount", 10)))
 		EffectType.SET_NEXT_STAGE_STARTING_STOP_PRESSURE:
 			GameManager.set_next_stage_starting_stop_pressure(int(effect.get("amount", 1)))
+		EffectType.SET_NEXT_REWARD_RARITY_BONUS:
+			GameManager.set_next_reward_rarity_bonus(int(effect.get("amount", 1)))
+		EffectType.GAIN_RANDOM_DIE_OF_RARITY:
+			return {"gained_dice": [_gain_random_die_of_rarity(int(effect.get("rarity", DiceData.Rarity.BLUE)))]}
 	return {}
 
 
@@ -342,6 +349,34 @@ func _pick_event_definition() -> Dictionary:
 	if event_index < 0:
 		event_index = 0
 	return (event_pool[event_index] as Dictionary).duplicate(true)
+
+
+func _build_blessing_pool() -> Array[Dictionary]:
+	var pool: Array[Dictionary] = [
+		{"name": "House Favor"},
+		{"name": "Lucky Break"},
+		{"name": "Well Stocked"},
+		{"name": "Second Wind"},
+		{"name": "Loaded Dice"},
+	]
+	if SaveManager.has_prestige_unlock("new_events"):
+		pool.append({"name": "Thread the Needle"})
+		pool.append({"name": "Golden Route"})
+	return pool
+
+
+func _build_curse_pool() -> Array[Dictionary]:
+	var pool: Array[Dictionary] = [
+		{"name": "Skimmed Purse"},
+		{"name": "Bent Pips"},
+		{"name": "Cold Streak"},
+		{"name": "Short Stack"},
+		{"name": "Cracked Guard"},
+	]
+	if SaveManager.has_prestige_unlock("new_events"):
+		pool.append({"name": "Skull Tax"})
+		pool.append({"name": "Dead End"})
+	return pool
 
 
 func _build_event_pool() -> Array[Dictionary]:
@@ -664,6 +699,51 @@ func _build_event_pool() -> Array[Dictionary]:
 				},
 			],
 		},
+		{
+			"title": "MELT MARKET",
+			"flavor": "A furnace broker weighs your scrap, your luck, and whatever you can afford to lose.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Take the Cashout",
+					"icon": "💵",
+					"color_key": "SCORE_GOLD",
+					"upside": "+20g now",
+					"downside": "No premium conversion",
+					"summary": "EVENT: Melt Market paid 20g",
+					"hint_type": "low_gold",
+					"effects": [{"type": EffectType.GAIN_GOLD, "amount": 20}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Smelt a Die",
+					"icon": "♨",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "Next die reward gets +1 rarity tier",
+					"downside": "Lose 1 random die",
+					"summary": "EVENT: Melt Market smelted a die into a better reward",
+					"hint_type": "wide_pool",
+					"effects": [
+						{"type": EffectType.LOSE_DIE, "count": 1},
+						{"type": EffectType.SET_NEXT_REWARD_RARITY_BONUS, "amount": 1},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Buy Hot Stock",
+					"icon": "🎲",
+					"color_key": "NEON_PURPLE",
+					"upside": "Gain a random rare die now",
+					"downside": "Lose 25g",
+					"summary": "EVENT: Melt Market sold you a rare die at a loss",
+					"hint_type": "low_gold",
+					"effects": [
+						{"type": EffectType.LOSE_GOLD, "amount": 25},
+						{"type": EffectType.GAIN_RANDOM_DIE_OF_RARITY, "rarity": DiceData.Rarity.BLUE},
+					],
+				},
+			],
+		},
 	]
 
 
@@ -781,6 +861,13 @@ func _gain_random_dice(count: int) -> Array[DiceData]:
 		GameManager.add_dice(die)
 		gained_dice.append(die)
 	return gained_dice
+
+
+func _gain_random_die_of_rarity(rarity_value: int) -> DiceData:
+	var rarity: DiceData.Rarity = clampi(rarity_value, DiceData.Rarity.GREY, DiceData.Rarity.PURPLE) as DiceData.Rarity
+	var die: DiceData = DiceRewardOverlayScript._pick_die_for_rarity(rarity)
+	GameManager.add_dice(die)
+	return die
 
 
 func _clear_choice_cards() -> void:

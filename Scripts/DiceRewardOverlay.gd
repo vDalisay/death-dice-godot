@@ -89,12 +89,14 @@ func _rebuild_reward_cards(luck: int) -> void:
 	_cards.clear()
 
 	var weights: Array[float] = _calc_weights(luck)
+	var rarity_bonus: int = GameManager.consume_next_reward_rarity_bonus()
 	for i: int in 3:
 		var die: DiceData = null
 		if i == 0:
 			die = DiceData.make_reroll_chaser_d6(mini(2, maxi(0, GameManager.current_loop - 1)))
 		else:
 			var rarity: DiceData.Rarity = _roll_rarity(weights)
+			rarity = _apply_rarity_bonus(rarity, rarity_bonus)
 			die = _pick_die_for_rarity(rarity)
 		_dice_options.append(die)
 		var card: PanelContainer = _build_card(die, i)
@@ -176,6 +178,10 @@ static func _pick_die_for_rarity(rarity: DiceData.Rarity) -> DiceData:
 	var method_name: String = pool[index]
 	var die: DiceData = Callable(DiceData, method_name).call() as DiceData
 	return die
+
+
+static func _apply_rarity_bonus(rarity: DiceData.Rarity, bonus: int) -> DiceData.Rarity:
+	return clampi(int(rarity) + maxi(0, bonus), DiceData.Rarity.GREY, DiceData.Rarity.PURPLE) as DiceData.Rarity
 
 
 # ---------------------------------------------------------------------------
