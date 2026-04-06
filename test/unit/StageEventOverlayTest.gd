@@ -12,6 +12,9 @@ var _orig_dice_pool: Array[DiceData] = []
 var _orig_gold: int = 0
 var _orig_lives: int = 0
 var _orig_stage_target: int = 0
+var _orig_next_stage_target_multiplier: float = 1.0
+var _orig_next_stage_first_bank_gold_multiplier: float = 1.0
+var _orig_next_stage_clear_gold_multiplier: float = 1.0
 
 
 func before_test() -> void:
@@ -23,6 +26,9 @@ func before_test() -> void:
 	_orig_gold = GameManager.gold
 	_orig_lives = GameManager.lives
 	_orig_stage_target = GameManager.stage_target_score
+	_orig_next_stage_target_multiplier = GameManager.event_next_stage_target_multiplier
+	_orig_next_stage_first_bank_gold_multiplier = GameManager.event_next_stage_first_bank_gold_multiplier
+	_orig_next_stage_clear_gold_multiplier = GameManager.event_next_stage_clear_gold_multiplier
 
 
 func after_test() -> void:
@@ -33,6 +39,9 @@ func after_test() -> void:
 	GameManager.stage_target_score = _orig_stage_target
 	GameManager.event_free_bust = false
 	GameManager.event_target_multiplier = 1.0
+	GameManager.event_next_stage_target_multiplier = _orig_next_stage_target_multiplier
+	GameManager.event_next_stage_first_bank_gold_multiplier = _orig_next_stage_first_bank_gold_multiplier
+	GameManager.event_next_stage_clear_gold_multiplier = _orig_next_stage_clear_gold_multiplier
 
 
 # ---------------------------------------------------------------------------
@@ -42,22 +51,37 @@ func after_test() -> void:
 func test_event_flags_default_values() -> void:
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 
 
 func test_reset_event_flags() -> void:
 	_gm.event_free_bust = true
 	_gm.event_target_multiplier = 1.15
+	_gm.event_next_stage_target_multiplier = 1.2
+	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
+	_gm.event_next_stage_clear_gold_multiplier = 2.0
 	_gm._reset_event_flags()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 
 
 func test_reset_run_clears_event_flags() -> void:
 	_gm.event_free_bust = true
 	_gm.event_target_multiplier = 1.15
+	_gm.event_next_stage_target_multiplier = 1.2
+	_gm.event_next_stage_first_bank_gold_multiplier = 1.35
+	_gm.event_next_stage_clear_gold_multiplier = 2.0
 	_gm.reset_run()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +187,27 @@ func test_boost_targets_sets_multiplier() -> void:
 	_overlay._apply_effect({"type": 7})
 	assert_float(GameManager.event_target_multiplier).is_equal(1.15)
 	assert_int(GameManager.stage_target_score).is_equal(115)
+
+
+func test_set_next_stage_target_multiplier_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER, "multiplier": 1.2})
+	assert_float(GameManager.event_next_stage_target_multiplier).is_equal(1.2)
+
+
+func test_set_next_stage_first_bank_gold_multiplier_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_FIRST_BANK_GOLD_MULTIPLIER, "multiplier": 1.35})
+	assert_float(GameManager.event_next_stage_first_bank_gold_multiplier).is_equal(1.35)
+
+
+func test_set_next_stage_clear_gold_multiplier_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER, "multiplier": 2.0})
+	assert_float(GameManager.event_next_stage_clear_gold_multiplier).is_equal(2.0)
+
+
+func test_reset_momentum_effect_sets_momentum_to_zero() -> void:
+	GameManager.momentum = 3
+	_overlay._apply_effect({"type": StageEventScript.EffectType.RESET_MOMENTUM})
+	assert_int(GameManager.momentum).is_equal(0)
 
 
 func test_lose_life_decrements() -> void:

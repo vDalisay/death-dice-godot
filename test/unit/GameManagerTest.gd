@@ -444,6 +444,40 @@ func test_apply_event_target_multiplier_scales_stage_target() -> void:
 	assert_int(_gm.stage_target_score).is_equal(115)
 
 
+func test_begin_stage_from_map_consumes_next_stage_target_multiplier() -> void:
+	_gm.set_next_stage_target_multiplier(1.25)
+	_gm.begin_stage_from_map()
+	assert_int(_gm.current_stage).is_equal(2)
+	assert_int(_gm.stage_target_score).is_equal(roundi(26.0 * 1.25))
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+
+
+func test_add_score_consumes_next_stage_first_bank_gold_multiplier_once() -> void:
+	_gm.set_next_stage_first_bank_gold_multiplier(1.35)
+	_gm.add_score(20)
+	assert_int(_gm.gold).is_equal(27)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	_gm.add_score(10)
+	assert_int(_gm.gold).is_equal(37)
+
+
+func test_consume_next_stage_clear_gold_bonus_applies_once() -> void:
+	_gm.set_next_stage_clear_gold_multiplier(2.0)
+	assert_int(_gm.consume_next_stage_clear_gold_bonus(30)).is_equal(60)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+	assert_int(_gm.consume_next_stage_clear_gold_bonus(30)).is_equal(30)
+
+
+func test_reset_run_clears_pending_next_stage_event_flags() -> void:
+	_gm.set_next_stage_target_multiplier(1.2)
+	_gm.set_next_stage_first_bank_gold_multiplier(1.35)
+	_gm.set_next_stage_clear_gold_multiplier(2.0)
+	_gm.reset_run()
+	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
+	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
+
+
 func test_remove_gold_clamps_and_emits() -> void:
 	_gm.gold = 10
 	monitor_signals(_gm, false)

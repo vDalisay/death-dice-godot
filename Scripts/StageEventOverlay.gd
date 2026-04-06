@@ -34,6 +34,10 @@ enum EffectType {
 	GAIN_REROUTE,
 	LOSE_HEAVY_GOLD,
 	DOUBLE_CURSED_STOP,
+	RESET_MOMENTUM,
+	SET_NEXT_STAGE_TARGET_MULTIPLIER,
+	SET_NEXT_STAGE_FIRST_BANK_GOLD_MULTIPLIER,
+	SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER,
 }
 
 const CHOICE_SAFE: String = "SAFE VALUE"
@@ -315,6 +319,14 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 		EffectType.DOUBLE_CURSED_STOP:
 			_add_cursed_stop_to_random_die()
 			_add_cursed_stop_to_random_die()
+		EffectType.RESET_MOMENTUM:
+			GameManager.reset_momentum()
+		EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER:
+			GameManager.set_next_stage_target_multiplier(float(effect.get("multiplier", 1.15)))
+		EffectType.SET_NEXT_STAGE_FIRST_BANK_GOLD_MULTIPLIER:
+			GameManager.set_next_stage_first_bank_gold_multiplier(float(effect.get("multiplier", 1.35)))
+		EffectType.SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER:
+			GameManager.set_next_stage_clear_gold_multiplier(float(effect.get("multiplier", 2.0)))
 	return {}
 
 
@@ -512,6 +524,94 @@ func _build_event_pool() -> Array[Dictionary]:
 				},
 			],
 		},
+		{
+			"title": "LAST CALL",
+			"flavor": "The pit boss offers one clean payout, one reset, and one debt against tomorrow.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Cash Out Quietly",
+					"icon": "💰",
+					"color_key": "SCORE_GOLD",
+					"upside": "+25g now",
+					"downside": "No extra leverage",
+					"summary": "EVENT: Last Call paid out 25g",
+					"hint_type": "low_gold",
+					"effects": [{"type": EffectType.GAIN_GOLD, "amount": 25}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Reset the Heater",
+					"icon": "♻",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "+45g immediately",
+					"downside": "Reset momentum",
+					"summary": "EVENT: Last Call traded momentum for 45g",
+					"hint_type": "momentum_high",
+					"effects": [
+						{"type": EffectType.RESET_MOMENTUM},
+						{"type": EffectType.GAIN_GOLD, "amount": 45},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Borrow From Tomorrow",
+					"icon": "⚡",
+					"color_key": "ACTION_CYAN",
+					"upside": "First bank next stage gains +35% gold",
+					"downside": "Lose 15g now",
+					"summary": "EVENT: Last Call staked your next stage bank for extra gold",
+					"hint_type": "momentum_low",
+					"effects": [
+						{"type": EffectType.LOSE_GOLD, "amount": 15},
+						{"type": EffectType.SET_NEXT_STAGE_FIRST_BANK_GOLD_MULTIPLIER, "multiplier": 1.35},
+					],
+				},
+			],
+		},
+		{
+			"title": "HOUSE ADVANTAGE",
+			"flavor": "The floor manager offers a little money now or a more expensive table next round.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Take the Token",
+					"icon": "🪙",
+					"color_key": "SCORE_GOLD",
+					"upside": "+20g now",
+					"downside": "No extra upside",
+					"summary": "EVENT: House Advantage paid out 20g",
+					"hint_type": "low_gold",
+					"effects": [{"type": EffectType.GAIN_GOLD, "amount": 20}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Play Up a Table",
+					"icon": "📈",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "+25g immediately",
+					"downside": "Next stage target +15%",
+					"summary": "EVENT: House Advantage raised the stakes for 25g",
+					"effects": [
+						{"type": EffectType.GAIN_GOLD, "amount": 25},
+						{"type": EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER, "multiplier": 1.15},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Rig the Payout",
+					"icon": "🎯",
+					"color_key": "NEON_PURPLE",
+					"upside": "Next stage clear reward gold is doubled",
+					"downside": "Next stage target +15%",
+					"summary": "EVENT: House Advantage rigged the next clear reward",
+					"effects": [
+						{"type": EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER, "multiplier": 1.15},
+						{"type": EffectType.SET_NEXT_STAGE_CLEAR_GOLD_MULTIPLIER, "multiplier": 2.0},
+					],
+				},
+			],
+		},
 	]
 
 
@@ -585,6 +685,12 @@ func _choice_hint(choice: Dictionary) -> String:
 		"high_hands":
 			if GameManager.hands >= 4:
 				return "GOOD IF YOU HAVE HANDS TO SPARE"
+		"momentum_high":
+			if GameManager.momentum >= 2:
+				return "GOOD IF MOMENTUM IS LOW VALUE"
+		"momentum_low":
+			if GameManager.momentum <= 1:
+				return "GOOD IF YOU'RE RESETTING"
 	return ""
 
 

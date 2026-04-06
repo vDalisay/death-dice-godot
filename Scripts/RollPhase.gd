@@ -1392,7 +1392,7 @@ func _perform_stage_clear() -> void:
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
-	var bonus: int = GameManager.get_stage_clear_bonus()
+	var bonus: int = GameManager.consume_next_stage_clear_gold_bonus(GameManager.get_stage_clear_bonus())
 	var surplus: int = GameManager.total_score - GameManager.stage_target_score
 	GameManager.add_gold(bonus)
 	SFXManager.play_stage_clear()

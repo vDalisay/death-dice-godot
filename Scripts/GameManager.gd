@@ -118,6 +118,9 @@ var near_death_banks_this_run: int = 0
 ## Event flags — temporary effects that reset each loop.
 var event_free_bust: bool = false
 var event_target_multiplier: float = 1.0
+var event_next_stage_target_multiplier: float = 1.0
+var event_next_stage_first_bank_gold_multiplier: float = 1.0
+var event_next_stage_clear_gold_multiplier: float = 1.0
 ## Momentum: consecutive banks this stage. Resets on bust / stage transition.
 var momentum: int = 0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
@@ -312,6 +315,40 @@ func apply_event_target_multiplier(multiplier: float) -> void:
 	stage_target_score = roundi(float(stage_target_score) * multiplier)
 
 
+func set_next_stage_target_multiplier(multiplier: float) -> void:
+	event_next_stage_target_multiplier = multiplier
+
+
+func set_next_stage_first_bank_gold_multiplier(multiplier: float) -> void:
+	event_next_stage_first_bank_gold_multiplier = multiplier
+
+
+func set_next_stage_clear_gold_multiplier(multiplier: float) -> void:
+	event_next_stage_clear_gold_multiplier = multiplier
+
+
+func apply_pending_next_stage_modifiers() -> void:
+	if not is_equal_approx(event_next_stage_target_multiplier, 1.0):
+		stage_target_score = roundi(float(stage_target_score) * event_next_stage_target_multiplier)
+		event_next_stage_target_multiplier = 1.0
+
+
+func consume_next_stage_first_bank_gold_bonus(base_gold: int) -> int:
+	if base_gold <= 0 or is_equal_approx(event_next_stage_first_bank_gold_multiplier, 1.0):
+		return base_gold
+	var adjusted_gold: int = roundi(float(base_gold) * event_next_stage_first_bank_gold_multiplier)
+	event_next_stage_first_bank_gold_multiplier = 1.0
+	return adjusted_gold
+
+
+func consume_next_stage_clear_gold_bonus(base_gold: int) -> int:
+	if base_gold <= 0 or is_equal_approx(event_next_stage_clear_gold_multiplier, 1.0):
+		return base_gold
+	var adjusted_gold: int = roundi(float(base_gold) * event_next_stage_clear_gold_multiplier)
+	event_next_stage_clear_gold_multiplier = 1.0
+	return adjusted_gold
+
+
 func remove_gold(amount: int) -> void:
 	gold = maxi(gold - maxi(0, amount), 0)
 	gold_changed.emit(gold)
@@ -389,6 +426,7 @@ func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
 	current_stage += 1
 	total_score = 0
 	stage_target_score = _calculate_stage_target(current_stage)
+	apply_pending_next_stage_modifiers()
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
 
@@ -460,6 +498,7 @@ func add_score(points: int) -> void:
 	var gold_earned: int = points
 	if chosen_archetype == Archetype.RISK_IT:
 		gold_earned *= 2
+	gold_earned = consume_next_stage_first_bank_gold_bonus(gold_earned)
 	add_gold(gold_earned)
 	score_changed.emit(total_score)
 	turn_banked.emit(points, total_score)
@@ -544,6 +583,7 @@ func advance_stage() -> void:
 	_last_call_heal_used_this_stage = false
 	reset_momentum()
 	stage_target_score = _calculate_stage_target(current_stage)
+	apply_pending_next_stage_modifiers()
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
 
@@ -568,6 +608,7 @@ func advance_loop() -> void:
 	clear_active_loop_contract()
 	generate_stage_map()
 	stage_target_score = _calculate_stage_target(current_stage)
+	apply_pending_next_stage_modifiers()
 	score_changed.emit(total_score)
 	stage_advanced.emit(current_stage)
 	run_mode_changed.emit(run_mode)
@@ -628,8 +669,7 @@ func reset_run() -> void:
 	near_death_banks_this_stage = 0
 	near_death_banks_this_run = 0
 	_last_call_heal_used_this_stage = false
-	event_free_bust = false
-	event_target_multiplier = 1.0
+	_reset_event_flags()
 	reset_momentum()
 	active_modifiers.clear()
 	clear_active_loop_contract()
@@ -824,6 +864,9 @@ func track_shop_spend(amount: int) -> void:
 func _reset_event_flags() -> void:
 	event_free_bust = false
 	event_target_multiplier = 1.0
+	event_next_stage_target_multiplier = 1.0
+	event_next_stage_first_bank_gold_multiplier = 1.0
+	event_next_stage_clear_gold_multiplier = 1.0
 
 
 func apply_prestige_reward_reroll_used() -> void:
@@ -945,6 +988,9 @@ func build_active_run_state() -> Dictionary:
 		"near_death_banks_this_run": near_death_banks_this_run,
 		"event_free_bust": event_free_bust,
 		"event_target_multiplier": event_target_multiplier,
+		"event_next_stage_target_multiplier": event_next_stage_target_multiplier,
+		"event_next_stage_first_bank_gold_multiplier": event_next_stage_first_bank_gold_multiplier,
+		"event_next_stage_clear_gold_multiplier": event_next_stage_clear_gold_multiplier,
 		"momentum": momentum,
 		"shop_gold_spent": _shop_gold_spent,
 		"miser_bonus_pending": _miser_bonus_pending,
@@ -996,6 +1042,9 @@ func apply_active_run_state(data: Dictionary) -> void:
 	near_death_banks_this_run = int(data.get("near_death_banks_this_run", 0))
 	event_free_bust = bool(data.get("event_free_bust", false))
 	event_target_multiplier = float(data.get("event_target_multiplier", 1.0))
+	event_next_stage_target_multiplier = float(data.get("event_next_stage_target_multiplier", 1.0))
+	event_next_stage_first_bank_gold_multiplier = float(data.get("event_next_stage_first_bank_gold_multiplier", 1.0))
+	event_next_stage_clear_gold_multiplier = float(data.get("event_next_stage_clear_gold_multiplier", 1.0))
 	momentum = int(data.get("momentum", 0))
 	_shop_gold_spent = int(data.get("shop_gold_spent", 0))
 	_miser_bonus_pending = bool(data.get("miser_bonus_pending", false))
