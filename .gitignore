@@ -12,10 +12,14 @@ reports/
 Mcp/godot-mcp-runtime
 
 # Test artifacts
-test_stderr.txt
-test_stdout.txt
-*_stderr.txt
-*_stdout.txt
+/test_stderr.txt
+/test_stdout.txt
+/test_run_stderr.txt
+/test_run_stdout.txt
+/full_test_stderr*.txt
+/full_test_stdout*.txt
+/*_stderr.txt
+/*_stdout.txt
 
 # Local planning notes
 PRESTIGE_SIDEBETS_PLAN.md
