@@ -79,7 +79,8 @@ size_flags_vertical = 3
 
 [node name="CardsContainer" type="GridContainer" parent="CenterContainer/Card/MarginContainer/Content/ScrollContainer"]
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 6
+size_flags_vertical = 6
 columns = 3
 theme_override_constants/h_separation = 12
 theme_override_constants/v_separation = 12
