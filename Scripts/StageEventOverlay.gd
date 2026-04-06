@@ -43,6 +43,8 @@ enum EffectType {
 	SET_NEXT_STAGE_STARTING_STOP_PRESSURE,
 	SET_NEXT_REWARD_RARITY_BONUS,
 	GAIN_RANDOM_DIE_OF_RARITY,
+	HEAL_IF_NOT_FULL_ELSE_GOLD,
+	SET_NEXT_ROUTE_RESTRICTION,
 }
 
 const CHOICE_SAFE: String = "SAFE VALUE"
@@ -340,6 +342,13 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 			GameManager.set_next_reward_rarity_bonus(int(effect.get("amount", 1)))
 		EffectType.GAIN_RANDOM_DIE_OF_RARITY:
 			return {"gained_dice": [_gain_random_die_of_rarity(int(effect.get("rarity", DiceData.Rarity.BLUE)))]}
+		EffectType.HEAL_IF_NOT_FULL_ELSE_GOLD:
+			if GameManager.hands < GameManager.stage_hand_cap:
+				GameManager.heal_hands(int(effect.get("heal", 1)))
+			else:
+				GameManager.add_gold(int(effect.get("gold", 15)))
+		EffectType.SET_NEXT_ROUTE_RESTRICTION:
+			GameManager.set_next_route_restriction(int(effect.get("restriction", GameManager.NextRouteRestriction.NONE)))
 	return {}
 
 
@@ -740,6 +749,52 @@ func _build_event_pool() -> Array[Dictionary]:
 					"effects": [
 						{"type": EffectType.LOSE_GOLD, "amount": 25},
 						{"type": EffectType.GAIN_RANDOM_DIE_OF_RARITY, "rarity": DiceData.Rarity.BLUE},
+					],
+				},
+			],
+		},
+		{
+			"title": "QUIET TABLE",
+			"flavor": "A velvet-rope dealer offers a calmer lane, if you can live with the house choosing what counts as calm.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Catch Your Breath",
+					"icon": "🫀",
+					"color_key": "ACTION_CYAN",
+					"upside": "Heal 1 hand, or gain 15g if already full",
+					"downside": "No route leverage",
+					"summary": "EVENT: Quiet Table steadied the run",
+					"hint_type": "fragile_run",
+					"effects": [{"type": EffectType.HEAL_IF_NOT_FULL_ELSE_GOLD, "heal": 1, "gold": 15}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Take the Quiet Lane",
+					"icon": "🕯",
+					"color_key": "ACTION_CYAN",
+					"upside": "Next route must be Standard and gain +2 LUCK",
+					"downside": "You lose access to spicier lines next row",
+					"summary": "EVENT: Quiet Table forced a standard route for +2 LUCK",
+					"hint_type": "fortune_build",
+					"effects": [
+						{"type": EffectType.SET_NEXT_ROUTE_RESTRICTION, "restriction": GameManager.NextRouteRestriction.STANDARD_ONLY},
+						{"type": EffectType.GAIN_LUCK, "amount": 2},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Shut the Hot Doors",
+					"icon": "🚪",
+					"color_key": "EXPLOSION_ORANGE",
+					"upside": "+35g and next die reward gets +1 rarity tier",
+					"downside": "Hard routes are barred next row",
+					"summary": "EVENT: Quiet Table barred hard routes for gold and a cleaner reward",
+					"hint_type": "low_gold",
+					"effects": [
+						{"type": EffectType.SET_NEXT_ROUTE_RESTRICTION, "restriction": GameManager.NextRouteRestriction.NO_HARD},
+						{"type": EffectType.GAIN_GOLD, "amount": 35},
+						{"type": EffectType.SET_NEXT_REWARD_RARITY_BONUS, "amount": 1},
 					],
 				},
 			],

@@ -17,6 +17,7 @@ var _orig_next_stage_first_bank_gold_multiplier: float = 1.0
 var _orig_next_stage_clear_gold_multiplier: float = 1.0
 var _orig_next_stage_starting_stop_pressure: int = 0
 var _orig_next_reward_rarity_bonus: int = 0
+var _orig_next_route_restriction: int = 0
 var _orig_run_stop_shards: int = 0
 
 
@@ -34,6 +35,7 @@ func before_test() -> void:
 	_orig_next_stage_clear_gold_multiplier = GameManager.event_next_stage_clear_gold_multiplier
 	_orig_next_stage_starting_stop_pressure = GameManager.event_next_stage_starting_stop_pressure
 	_orig_next_reward_rarity_bonus = GameManager.event_next_reward_rarity_bonus
+	_orig_next_route_restriction = GameManager.event_next_route_restriction
 	_orig_run_stop_shards = GameManager.current_run_stop_shards
 
 
@@ -50,6 +52,7 @@ func after_test() -> void:
 	GameManager.event_next_stage_clear_gold_multiplier = _orig_next_stage_clear_gold_multiplier
 	GameManager.event_next_stage_starting_stop_pressure = _orig_next_stage_starting_stop_pressure
 	GameManager.event_next_reward_rarity_bonus = _orig_next_reward_rarity_bonus
+	GameManager.event_next_route_restriction = _orig_next_route_restriction as GameManager.NextRouteRestriction
 	GameManager.current_run_stop_shards = _orig_run_stop_shards
 
 
@@ -65,6 +68,7 @@ func test_event_flags_default_values() -> void:
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
 
 
 func test_reset_event_flags() -> void:
@@ -75,6 +79,7 @@ func test_reset_event_flags() -> void:
 	_gm.event_next_stage_clear_gold_multiplier = 2.0
 	_gm.event_next_stage_starting_stop_pressure = 1
 	_gm.event_next_reward_rarity_bonus = 1
+	_gm.event_next_route_restriction = _gm.NextRouteRestriction.NO_HARD
 	_gm._reset_event_flags()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
@@ -83,6 +88,7 @@ func test_reset_event_flags() -> void:
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
 
 
 func test_reset_run_clears_event_flags() -> void:
@@ -93,6 +99,7 @@ func test_reset_run_clears_event_flags() -> void:
 	_gm.event_next_stage_clear_gold_multiplier = 2.0
 	_gm.event_next_stage_starting_stop_pressure = 1
 	_gm.event_next_reward_rarity_bonus = 1
+	_gm.event_next_route_restriction = _gm.NextRouteRestriction.STANDARD_ONLY
 	_gm.reset_run()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
@@ -101,6 +108,7 @@ func test_reset_run_clears_event_flags() -> void:
 	assert_float(_gm.event_next_stage_clear_gold_multiplier).is_equal(1.0)
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
+	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +245,29 @@ func test_set_next_stage_starting_stop_pressure_sets_flag() -> void:
 func test_set_next_reward_rarity_bonus_sets_flag() -> void:
 	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_REWARD_RARITY_BONUS, "amount": 1})
 	assert_int(GameManager.event_next_reward_rarity_bonus).is_equal(1)
+
+
+func test_set_next_route_restriction_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_ROUTE_RESTRICTION, "restriction": GameManager.NextRouteRestriction.STANDARD_ONLY})
+	assert_int(GameManager.event_next_route_restriction).is_equal(GameManager.NextRouteRestriction.STANDARD_ONLY)
+
+
+func test_heal_if_not_full_else_gold_heals_when_hurt() -> void:
+	GameManager.stage_hand_cap = 5
+	GameManager.hands = 3
+	var before_gold: int = GameManager.gold
+	_overlay._apply_effect({"type": StageEventScript.EffectType.HEAL_IF_NOT_FULL_ELSE_GOLD, "heal": 1, "gold": 15})
+	assert_int(GameManager.hands).is_equal(4)
+	assert_int(GameManager.gold).is_equal(before_gold)
+
+
+func test_heal_if_not_full_else_gold_pays_gold_when_full() -> void:
+	GameManager.stage_hand_cap = 5
+	GameManager.hands = 5
+	var before_gold: int = GameManager.gold
+	_overlay._apply_effect({"type": StageEventScript.EffectType.HEAL_IF_NOT_FULL_ELSE_GOLD, "heal": 1, "gold": 15})
+	assert_int(GameManager.hands).is_equal(5)
+	assert_int(GameManager.gold).is_equal(before_gold + 15)
 
 
 func test_gain_random_die_of_rarity_adds_blue_die() -> void:

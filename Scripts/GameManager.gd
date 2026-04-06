@@ -22,6 +22,7 @@ const ARCHETYPE_CAPSTONE_LOOP: int = 3
 
 enum Archetype { CAUTION, RISK_IT, BLANK_SLATE, FORTUNE_FOOL, STOP_COLLECTOR, LAST_CALL }
 enum RunMode { CLASSIC, GAUNTLET }
+enum NextRouteRestriction { NONE, STANDARD_ONLY, NO_HARD }
 const ARCHETYPE_NAMES: Dictionary = {
 	Archetype.CAUTION: "Caution",
 	Archetype.RISK_IT: "Risk It",
@@ -123,6 +124,7 @@ var event_next_stage_first_bank_gold_multiplier: float = 1.0
 var event_next_stage_clear_gold_multiplier: float = 1.0
 var event_next_stage_starting_stop_pressure: int = 0
 var event_next_reward_rarity_bonus: int = 0
+var event_next_route_restriction: NextRouteRestriction = NextRouteRestriction.NONE
 ## Momentum: consecutive banks this stage. Resets on bust / stage transition.
 var momentum: int = 0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
@@ -337,6 +339,17 @@ func set_next_reward_rarity_bonus(amount: int) -> void:
 	event_next_reward_rarity_bonus = maxi(0, amount)
 
 
+func set_next_route_restriction(restriction: int) -> void:
+	if not NextRouteRestriction.values().has(restriction):
+		event_next_route_restriction = NextRouteRestriction.NONE
+		return
+	event_next_route_restriction = restriction as NextRouteRestriction
+
+
+func clear_next_route_restriction() -> void:
+	event_next_route_restriction = NextRouteRestriction.NONE
+
+
 func apply_pending_next_stage_modifiers() -> void:
 	if not is_equal_approx(event_next_stage_target_multiplier, 1.0):
 		stage_target_score = roundi(float(stage_target_score) * event_next_stage_target_multiplier)
@@ -442,6 +455,7 @@ func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
 	if stage_node != null:
 		stage_variant = stage_node.stage_variant
 	set_current_stage_variant(stage_variant)
+	clear_next_route_restriction()
 	clear_special_stage()
 
 	total_stages_cleared += 1
@@ -891,6 +905,7 @@ func _reset_event_flags() -> void:
 	event_next_stage_clear_gold_multiplier = 1.0
 	event_next_stage_starting_stop_pressure = 0
 	event_next_reward_rarity_bonus = 0
+	event_next_route_restriction = NextRouteRestriction.NONE
 
 
 func apply_prestige_reward_reroll_used() -> void:
@@ -1017,6 +1032,7 @@ func build_active_run_state() -> Dictionary:
 		"event_next_stage_clear_gold_multiplier": event_next_stage_clear_gold_multiplier,
 		"event_next_stage_starting_stop_pressure": event_next_stage_starting_stop_pressure,
 		"event_next_reward_rarity_bonus": event_next_reward_rarity_bonus,
+		"event_next_route_restriction": int(event_next_route_restriction),
 		"momentum": momentum,
 		"shop_gold_spent": _shop_gold_spent,
 		"miser_bonus_pending": _miser_bonus_pending,
@@ -1073,6 +1089,7 @@ func apply_active_run_state(data: Dictionary) -> void:
 	event_next_stage_clear_gold_multiplier = float(data.get("event_next_stage_clear_gold_multiplier", 1.0))
 	event_next_stage_starting_stop_pressure = int(data.get("event_next_stage_starting_stop_pressure", 0))
 	event_next_reward_rarity_bonus = int(data.get("event_next_reward_rarity_bonus", 0))
+	set_next_route_restriction(int(data.get("event_next_route_restriction", int(NextRouteRestriction.NONE))))
 	momentum = int(data.get("momentum", 0))
 	_shop_gold_spent = int(data.get("shop_gold_spent", 0))
 	_miser_bonus_pending = bool(data.get("miser_bonus_pending", false))

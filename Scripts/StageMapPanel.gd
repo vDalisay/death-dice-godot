@@ -64,6 +64,7 @@ var _reroute_enabled: bool = false
 var _transition_tween: Tween = null
 var _last_open_used_loop_reveal: bool = false
 var _is_closing: bool = false
+var _route_restriction: int = GameManager.NextRouteRestriction.NONE
 
 
 func _ready() -> void:
@@ -84,6 +85,7 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
     _reroute_uses = reroute_uses if _current_row > 0 else 0
     _reroute_enabled = false
     _title_label.text = "ROUTE BOARD"
+    _route_restriction = int(GameManager.event_next_route_restriction)
     modulate.a = 1.0
     _backdrop.modulate.a = 0.0
     visible = true
@@ -451,9 +453,54 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
 
 
 func _can_reach(row: int, col: int) -> bool:
+    if not _is_route_allowed(row, col):
+        return false
     if row == _current_row and _reroute_enabled:
         return true
     return _is_reachable_without_reroute(row, col)
+
+
+func _is_route_allowed(row: int, col: int) -> bool:
+    if row != _current_row or _stage_map == null:
+        return true
+    if not _is_route_restriction_active_for_current_row():
+        return true
+    var node: MapNodeData = _stage_map.get_node_at(row, col)
+    if node == null:
+        return false
+    match _route_restriction:
+        GameManager.NextRouteRestriction.STANDARD_ONLY:
+            return _is_standard_route(node)
+        GameManager.NextRouteRestriction.NO_HARD:
+            return not _is_hard_route(node)
+    return true
+
+
+func _is_route_restriction_active_for_current_row() -> bool:
+    if _route_restriction == GameManager.NextRouteRestriction.NONE or _stage_map == null:
+        return false
+    var row_nodes: Array[MapNodeData] = _stage_map.get_row(_current_row)
+    for node: MapNodeData in row_nodes:
+        if node != null and _node_satisfies_route_restriction(node):
+            return true
+    return false
+
+
+func _node_satisfies_route_restriction(node: MapNodeData) -> bool:
+    match _route_restriction:
+        GameManager.NextRouteRestriction.STANDARD_ONLY:
+            return _is_standard_route(node)
+        GameManager.NextRouteRestriction.NO_HARD:
+            return not _is_hard_route(node)
+    return true
+
+
+func _is_standard_route(node: MapNodeData) -> bool:
+    return node.type == MapNodeData.NodeType.NORMAL_STAGE and not node.has_special_stage_variant()
+
+
+func _is_hard_route(node: MapNodeData) -> bool:
+    return node.has_special_stage_variant() or node.type == MapNodeData.NodeType.SPECIAL_STAGE
 
 
 func _is_reachable_without_reroute(row: int, col: int) -> bool:
@@ -562,6 +609,8 @@ func _get_selected_node_state_text(row: int, col: int) -> String:
         return "Spent"
     if row == _current_row and _reroute_enabled and not _is_reachable_without_reroute(row, col):
         return "Reroute"
+    if row == _current_row and not _is_route_allowed(row, col):
+        return "Restricted"
     if row == _current_row and _can_reach(row, col):
         return "Available Now"
     if row == _current_row:
@@ -620,6 +669,11 @@ func _refresh_hint_label() -> void:
     var base_text: String = "Stage %d / %d  |  Inspect a route, then commit from the lit row." % [_current_row + 1, StageMapData.ROWS_PER_LOOP]
     if _selected_node != null:
         base_text = "Stage %d / %d  |  %s" % [_current_row + 1, StageMapData.ROWS_PER_LOOP, _selected_node.get_hover_description()]
+    if _is_route_restriction_active_for_current_row():
+        var restriction_text: String = "Quiet Table: standard route required."
+        if _route_restriction == GameManager.NextRouteRestriction.NO_HARD:
+            restriction_text = "Quiet Table: hard routes are barred."
+        base_text = "%s  %s" % [base_text, restriction_text]
     if _reroute_enabled:
         _hint_label.text = "%s  Reroute preview is live; brass marks spend a token only if chosen." % base_text
     elif _reroute_uses > 0:
@@ -643,6 +697,8 @@ func _get_route_hint(row: int, col: int) -> String:
         return "Row %d visited" % (row + 1)
     if row > _current_row:
         return "Row %d future path" % (row + 1)
+    if not _is_route_allowed(row, col):
+        return "Row %d restricted by Quiet Table" % (row + 1)
     if _reroute_enabled and not _is_reachable_without_reroute(row, col):
         return "Row %d reroute path" % (row + 1)
     if _is_reachable_without_reroute(row, col):
