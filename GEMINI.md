@@ -1,6 +1,7 @@
 # Death Dice - Gemini Agent Context
 
 ## Architecture & Conventions (Strict)
+- **Project Lore & Mechanics:** If you need to understand the game loop, core mechanics, or current codebase state, read `ProjectInfo.md`.
 - **GDScript 4.6.1 (Mono):** Static typing is mandatory for all variables, parameters, and return types.
 - **Decoupling:** Scenes NEVER reach into each other directly. Use typed Signals for cross-scene communication.
 - **Node Refs:** Always use `@onready` for node references. Never use `get_node()` inside `_process()`.
@@ -20,8 +21,3 @@
 - **No Headless Testing:** GdUnit4 does not support `--headless` in this project.
 - **Runtime Checks:** Always run the project via `godot-mcp` after changes and check debug output for silent errors.
 
-## Core Game Design Philosophy
-- **Core Loop:** Roll entire dice pool -> View results -> Select dice to Keep or Reroll -> Reroll -> Repeat until Bank or Bust.
-- **Push-Your-Luck:** Tension is the core driver of fun. The safe choice (bank) must always be available. Busting costs 1 life and the turn score.
-- **Bust Thresholds:** Turn 1 is immune. Turns 2-3 have a lenient threshold (4 stops). Turns 4+ use the standard threshold (3 stops).
-- **Rewards:** Prioritize "juicy" audio-visual feedback, variable rewards (Cubitos-style), and "snowball" progression fantasies.
