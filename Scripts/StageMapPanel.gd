@@ -65,6 +65,7 @@ var _transition_tween: Tween = null
 var _last_open_used_loop_reveal: bool = false
 var _is_closing: bool = false
 var _route_restriction: int = GameManager.NextRouteRestriction.NONE
+var _next_row_reveal_active: bool = false
 
 
 func _ready() -> void:
@@ -86,6 +87,7 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
     _reroute_enabled = false
     _title_label.text = "ROUTE BOARD"
     _route_restriction = int(GameManager.event_next_route_restriction)
+    _next_row_reveal_active = GameManager.consume_next_map_row_reveal()
     modulate.a = 1.0
     _backdrop.modulate.a = 0.0
     visible = true
@@ -93,6 +95,7 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
     _last_open_used_loop_reveal = GameManager.consume_loop_reveal(GameManager.current_loop)
     _refresh_context_label()
     _refresh_hint_label()
+    _refresh_reveal_preview()
     _refresh_reroute_button()
     _refresh_selected_node_panel()
     _pending_open = true
@@ -366,6 +369,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
     var node_color: Color = node.get_color()
     var is_selected: bool = row == _selected_row and col == _selected_col
     var is_current_row: bool = row == _current_row
+    var is_revealed_future_row: bool = row == _get_revealed_row_index()
     var is_reachable: bool = _is_reachable_without_reroute(row, col)
     var is_reroute_target: bool = is_current_row and _reroute_enabled and not is_reachable
     var is_available_now: bool = is_current_row and _can_reach(row, col)
@@ -418,6 +422,14 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
         state_text = "LOCKED"
         state_color = Color("#8B7051")
         button_alpha = UNREACHABLE_ALPHA
+    elif is_revealed_future_row:
+        fill_color = Color("#1A2026")
+        border_color = Color("#5B7A92")
+        accent_color = Color("#8EC7F2")
+        stamp_color = Color("#D8EEF8")
+        state_text = "SEEN"
+        state_color = Color("#8EC7F2")
+        button_alpha = 0.95
     else:
         fill_color = Color("#131018")
         border_color = Color("#2A252D")
@@ -600,6 +612,37 @@ func _refresh_selected_node_panel() -> void:
     _selected_node_rule.text = "Rule Preview: %s" % special_preview
 
 
+func _refresh_reveal_preview() -> void:
+    var revealed_row_index: int = _get_revealed_row_index()
+    if revealed_row_index < 0 or _stage_map == null:
+        _board_label.text = "ROUTE GRID"
+        _legend_label.text = "Hover routes for details."
+        return
+    _board_label.text = "ROUTE GRID  |  LANTERN ON ROW %d" % (revealed_row_index + 1)
+    _legend_label.text = _build_revealed_row_preview(revealed_row_index)
+
+
+func _get_revealed_row_index() -> int:
+    if not _next_row_reveal_active or _stage_map == null:
+        return -1
+    var next_row: int = _current_row + 1
+    if next_row < 0 or next_row >= _stage_map.get_row_count():
+        return -1
+    return next_row
+
+
+func _build_revealed_row_preview(row_index: int) -> String:
+    var row_nodes: Array[MapNodeData] = _stage_map.get_row(row_index)
+    var parts: Array[String] = []
+    for node: MapNodeData in row_nodes:
+        if node == null:
+            continue
+        parts.append("%s: %s" % [node.get_display_name(), node.get_hover_description()])
+    if parts.is_empty():
+        return "Lantern found no future route data."
+    return "Lantern reveal row %d -> %s" % [row_index + 1, "  |  ".join(parts)]
+
+
 func _get_selected_node_state_text(row: int, col: int) -> String:
     if _selected_node == null:
         return "Inspect"
@@ -674,6 +717,9 @@ func _refresh_hint_label() -> void:
         if _route_restriction == GameManager.NextRouteRestriction.NO_HARD:
             restriction_text = "Quiet Table: hard routes are barred."
         base_text = "%s  %s" % [base_text, restriction_text]
+    var revealed_row_index: int = _get_revealed_row_index()
+    if revealed_row_index >= 0:
+        base_text = "%s  Loaded Lantern reveals row %d ahead." % [base_text, revealed_row_index + 1]
     if _reroute_enabled:
         _hint_label.text = "%s  Reroute preview is live; brass marks spend a token only if chosen." % base_text
     elif _reroute_uses > 0:
@@ -696,6 +742,8 @@ func _get_route_hint(row: int, col: int) -> String:
     if row < _current_row:
         return "Row %d visited" % (row + 1)
     if row > _current_row:
+        if row == _get_revealed_row_index():
+            return "Row %d lantern-revealed" % (row + 1)
         return "Row %d future path" % (row + 1)
     if not _is_route_allowed(row, col):
         return "Row %d restricted by Quiet Table" % (row + 1)

@@ -18,6 +18,7 @@ var _orig_next_stage_clear_gold_multiplier: float = 1.0
 var _orig_next_stage_starting_stop_pressure: int = 0
 var _orig_next_reward_rarity_bonus: int = 0
 var _orig_next_route_restriction: int = 0
+var _orig_next_map_row_reveal: bool = false
 var _orig_run_stop_shards: int = 0
 
 
@@ -36,6 +37,7 @@ func before_test() -> void:
 	_orig_next_stage_starting_stop_pressure = GameManager.event_next_stage_starting_stop_pressure
 	_orig_next_reward_rarity_bonus = GameManager.event_next_reward_rarity_bonus
 	_orig_next_route_restriction = GameManager.event_next_route_restriction
+	_orig_next_map_row_reveal = GameManager.event_next_map_row_reveal
 	_orig_run_stop_shards = GameManager.current_run_stop_shards
 
 
@@ -53,6 +55,7 @@ func after_test() -> void:
 	GameManager.event_next_stage_starting_stop_pressure = _orig_next_stage_starting_stop_pressure
 	GameManager.event_next_reward_rarity_bonus = _orig_next_reward_rarity_bonus
 	GameManager.event_next_route_restriction = _orig_next_route_restriction as GameManager.NextRouteRestriction
+	GameManager.event_next_map_row_reveal = _orig_next_map_row_reveal
 	GameManager.current_run_stop_shards = _orig_run_stop_shards
 
 
@@ -69,6 +72,7 @@ func test_event_flags_default_values() -> void:
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 func test_reset_event_flags() -> void:
@@ -80,6 +84,7 @@ func test_reset_event_flags() -> void:
 	_gm.event_next_stage_starting_stop_pressure = 1
 	_gm.event_next_reward_rarity_bonus = 1
 	_gm.event_next_route_restriction = _gm.NextRouteRestriction.NO_HARD
+	_gm.event_next_map_row_reveal = true
 	_gm._reset_event_flags()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
@@ -89,6 +94,7 @@ func test_reset_event_flags() -> void:
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 func test_reset_run_clears_event_flags() -> void:
@@ -100,6 +106,7 @@ func test_reset_run_clears_event_flags() -> void:
 	_gm.event_next_stage_starting_stop_pressure = 1
 	_gm.event_next_reward_rarity_bonus = 1
 	_gm.event_next_route_restriction = _gm.NextRouteRestriction.STANDARD_ONLY
+	_gm.event_next_map_row_reveal = true
 	_gm.reset_run()
 	assert_bool(_gm.event_free_bust).is_false()
 	assert_float(_gm.event_target_multiplier).is_equal(1.0)
@@ -109,6 +116,7 @@ func test_reset_run_clears_event_flags() -> void:
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +258,11 @@ func test_set_next_reward_rarity_bonus_sets_flag() -> void:
 func test_set_next_route_restriction_sets_flag() -> void:
 	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_ROUTE_RESTRICTION, "restriction": GameManager.NextRouteRestriction.STANDARD_ONLY})
 	assert_int(GameManager.event_next_route_restriction).is_equal(GameManager.NextRouteRestriction.STANDARD_ONLY)
+
+
+func test_set_next_map_row_reveal_sets_flag() -> void:
+	_overlay._apply_effect({"type": StageEventScript.EffectType.SET_NEXT_MAP_ROW_REVEAL, "enabled": true})
+	assert_bool(GameManager.event_next_map_row_reveal).is_true()
 
 
 func test_heal_if_not_full_else_gold_heals_when_hurt() -> void:

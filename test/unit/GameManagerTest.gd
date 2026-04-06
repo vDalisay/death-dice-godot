@@ -489,6 +489,13 @@ func test_set_next_route_restriction_sanitizes_invalid_values() -> void:
 	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.STANDARD_ONLY)
 
 
+func test_consume_next_map_row_reveal_applies_once() -> void:
+	_gm.set_next_map_row_reveal(true)
+	assert_bool(_gm.consume_next_map_row_reveal()).is_true()
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
+	assert_bool(_gm.consume_next_map_row_reveal()).is_false()
+
+
 func test_reset_run_clears_pending_next_stage_event_flags() -> void:
 	_gm.set_next_stage_target_multiplier(1.2)
 	_gm.set_next_stage_first_bank_gold_multiplier(1.35)
@@ -496,6 +503,7 @@ func test_reset_run_clears_pending_next_stage_event_flags() -> void:
 	_gm.set_next_stage_starting_stop_pressure(1)
 	_gm.set_next_reward_rarity_bonus(1)
 	_gm.set_next_route_restriction(_gm.NextRouteRestriction.NO_HARD)
+	_gm.set_next_map_row_reveal(true)
 	_gm.reset_run()
 	assert_float(_gm.event_next_stage_target_multiplier).is_equal(1.0)
 	assert_float(_gm.event_next_stage_first_bank_gold_multiplier).is_equal(1.0)
@@ -503,6 +511,7 @@ func test_reset_run_clears_pending_next_stage_event_flags() -> void:
 	assert_int(_gm.event_next_stage_starting_stop_pressure).is_equal(0)
 	assert_int(_gm.event_next_reward_rarity_bonus).is_equal(0)
 	assert_int(_gm.event_next_route_restriction).is_equal(_gm.NextRouteRestriction.NONE)
+	assert_bool(_gm.event_next_map_row_reveal).is_false()
 
 
 func test_remove_gold_clamps_and_emits() -> void:

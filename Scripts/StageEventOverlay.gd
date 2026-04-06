@@ -45,6 +45,7 @@ enum EffectType {
 	GAIN_RANDOM_DIE_OF_RARITY,
 	HEAL_IF_NOT_FULL_ELSE_GOLD,
 	SET_NEXT_ROUTE_RESTRICTION,
+	SET_NEXT_MAP_ROW_REVEAL,
 }
 
 const CHOICE_SAFE: String = "SAFE VALUE"
@@ -349,6 +350,8 @@ func _apply_effect(effect: Dictionary) -> Dictionary:
 				GameManager.add_gold(int(effect.get("gold", 15)))
 		EffectType.SET_NEXT_ROUTE_RESTRICTION:
 			GameManager.set_next_route_restriction(int(effect.get("restriction", GameManager.NextRouteRestriction.NONE)))
+		EffectType.SET_NEXT_MAP_ROW_REVEAL:
+			GameManager.set_next_map_row_reveal(bool(effect.get("enabled", true)))
 	return {}
 
 
@@ -795,6 +798,52 @@ func _build_event_pool() -> Array[Dictionary]:
 						{"type": EffectType.SET_NEXT_ROUTE_RESTRICTION, "restriction": GameManager.NextRouteRestriction.NO_HARD},
 						{"type": EffectType.GAIN_GOLD, "amount": 35},
 						{"type": EffectType.SET_NEXT_REWARD_RARITY_BONUS, "amount": 1},
+					],
+				},
+			],
+		},
+		{
+			"title": "LOADED LANTERN",
+			"flavor": "A brass guide-lamp can light the board for a price, or burn your next table hotter than planned.",
+			"choices": [
+				{
+					"category": CHOICE_SAFE,
+					"name": "Carry the Lamp",
+					"icon": "🏮",
+					"color_key": "ACTION_CYAN",
+					"upside": "+1 reroute use",
+					"downside": "No extra information",
+					"summary": "EVENT: Loaded Lantern granted a reroute token",
+					"hint_type": "wide_pool",
+					"effects": [{"type": EffectType.GAIN_REROUTE, "amount": 1}],
+				},
+				{
+					"category": CHOICE_BARGAIN,
+					"name": "Light the Side Paths",
+					"icon": "✨",
+					"color_key": "ACTION_CYAN",
+					"upside": "+1 reroute use and +1 LUCK",
+					"downside": "Next stage target +8%",
+					"summary": "EVENT: Loaded Lantern bought luck and reroute room at a steeper target",
+					"hint_type": "fortune_build",
+					"effects": [
+						{"type": EffectType.GAIN_REROUTE, "amount": 1},
+						{"type": EffectType.GAIN_LUCK, "amount": 1},
+						{"type": EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER, "multiplier": 1.08},
+					],
+				},
+				{
+					"category": CHOICE_PREMIUM,
+					"name": "Flood the Board",
+					"icon": "🔦",
+					"color_key": "NEON_PURPLE",
+					"upside": "Next map row is fully previewed",
+					"downside": "Next stage target +15%",
+					"summary": "EVENT: Loaded Lantern exposed the next row for a harder stage",
+					"hint_type": "thin_pool",
+					"effects": [
+						{"type": EffectType.SET_NEXT_MAP_ROW_REVEAL, "enabled": true},
+						{"type": EffectType.SET_NEXT_STAGE_TARGET_MULTIPLIER, "multiplier": 1.15},
 					],
 				},
 			],

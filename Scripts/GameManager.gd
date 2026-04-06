@@ -125,6 +125,7 @@ var event_next_stage_clear_gold_multiplier: float = 1.0
 var event_next_stage_starting_stop_pressure: int = 0
 var event_next_reward_rarity_bonus: int = 0
 var event_next_route_restriction: NextRouteRestriction = NextRouteRestriction.NONE
+var event_next_map_row_reveal: bool = false
 ## Momentum: consecutive banks this stage. Resets on bust / stage transition.
 var momentum: int = 0
 ## Tracks gold spent in the current shop visit (for Miser modifier).
@@ -348,6 +349,17 @@ func set_next_route_restriction(restriction: int) -> void:
 
 func clear_next_route_restriction() -> void:
 	event_next_route_restriction = NextRouteRestriction.NONE
+
+
+func set_next_map_row_reveal(enabled: bool) -> void:
+	event_next_map_row_reveal = enabled
+
+
+func consume_next_map_row_reveal() -> bool:
+	if not event_next_map_row_reveal:
+		return false
+	event_next_map_row_reveal = false
+	return true
 
 
 func apply_pending_next_stage_modifiers() -> void:
@@ -906,6 +918,7 @@ func _reset_event_flags() -> void:
 	event_next_stage_starting_stop_pressure = 0
 	event_next_reward_rarity_bonus = 0
 	event_next_route_restriction = NextRouteRestriction.NONE
+	event_next_map_row_reveal = false
 
 
 func apply_prestige_reward_reroll_used() -> void:
@@ -1033,6 +1046,7 @@ func build_active_run_state() -> Dictionary:
 		"event_next_stage_starting_stop_pressure": event_next_stage_starting_stop_pressure,
 		"event_next_reward_rarity_bonus": event_next_reward_rarity_bonus,
 		"event_next_route_restriction": int(event_next_route_restriction),
+		"event_next_map_row_reveal": event_next_map_row_reveal,
 		"momentum": momentum,
 		"shop_gold_spent": _shop_gold_spent,
 		"miser_bonus_pending": _miser_bonus_pending,
@@ -1090,6 +1104,7 @@ func apply_active_run_state(data: Dictionary) -> void:
 	event_next_stage_starting_stop_pressure = int(data.get("event_next_stage_starting_stop_pressure", 0))
 	event_next_reward_rarity_bonus = int(data.get("event_next_reward_rarity_bonus", 0))
 	set_next_route_restriction(int(data.get("event_next_route_restriction", int(NextRouteRestriction.NONE))))
+	event_next_map_row_reveal = bool(data.get("event_next_map_row_reveal", false))
 	momentum = int(data.get("momentum", 0))
 	_shop_gold_spent = int(data.get("shop_gold_spent", 0))
 	_miser_bonus_pending = bool(data.get("miser_bonus_pending", false))
