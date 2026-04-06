@@ -165,16 +165,15 @@ func test_per_die_scores_sum_equals_turn_score() -> void:
 	assert_int(per_die_sum).is_equal(turn_score)
 
 
-func test_multiplier_vfx_anchor_is_left_center_of_arena() -> void:
+func test_multiplier_vfx_anchor_is_left_of_progress_bar() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
 	var anchor: Vector2 = root._get_multiplier_vfx_anchor_global_position()
-	var arena_rect := Rect2(root._arena_viewport_container.global_position, root._arena_viewport_container.size)
-	assert_float(anchor.x).is_greater_equal(arena_rect.position.x)
-	assert_float(anchor.x).is_less(arena_rect.position.x + arena_rect.size.x * 0.35)
-	assert_float(anchor.y).is_greater(arena_rect.position.y + arena_rect.size.y * 0.25)
-	assert_float(anchor.y).is_less(arena_rect.position.y + arena_rect.size.y * 0.75)
+	var bar_rect := Rect2(root.hud.progress_bar.global_position, root.hud.progress_bar.size)
+	assert_float(anchor.x).is_less(bar_rect.position.x)
+	assert_float(anchor.x).is_greater(bar_rect.position.x - 40.0)
+	assert_float(absf(anchor.y - (bar_rect.position.y + bar_rect.size.y * 0.5))).is_less(0.1)
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +208,7 @@ func test_close_call_at_threshold_minus_one() -> void:
 
 	# Should show CLOSE CALL and remain ACTIVE (not bust).
 	assert_int(root.turn_state).is_equal(RollPhase.TurnState.ACTIVE)
-	assert_str(root.hud.status_label.text).contains("CLOSE CALL")
+	assert_bool(_hud_feed_contains(root.hud, "CLOSE CALL")).is_true()
 
 
 func test_close_call_not_on_turn_1() -> void:
@@ -239,7 +238,7 @@ func test_close_call_not_on_turn_1() -> void:
 	await runner.simulate_frames(2)
 
 	# On turn 1, CLOSE CALL should not appear (turn 1 immunity has its own msg).
-	assert_str(root.hud.status_label.text).not_contains("CLOSE CALL")
+	assert_bool(_hud_feed_contains(root.hud, "CLOSE CALL")).is_false()
 
 
 func test_clean_roll_on_zero_stops() -> void:
@@ -262,7 +261,7 @@ func test_clean_roll_on_zero_stops() -> void:
 	root._process_roll_results(all_indices)
 	await runner.simulate_frames(2)
 
-	assert_str(root.hud.status_label.text).contains("CLEAN ROLL")
+	assert_bool(_hud_feed_contains(root.hud, "CLEAN ROLL")).is_true()
 
 
 # ---------------------------------------------------------------------------
@@ -385,9 +384,17 @@ func test_insurance_cancels_bust_forfeits_turn_and_burns_face() -> void:
 	assert_int(GameManager.lives).is_equal(lives_before)
 	assert_int(GameManager.total_score).is_equal(0)
 	assert_int(insurance_face.type).is_equal(DiceFaceData.FaceType.BLANK)
-	assert_str(root.hud.status_label.text).contains("INSURANCE")
+	assert_bool(_hud_feed_contains(root.hud, "INSURANCE")).is_true()
 
 	for _i: int in 20:
 		await runner.simulate_frames(1, 100)
 	await runner.simulate_frames(5)
 	assert_int(root.turn_state).is_equal(RollPhase.TurnState.IDLE)
+
+
+func _hud_feed_contains(hud: HUD, needle: String) -> bool:
+	for entry: Dictionary in hud._feed_entries:
+		var message: String = str(entry.get("message", ""))
+		if message.contains(needle):
+			return true
+	return false

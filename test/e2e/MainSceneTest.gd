@@ -2,6 +2,8 @@ extends GdUnitTestSuite
 ## End-to-end tests for the main game scene using GdUnit4 scene runner.
 ## Tests the full game loop: rolling, banking, busting, and new runs.
 
+const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
+
 
 func before_test() -> void:
 	GameManager.skip_archetype_picker = true
@@ -48,7 +50,8 @@ func test_roll_button_starts_enabled() -> void:
 	var root: RollPhase = _get_root(runner)
 	assert_bool(root.roll_button.disabled).is_false()
 	assert_str(root.roll_button.text).is_equal("Roll All")
-	assert_str(GameManager.active_loop_contract_id).is_equal("safe_hands")
+	assert_str(GameManager.active_loop_contract_id).is_not_empty()
+	assert_bool(LoopContractCatalogScript.get_pool_ids_for_loop(1).has(GameManager.active_loop_contract_id)).is_true()
 
 
 func test_contract_overlay_is_visible_next_to_arena() -> void:
@@ -292,6 +295,7 @@ func test_near_death_bank_awards_bonus_gold() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _get_root(runner)
+	GameManager.clear_active_loop_contract()
 	GameManager.stage_target_score = 999
 	GameManager.gold = 0
 	GameManager.total_score = 0

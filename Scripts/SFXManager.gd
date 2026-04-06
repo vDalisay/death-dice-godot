@@ -128,6 +128,14 @@ func play_shield_absorb() -> void:
 	_play_tone_delayed(920.0, 0.08, 0.3, 0.04)
 
 
+func play_ui_slot(is_heavy: bool = false) -> void:
+	var base: float = 170.0 if is_heavy else 220.0
+	var accent: float = 940.0 if is_heavy else 1120.0
+	_play_tone(base, 0.08, 0.42)
+	_play_tone_delayed(base * 0.72, 0.11, 0.28, 0.015)
+	_play_tone_delayed(accent, 0.04, 0.18, 0.02)
+
+
 # ---------------------------------------------------------------------------
 # Internal
 # ---------------------------------------------------------------------------
