@@ -328,6 +328,7 @@ func _on_bank_pressed() -> void:
 	var old_total: int = GameManager.total_score
 	var will_clear_stage: bool = old_total + banked >= GameManager.stage_target_score
 	var special_clear_rewards: Dictionary = GameManager.get_special_stage_clear_rewards(effective_stops, will_clear_stage)
+	var special_score_bonus: int = int(special_preview.get("bonus_score", 0)) + int(special_clear_rewards.get("bonus_score", 0))
 	_defer_stage_clear_overlay = will_clear_stage
 	_pending_stage_clear_overlay = false
 	GameManager.add_score(banked)
@@ -339,6 +340,11 @@ func _on_bank_pressed() -> void:
 	var special_luck: int = int(special_preview.get("bonus_luck", 0)) + int(special_clear_rewards.get("bonus_luck", 0))
 	if special_luck > 0:
 		GameManager.add_luck(special_luck)
+	_publish_bank_score_feed(combo_bonus, streak_mult, momentum_mult, special_score_bonus, banked)
+	if special_gold > 0:
+		hud.push_event_effect("SPECIAL PAYOUT +%dg" % special_gold, _UITheme.SCORE_GOLD)
+	if special_luck > 0:
+		hud.push_event_effect("SPECIAL LUCK +%d" % special_luck, _UITheme.SUCCESS_GREEN)
 	# Reset momentum after banking (cashes out the bonus).
 	GameManager.reset_momentum()
 	# Accumulate LUCK face values for dice reward rarity.
@@ -1169,6 +1175,7 @@ func _sync_ui() -> void:
 	var risk_details: String = _build_risk_details(effective_stops, shield_count, threshold, bust_odds, reroll_ev)
 	var turn_score: int = _calculate_turn_score()
 	hud.update_turn(turn_score, effective_stops, threshold, shield_count, _reroll_count, bust_odds, risk_details, reroll_ev)
+	hud.refresh_stage_rule_header()
 	_refresh_risk_tower(bust_odds, effective_stops, risk_details)
 	_sync_buttons()
 	_refresh_contract_overlay()
@@ -1661,6 +1668,24 @@ func _show_total_locked_status(new_total: int) -> void:
 	hud.show_status("TOTAL LOCKED: %d" % new_total, _UITheme.SUCCESS_GREEN)
 
 
+func _publish_bank_score_feed(
+	combo_bonus: int,
+	streak_multiplier: float,
+	momentum_multiplier: float,
+	special_score_bonus: int,
+	banked_score: int
+) -> void:
+	if combo_bonus > 0:
+		hud.push_score_causality_tag("Combo", "+%d" % combo_bonus, _UITheme.ROSE_ACCENT)
+	if streak_multiplier > 1.0:
+		hud.push_score_causality_tag("Streak", "x%.1f" % streak_multiplier, _UITheme.EXPLOSION_ORANGE)
+	if momentum_multiplier > 1.0:
+		hud.push_score_causality_tag("Momentum", "x%.2f" % momentum_multiplier, _UITheme.ACTION_CYAN)
+	if special_score_bonus > 0:
+		hud.push_score_causality_tag("Rule Bonus", "+%d" % special_score_bonus, _UITheme.STATUS_HIGHLIGHT)
+	hud.push_score_causality_tag("Banked", "+%d" % banked_score, _UITheme.SUCCESS_GREEN)
+
+
 func _play_multiply_face_vfx() -> void:
 	var effect_index: int = 0
 	var anchor: Vector2 = _get_multiplier_vfx_anchor_global_position()
@@ -1885,6 +1910,7 @@ func _on_stage_event_resolved(summary: String, status_color: Color, event_overla
 		_active_event_overlay = null
 	_queue_free_if_valid(event_overlay)
 	if summary != "":
+		hud.push_event_effect(summary, status_color)
 		hud.show_status(summary, status_color)
 	_open_stage_map()
 
@@ -1949,12 +1975,18 @@ func _start_stage_from_map(stage_node: MapNodeData = null, special_rule_id: Stri
 	_stage_starting_stop_pressure = GameManager.consume_next_stage_starting_stop_pressure()
 	if special_rule_id != "":
 		GameManager.enter_special_stage(special_rule_id)
-		hud.show_status(
-			"SPECIAL STAGE: %s" % GameManager.get_active_special_stage_summary(),
-			GameManager.get_active_special_stage_color()
-		)
+		hud.refresh_stage_rule_header()
+		var special_summary: String = "SPECIAL STAGE: %s" % GameManager.get_active_special_stage_summary()
+		hud.push_event_effect(special_summary, GameManager.get_active_special_stage_color())
+		hud.show_status(special_summary, GameManager.get_active_special_stage_color())
 	elif GameManager.has_current_stage_variant():
-		hud.show_status(GameManager.get_current_stage_variant_hover_text(), Color(0.55, 0.9, 1.0))
+		hud.refresh_stage_rule_header()
+		var variant_summary: String = GameManager.get_current_stage_variant_hover_text()
+		hud.push_event_effect(variant_summary, Color(0.55, 0.9, 1.0))
+		hud.show_status(variant_summary, Color(0.55, 0.9, 1.0))
+	else:
+		hud.refresh_stage_rule_header()
+	hud.play_stage_intro_cards()
 	_set_roll_surface_visible(true, false)
 	_update_streak_display()
 	_run_active = true

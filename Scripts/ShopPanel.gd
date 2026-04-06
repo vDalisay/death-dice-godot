@@ -118,7 +118,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	_main_content_scroll.scroll_vertical = 0
 	visible = true
 	_is_closing = false
-	_play_open_intro()
+	call_deferred("_play_open_intro")
 
 
 func open_from_resume(snapshot: Dictionary) -> void:
@@ -138,7 +138,7 @@ func open_from_resume(snapshot: Dictionary) -> void:
 	_main_content_scroll.scroll_vertical = 0
 	visible = true
 	_is_closing = false
-	_play_open_intro()
+	call_deferred("_play_open_intro")
 
 
 func build_resume_snapshot() -> Dictionary:
@@ -732,16 +732,13 @@ func _play_open_intro() -> void:
 	for index: int in _card_panels.size():
 		var card: PanelContainer = _card_panels[index]
 		card.modulate.a = 0.0
-		card.position.y += 14.0
 		card.scale = Vector2(0.96, 0.96)
 		_transition_tween.tween_callback(Callable(self, "_reveal_card_by_index").bind(index)).set_delay(CARD_REVEAL_STAGGER * index)
 
 
 func _reveal_card(card: PanelContainer) -> void:
 	var tween: Tween = create_tween()
-	var end_y: float = card.position.y - 14.0
 	tween.tween_property(card, "modulate:a", 1.0, CARD_REVEAL_DURATION)
-	tween.parallel().tween_property(card, "position:y", end_y, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_property(card, "scale", Vector2.ONE, CARD_REVEAL_DURATION).set_ease(Tween.EASE_OUT)
 
 

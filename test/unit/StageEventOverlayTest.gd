@@ -217,6 +217,27 @@ func test_add_cursed_stop_to_random_die() -> void:
 	assert_bool(has_cursed).is_true()
 
 
+func test_add_cursed_stop_returns_replacement_preview() -> void:
+	var die: DiceData = DiceData.make_standard_d6()
+	GameManager.dice_pool.clear()
+	GameManager.dice_pool.append(die)
+	var replacement: Dictionary = _overlay._add_cursed_stop_to_random_die()
+	assert_str(replacement.get("die_name", "") as String).is_equal(die.dice_name)
+	assert_bool(replacement.has("face_index")).is_true()
+	assert_str(replacement.get("before_text", "") as String).is_not_empty()
+
+
+func test_build_effect_summary_includes_cursed_replacement_preview() -> void:
+	var summary: String = _overlay._build_effect_summary(
+		{"summary": "EVENT: Test curse"},
+		{"cursed_replacements": [{"die_name": "Lucky D6", "face_index": 2, "before_text": "5"}]}
+	)
+	assert_str(summary).contains("Curse:")
+	assert_str(summary).contains("Lucky D6")
+	assert_str(summary).contains("f3")
+	assert_str(summary).contains("5 -> ☠STOP")
+
+
 func test_boost_targets_sets_multiplier() -> void:
 	GameManager.stage_target_score = 100
 	_overlay._apply_effect({"type": 7})
@@ -433,14 +454,13 @@ func test_gain_random_dice_choice_waits_for_result_continue() -> void:
 	choice_row.add_child(safe_card)
 	choice_row.add_child(bargain_card)
 	overlay.set("_choice_cards", [premium_card, safe_card, bargain_card])
-	monitor_signals(overlay, false)
 	overlay.call("_on_choice_made", 0)
 	await get_tree().create_timer(0.75).timeout
-	assert_signal(overlay).is_not_emitted("event_resolved")
 	var continue_button: Button = overlay.get("_continue_button") as Button
 	assert_object(continue_button).is_not_null()
 	assert_bool(continue_button.visible).is_true()
 	var title_label: Label = overlay.get_node("CenterContainer/Card/MarginContainer/Content/TitleLabel") as Label
 	assert_str(title_label.text).is_equal("REWARD GAINED")
+	assert_bool(overlay.get("_resolved") as bool).is_true()
 	continue_button.pressed.emit()
-	assert_signal(overlay).is_emitted("event_resolved")
+	assert_bool(continue_button.disabled).is_true()

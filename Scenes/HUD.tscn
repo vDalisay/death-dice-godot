@@ -27,6 +27,10 @@ theme_override_constants/separation = 16
 layout_mode = 2
 text = "STAGE 1/5"
 
+[node name="RuleHeaderLabel" type="Label" parent="TopBar/TopBarMargin/TopBarRow"]
+layout_mode = 2
+text = "RULE: NORMAL"
+
 [node name="TopSpacer" type="Control" parent="TopBar/TopBarMargin/TopBarRow"]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -184,6 +188,24 @@ layout_mode = 2
 text = "Press 'Roll All' to begin your turn!"
 horizontal_alignment = 1
 autowrap_mode = 3
+
+[node name="FeedRow" type="CenterContainer" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 34)
+
+[node name="FeedLane" type="HBoxContainer" parent="FeedRow"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FeedTitle" type="Label" parent="FeedRow/FeedLane"]
+layout_mode = 2
+text = "FEED"
+
+[node name="FeedContainer" type="HBoxContainer" parent="FeedRow/FeedLane"]
+clip_contents = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 28)
+theme_override_constants/separation = 6
 
 [node name="ModifierTooltip" type="PanelContainer" parent="."]
 visible = false

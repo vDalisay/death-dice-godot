@@ -28,9 +28,23 @@ const COMBO_BADGE_HEIGHT: int = 26
 const JUICY_DANGER_MIN: float = 0.6
 const JUICY_DANGER_MAX: float = 0.85
 const JUICY_DANGER_SCORE_FLOOR: int = 12
+const RULE_HEADER_NORMAL: String = "RULE: NORMAL"
+const FEED_TAG_TTL_SECONDS: float = 7.5
+const FEED_MAX_TAGS: int = 6
+const INTRO_CARD_POP_DURATION: float = 0.26
+const INTRO_CARD_TYPE_DURATION: float = 0.62
+const INTRO_CARD_HOLD_DURATION: float = 0.36
+const INTRO_CARD_TRAVEL_DURATION: float = 0.56
+const INTRO_CARD_FADE_DURATION: float = 0.18
+const INTRO_CARD_SEQUENCE_GAP: float = 0.10
+const INTRO_CARD_SPLIT_Y: float = 18.0
+const INTRO_CARD_TARGET_Y_OFFSET: float = -6.0
+const INTRO_CARD_SIZE: Vector2 = Vector2(360.0, 132.0)
+const INTRO_CARD_RETURN_SCALE: Vector2 = Vector2(0.52, 0.52)
 
 # -- Top bar labels --
 @onready var stage_label: Label      = $TopBar/TopBarMargin/TopBarRow/StageLabel
+@onready var _rule_header_label: Label = $TopBar/TopBarMargin/TopBarRow/RuleHeaderLabel
 @onready var gold_label: Label       = $TopBar/TopBarMargin/TopBarRow/GoldLabel
 @onready var luck_label: Label       = $TopBar/TopBarMargin/TopBarRow/LuckLabel
 @onready var momentum_label: Label   = $TopBar/TopBarMargin/TopBarRow/MomentumLabel
@@ -42,6 +56,9 @@ const JUICY_DANGER_SCORE_FLOOR: int = 12
 @onready var _modifier_tooltip: PanelContainer = $ModifierTooltip
 @onready var _modifier_tooltip_name_label: Label = $ModifierTooltip/MarginContainer/TooltipVBox/TooltipNameLabel
 @onready var _modifier_tooltip_desc_label: Label = $ModifierTooltip/MarginContainer/TooltipVBox/TooltipDescLabel
+@onready var _feed_row: CenterContainer = $FeedRow
+@onready var _feed_title: Label = $FeedRow/FeedLane/FeedTitle
+@onready var _feed_container: HBoxContainer = $FeedRow/FeedLane/FeedContainer
 
 # -- Score row --
 @onready var turn_score_label: Label   = $ScoreRow/TurnScorePanel/TurnScoreMargin/TurnScoreVBox/TurnScoreLabel
@@ -94,14 +111,19 @@ var _contract_progress_service: RefCounted = null
 var _seed_label: Label = null
 var _seed_row: HBoxContainer = null
 var _seed_copy_button: Button = null
+var _feed_entries: Array[Dictionary] = []
+var _feed_entry_counter: int = 0
+var _stage_intro_layer: Control = null
 
 
 func _ready() -> void:
 	_cache_modifier_badges()
 	_create_seed_label()
+	_ensure_stage_intro_layer()
 	_apply_theme_styling()
 	_contract_progress_service = ContractProgressServiceScript.new()
 	_progress_bar_base_size = progress_bar.custom_minimum_size
+	_update_feed_visibility()
 	GameManager.score_changed.connect(_on_score_changed)
 	GameManager.hands_changed.connect(_on_lives_changed)
 	GameManager.gold_changed.connect(_on_gold_changed)
@@ -114,6 +136,7 @@ func _ready() -> void:
 	GameManager.run_mode_changed.connect(_on_run_mode_changed)
 	GameManager.run_seed_changed.connect(_on_run_seed_changed)
 	GameManager.stage_advanced.connect(_on_stage_advanced)
+	GameManager.stage_variant_changed.connect(_on_stage_variant_changed)
 	GameManager.run_ended.connect(_on_run_ended)
 	GameManager.stage_cleared.connect(_on_stage_cleared)
 	GameManager.loop_advanced.connect(_on_loop_advanced)
@@ -126,6 +149,7 @@ func _ready() -> void:
 	_held_stop_count = GameManager.held_stop_count
 	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
+	_refresh_stage_rule_header()
 	_refresh_seed_display()
 	_refresh_modifier_display()
 	_refresh_contract_display()
@@ -133,6 +157,15 @@ func _ready() -> void:
 	_refresh_progress_display()
 	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
 	_score_feedback_display_total = GameManager.total_score
+
+
+func _process(_delta: float) -> void:
+	_prune_expired_feed_entries()
+	if _stage_intro_layer == null or not is_instance_valid(_stage_intro_layer):
+		return
+	var viewport_size: Vector2 = get_viewport_rect().size
+	if _stage_intro_layer.size != viewport_size:
+		_stage_intro_layer.size = viewport_size
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +179,9 @@ func _apply_theme_styling() -> void:
 	stage_label.add_theme_font_override("font", _UITheme.font_display())
 	stage_label.add_theme_font_size_override("font_size", 12)
 	stage_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
+	_rule_header_label.add_theme_font_override("font", _UITheme.font_mono())
+	_rule_header_label.add_theme_font_size_override("font_size", 12)
+	_rule_header_label.add_theme_color_override("font_color", Color.WHITE)
 	gold_label.add_theme_font_override("font", _UITheme.font_stats())
 	gold_label.add_theme_font_size_override("font_size", 20)
 	gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
@@ -164,6 +200,9 @@ func _apply_theme_styling() -> void:
 	_modifier_tooltip_desc_label.add_theme_font_override("font", _UITheme.font_body())
 	_modifier_tooltip_desc_label.add_theme_font_size_override("font_size", 14)
 	_modifier_tooltip_desc_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
+	_feed_title.add_theme_font_override("font", _UITheme.font_display())
+	_feed_title.add_theme_font_size_override("font_size", 10)
+	_feed_title.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 
 	# Turn score panel (HERO element)
 	_turn_score_panel.add_theme_stylebox_override("panel",
@@ -292,6 +331,47 @@ func update_turn(
 	var juicy_danger: bool = _is_juicy_danger(stop_count, bust_threshold, bust_odds, turn_score)
 	_refresh_risk_meta(stop_count, bust_threshold, shield_count, reroll_ev, juicy_danger)
 	_refresh_modifier_display()
+
+
+func refresh_stage_rule_header() -> void:
+	_refresh_stage_rule_header()
+
+
+func push_event_effect(summary: String, status_color: Color = _UITheme.STATUS_INFO, ttl_seconds: float = FEED_TAG_TTL_SECONDS) -> void:
+	_push_feed_tag("EVENT", summary, status_color, ttl_seconds)
+
+
+func push_score_causality_tag(label: String, value_text: String, status_color: Color = _UITheme.SCORE_GOLD, ttl_seconds: float = FEED_TAG_TTL_SECONDS) -> void:
+	var label_text: String = label.strip_edges()
+	var value_label: String = value_text.strip_edges()
+	if label_text.is_empty() and value_label.is_empty():
+		return
+	var detail: String = value_label if label_text.is_empty() else "%s %s" % [label_text, value_label]
+	_push_feed_tag("SCORE", detail.strip_edges(), status_color, ttl_seconds)
+
+
+func play_stage_intro_cards() -> void:
+	_ensure_stage_intro_layer()
+	_clear_stage_intro_cards()
+	var rule_text: String = _extract_rule_label_text(_rule_header_label.text)
+	var target_text: String = str(GameManager.stage_target_score)
+	var center: Vector2 = get_viewport_rect().size * 0.5
+	var rule_start: Vector2 = center + Vector2(0.0, -INTRO_CARD_SPLIT_Y)
+	var target_start: Vector2 = center + Vector2(0.0, INTRO_CARD_SPLIT_Y)
+	var rule_anchor: Vector2 = _get_label_anchor_center(_rule_header_label, INTRO_CARD_TARGET_Y_OFFSET)
+	var target_anchor: Vector2 = _get_label_anchor_center(target_label, INTRO_CARD_TARGET_Y_OFFSET)
+	var rule_card: PanelContainer = _build_intro_card("RULE", rule_text, _get_rule_header_display_color())
+	var target_card: PanelContainer = _build_intro_card("TARGET", target_text, _UITheme.SCORE_GOLD)
+	target_card.visible = false
+	_stage_intro_layer.add_child(rule_card)
+	_stage_intro_layer.add_child(target_card)
+	_animate_intro_card(
+		rule_card,
+		rule_start,
+		rule_anchor,
+		0.0,
+		Callable(self, "_animate_intro_card").bind(target_card, target_start, target_anchor, INTRO_CARD_SEQUENCE_GAP)
+	)
 
 func show_status(message: String, colour: Color = Color.WHITE) -> void:
 	status_label.text     = message
@@ -498,6 +578,208 @@ func show_floating_gold(amount: int) -> void:
 	tween.tween_callback(lbl.queue_free)
 
 
+func _ensure_stage_intro_layer() -> void:
+	if _stage_intro_layer != null and is_instance_valid(_stage_intro_layer):
+		return
+	_stage_intro_layer = Control.new()
+	_stage_intro_layer.name = "StageIntroLayer"
+	_stage_intro_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stage_intro_layer.top_level = true
+	_stage_intro_layer.z_index = 220
+	_stage_intro_layer.anchor_left = 0.0
+	_stage_intro_layer.anchor_top = 0.0
+	_stage_intro_layer.anchor_right = 0.0
+	_stage_intro_layer.anchor_bottom = 0.0
+	_stage_intro_layer.global_position = Vector2.ZERO
+	_stage_intro_layer.size = get_viewport_rect().size
+	add_child(_stage_intro_layer)
+
+
+func _clear_stage_intro_cards() -> void:
+	if _stage_intro_layer == null or not is_instance_valid(_stage_intro_layer):
+		return
+	for child: Node in _stage_intro_layer.get_children():
+		child.queue_free()
+
+
+func _build_intro_card(title_text: String, body_text: String, accent: Color) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = INTRO_CARD_SIZE
+	card.z_index = 260
+	card.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_semantic_frame_panel(Color(_UITheme.SURFACE_ASH, 0.985), Color(accent, 0.96), 14, 3)
+	)
+	var margin := MarginContainer.new()
+	margin.name = "CardMargin"
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	card.add_child(margin)
+	var card_vbox := VBoxContainer.new()
+	card_vbox.name = "CardVBox"
+	card_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(card_vbox)
+	var heading := Label.new()
+	heading.name = "HeadingLabel"
+	heading.text = title_text
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_override("font", _UITheme.font_mono())
+	heading.add_theme_font_size_override("font_size", 16)
+	heading.add_theme_color_override("font_color", Color(accent, 0.98))
+	card_vbox.add_child(heading)
+	var body := Label.new()
+	body.name = "BodyLabel"
+	body.text = body_text
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_font_override("font", _UITheme.font_display())
+	body.add_theme_font_size_override("font_size", 24)
+	body.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	body.visible_characters = 0
+	card_vbox.add_child(body)
+	return card
+
+
+func _animate_intro_card(
+	card: PanelContainer,
+	start_center: Vector2,
+	end_center: Vector2,
+	delay: float,
+	on_complete: Callable = Callable()
+) -> void:
+	if card == null or not is_instance_valid(card):
+		return
+	var body: Label = card.get_node("CardMargin/CardVBox/BodyLabel") as Label
+	if body == null:
+		return
+	var card_size: Vector2 = card.custom_minimum_size
+	card.size = card_size
+	card.pivot_offset = card_size * 0.5
+	card.global_position = start_center - card_size * 0.5
+	card.visible = false
+	card.modulate.a = 0.0
+	card.scale = Vector2(0.68, 0.68)
+	body.visible_characters = 0
+	var end_position: Vector2 = end_center - card_size * 0.5
+	var tween: Tween = card.create_tween()
+	tween.tween_interval(delay)
+	tween.tween_callback(func() -> void:
+		card.visible = true
+	)
+	tween.tween_property(card, "modulate:a", 1.0, INTRO_CARD_POP_DURATION)
+	tween.parallel().tween_property(card, "scale", Vector2.ONE, INTRO_CARD_POP_DURATION).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(body, "visible_characters", body.text.length(), INTRO_CARD_TYPE_DURATION).set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_interval(INTRO_CARD_HOLD_DURATION)
+	tween.tween_property(card, "global_position", end_position, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_property(card, "scale", INTRO_CARD_RETURN_SCALE, INTRO_CARD_TRAVEL_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(card, "modulate:a", 0.0, INTRO_CARD_FADE_DURATION).set_delay(maxf(0.0, INTRO_CARD_TRAVEL_DURATION - INTRO_CARD_FADE_DURATION * 0.5))
+	if on_complete.is_valid():
+		tween.tween_callback(on_complete)
+	tween.tween_callback(card.queue_free)
+
+
+func _get_label_anchor_center(label: Label, y_offset: float = 0.0) -> Vector2:
+	if label == null:
+		return get_viewport_rect().size * 0.5
+	return label.global_position + label.size * 0.5 + Vector2(0.0, y_offset)
+
+
+func _extract_rule_label_text(rule_label: String) -> String:
+	var clean_label: String = rule_label.strip_edges()
+	if clean_label.begins_with("RULE:"):
+		return clean_label.trim_prefix("RULE:").strip_edges()
+	return clean_label
+
+
+func _push_feed_tag(category: String, message: String, tint: Color, ttl_seconds: float = FEED_TAG_TTL_SECONDS) -> void:
+	var trimmed_message: String = message.strip_edges()
+	if trimmed_message.is_empty():
+		return
+	var expires_at: int = Time.get_ticks_msec() + int(maxf(0.2, ttl_seconds) * 1000.0)
+	var entry: Dictionary = {
+		"id": _feed_entry_counter,
+		"category": category.strip_edges(),
+		"message": trimmed_message,
+		"tint": tint,
+		"expires_at": expires_at,
+	}
+	_feed_entry_counter += 1
+	_feed_entries.append(entry)
+	while _feed_entries.size() > FEED_MAX_TAGS:
+		_feed_entries.remove_at(0)
+	_rebuild_feed_tags()
+
+
+func _prune_expired_feed_entries() -> void:
+	if _feed_entries.is_empty():
+		return
+	var now: int = Time.get_ticks_msec()
+	var filtered: Array[Dictionary] = []
+	for entry: Dictionary in _feed_entries:
+		if int(entry.get("expires_at", 0)) > now:
+			filtered.append(entry)
+	if filtered.size() == _feed_entries.size():
+		return
+	_feed_entries = filtered
+	_rebuild_feed_tags()
+
+
+func _rebuild_feed_tags() -> void:
+	if _feed_container == null:
+		return
+	for child: Node in _feed_container.get_children():
+		child.queue_free()
+	for entry: Dictionary in _feed_entries:
+		_feed_container.add_child(_build_feed_badge(entry))
+	_update_feed_visibility()
+
+
+func _build_feed_badge(entry: Dictionary) -> PanelContainer:
+	var category_text: String = (entry.get("category", "EVENT") as String).to_upper()
+	var message_text: String = entry.get("message", "") as String
+	var tint: Color = entry.get("tint", _UITheme.STATUS_NEUTRAL) as Color
+	var badge := PanelContainer.new()
+	badge.custom_minimum_size = Vector2(0.0, 24.0)
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge.add_theme_stylebox_override(
+		"panel",
+		_UITheme.make_semantic_frame_panel(Color(_UITheme.SURFACE_INSET_ASH, 0.94), Color(tint, 0.88), _UITheme.CORNER_RADIUS_BADGE, 1)
+	)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 3)
+	margin.add_theme_constant_override("margin_bottom", 3)
+	badge.add_child(margin)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	margin.add_child(row)
+	var category_label := Label.new()
+	category_label.text = category_text
+	category_label.add_theme_font_override("font", _UITheme.font_mono())
+	category_label.add_theme_font_size_override("font_size", 11)
+	category_label.add_theme_color_override("font_color", Color(tint, 0.95))
+	row.add_child(category_label)
+	var message_label := Label.new()
+	message_label.text = message_text
+	message_label.add_theme_font_override("font", _UITheme.font_body())
+	message_label.add_theme_font_size_override("font_size", 13)
+	message_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
+	row.add_child(message_label)
+	return badge
+
+
+func _update_feed_visibility() -> void:
+	if _feed_row == null:
+		return
+	_feed_row.visible = true
+	_feed_title.self_modulate = Color.WHITE if not _feed_entries.is_empty() else Color(1.0, 1.0, 1.0, 0.7)
+
+
 # ---------------------------------------------------------------------------
 # Risk Tooltip
 # ---------------------------------------------------------------------------
@@ -670,6 +952,7 @@ func _refresh_momentum_display() -> void:
 func _on_stage_advanced(_new_stage: int) -> void:
 	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
+	_refresh_stage_rule_header()
 	_refresh_progress_display()
 	_refresh_contract_display()
 
@@ -682,6 +965,7 @@ func _on_stage_cleared() -> void:
 func _on_loop_advanced(_new_loop: int) -> void:
 	_near_death_banks = GameManager.near_death_banks_this_stage
 	_refresh_stage_display()
+	_refresh_stage_rule_header()
 	_refresh_progress_display()
 	_refresh_contract_display()
 
@@ -692,6 +976,11 @@ func _on_highscore_changed(new_highscore: int) -> void:
 func _on_run_mode_changed(_new_mode: int) -> void:
 	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
 	_refresh_stage_display()
+	_refresh_stage_rule_header()
+
+
+func _on_stage_variant_changed(_new_variant: int) -> void:
+	_refresh_stage_rule_header()
 
 
 func _refresh_stage_display() -> void:
@@ -701,6 +990,31 @@ func _refresh_stage_display() -> void:
 	var mode_text: String = " [%s]" % GameManager.get_run_mode_name().to_upper() if GameManager.run_mode == GameManager.RunMode.GAUNTLET else ""
 	stage_label.text = "ROW %d/%d%s%s" % [row_display, row_count, loop_text, mode_text]
 	target_label.text = "Target: %d" % GameManager.stage_target_score
+
+
+func _refresh_stage_rule_header() -> void:
+	if _rule_header_label == null:
+		return
+	if GameManager.has_active_special_stage():
+		_rule_header_label.text = "RULE: %s" % GameManager.get_active_special_stage_name().to_upper()
+		_rule_header_label.modulate = _bright_rule_color(GameManager.get_active_special_stage_color())
+		return
+	if GameManager.has_current_stage_variant():
+		_rule_header_label.text = "RULE: %s" % GameManager.get_current_stage_variant_name().to_upper()
+		_rule_header_label.modulate = _bright_rule_color(_UITheme.ACTION_CYAN)
+		return
+	_rule_header_label.text = RULE_HEADER_NORMAL
+	_rule_header_label.modulate = _UITheme.STAGE_FAMILY_ACCENT_TEXT
+
+
+func _get_rule_header_display_color() -> Color:
+	if _rule_header_label == null:
+		return _UITheme.STAGE_FAMILY_ACCENT_TEXT
+	return _rule_header_label.modulate
+
+
+func _bright_rule_color(base_color: Color) -> Color:
+	return base_color.lerp(_UITheme.BRIGHT_TEXT, 0.45)
 
 
 func _refresh_progress_display() -> void:
