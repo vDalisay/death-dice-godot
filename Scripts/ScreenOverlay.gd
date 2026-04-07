@@ -9,12 +9,21 @@ const ChromaticShader: Shader = preload("res://Shaders/chromatic_aberration.gdsh
 const BarrelDistortionShader: Shader = preload("res://Shaders/barrel_distortion.gdshader")
 const StaticNoiseShader: Shader = preload("res://Shaders/static_noise.gdshader")
 
-const SCANLINE_INTENSITY: float = 0.24
-const VIGNETTE_INTENSITY: float = 0.55
-const BARREL_STRENGTH: float = 0.02
-const BARREL_EDGE_FADE: float = 0.06
-const CHROMATIC_BUST_PEAK: float = 0.025
-const CHROMATIC_JACKPOT_PEAK: float = 0.015
+const SCANLINE_INTENSITY: float = 0.29
+const SCANLINE_DRIFT_SPEED: float = 0.018
+const SCANLINE_ROLL_STRENGTH: float = 0.34
+const SCANLINE_HAZE_STRENGTH: float = 0.28
+const SCANLINE_GRIME_STRENGTH: float = 0.22
+const SCANLINE_TINT: Color = Color("#0c1917")
+const VIGNETTE_INTENSITY: float = 0.66
+const VIGNETTE_RADIUS: float = 0.82
+const VIGNETTE_SOFTNESS: float = 0.58
+const VIGNETTE_PULSE_STRENGTH: float = 0.09
+const VIGNETTE_COLOR: Color = Color("#020906")
+const BARREL_STRENGTH: float = 0.024
+const BARREL_EDGE_FADE: float = 0.085
+const CHROMATIC_BUST_PEAK: float = 0.028
+const CHROMATIC_JACKPOT_PEAK: float = 0.018
 const CHROMATIC_BUST_DURATION: float = 0.5
 const CHROMATIC_JACKPOT_DURATION: float = 0.4
 const DISTRESS_STATIC_PEAK: float = 0.72
@@ -25,6 +34,7 @@ const DISTRESS_FLASH_DURATION: float = 0.12
 var _scanline_rect: ColorRect = null
 var _scanline_material: ShaderMaterial = null
 var _vignette_rect: ColorRect = null
+var _vignette_material: ShaderMaterial = null
 var _barrel_rect: ColorRect = null
 var _barrel_material: ShaderMaterial = null
 var _distress_flash_rect: ColorRect = null
@@ -142,6 +152,11 @@ func _build_scanline() -> void:
 	_scanline_material = ShaderMaterial.new()
 	_scanline_material.shader = ScanlineShader
 	_scanline_material.set_shader_parameter("intensity", SCANLINE_INTENSITY)
+	_scanline_material.set_shader_parameter("drift_speed", SCANLINE_DRIFT_SPEED)
+	_scanline_material.set_shader_parameter("roll_strength", SCANLINE_ROLL_STRENGTH)
+	_scanline_material.set_shader_parameter("haze_strength", SCANLINE_HAZE_STRENGTH)
+	_scanline_material.set_shader_parameter("grime_strength", SCANLINE_GRIME_STRENGTH)
+	_scanline_material.set_shader_parameter("tint", SCANLINE_TINT)
 	_scanline_rect.material = _scanline_material
 	add_child(_scanline_rect)
 
@@ -150,10 +165,14 @@ func _build_vignette() -> void:
 	_vignette_rect = ColorRect.new()
 	_vignette_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_vignette_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var mat := ShaderMaterial.new()
-	mat.shader = VignetteShader
-	mat.set_shader_parameter("intensity", VIGNETTE_INTENSITY)
-	_vignette_rect.material = mat
+	_vignette_material = ShaderMaterial.new()
+	_vignette_material.shader = VignetteShader
+	_vignette_material.set_shader_parameter("radius", VIGNETTE_RADIUS)
+	_vignette_material.set_shader_parameter("softness", VIGNETTE_SOFTNESS)
+	_vignette_material.set_shader_parameter("intensity", VIGNETTE_INTENSITY)
+	_vignette_material.set_shader_parameter("pulse_strength", VIGNETTE_PULSE_STRENGTH)
+	_vignette_material.set_shader_parameter("color", VIGNETTE_COLOR)
+	_vignette_rect.material = _vignette_material
 	add_child(_vignette_rect)
 
 
@@ -173,7 +192,7 @@ func _build_distress_flash() -> void:
 	_distress_flash_rect = ColorRect.new()
 	_distress_flash_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_distress_flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_distress_flash_rect.color = Color("#FF1A33")
+	_distress_flash_rect.color = Color("#8C141F")
 	_distress_flash_rect.modulate.a = 0.0
 	_distress_flash_rect.visible = false
 	add_child(_distress_flash_rect)

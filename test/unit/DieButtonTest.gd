@@ -127,3 +127,14 @@ func test_die_name_is_shown() -> void:
 func test_explode_face_uses_styled_glyph() -> void:
 	var face: DiceFaceData = _make_face(DiceFaceData.FaceType.EXPLODE, 3)
 	assert_str(face.get_display_text()).is_equal("✦3")
+
+
+func test_stopped_face_click_toggles_to_kept_and_back_to_stopped() -> void:
+	var btn: DieButton = auto_free(DieButtonScene.instantiate()) as DieButton
+	add_child(btn)
+	await await_idle_frame()
+	btn.show_face(_make_face(DiceFaceData.FaceType.STOP, 0), DieButton.DieState.STOPPED)
+	btn.emit_signal("pressed")
+	assert_int(btn.die_state).is_equal(DieButton.DieState.KEPT)
+	btn.emit_signal("pressed")
+	assert_int(btn.die_state).is_equal(DieButton.DieState.STOPPED)

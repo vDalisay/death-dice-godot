@@ -380,7 +380,7 @@ func _on_seed_copy_pressed() -> void:
 	if seed_text.is_empty():
 		return
 	DisplayServer.clipboard_set(seed_text)
-	push_event_effect("Seed copied.", _UITheme.ACTION_CYAN)
+	push_event_effect("Copied to clipboard!", _UITheme.ACTION_CYAN)
 
 
 func _cache_modifier_badges() -> void:
@@ -1089,13 +1089,16 @@ func _refresh_contract_display() -> void:
 		_contract_label.text = ""
 		return
 	_contract_label.visible = true
-	if _contract_progress_service == null:
-		_contract_label.text = contract.display_name
-		return
-	_contract_label.text = _contract_progress_service.format_progress_text(
-		GameManager.active_loop_contract_id,
-		GameManager.active_loop_contract_progress
-	)
+	var progress_text: String = ""
+	if _contract_progress_service != null:
+		progress_text = _contract_progress_service.format_progress_text(
+			GameManager.active_loop_contract_id,
+			GameManager.active_loop_contract_progress
+		)
+	if progress_text.is_empty():
+		_contract_label.text = contract.description
+	else:
+		_contract_label.text = "%s | %s" % [contract.description, progress_text]
 
 
 func _is_juicy_danger(stop_count: int, bust_threshold: int, bust_odds: float, turn_score: int) -> bool:

@@ -129,12 +129,14 @@ func test_shift_click_picks_up_stopped_dice_of_same_face() -> void:
 	root._sync_all_dice()
 	root._sync_ui()
 
-	# Shift+click die 0 to pick up (deselect) — both stops should be picked up.
-	root.dice_arena.die_shift_clicked.emit(0, false)
+	# Shift+click die 0 to mark matching stopped dice for reroll while preserving stopped state.
+	root.dice_arena.die_shift_clicked.emit(0, true)
 	await runner.simulate_frames(1)
 
-	assert_bool(root.dice_stopped[0]).is_false()
-	assert_bool(root.dice_stopped[1]).is_false()
+	assert_bool(root.dice_stopped[0]).is_true()
+	assert_bool(root.dice_stopped[1]).is_true()
+	assert_bool(root.dice_keep[0]).is_true()
+	assert_bool(root.dice_keep[1]).is_true()
 	assert_bool(root.dice_keep[2]).is_false()  # Unaffected — different face
 
 

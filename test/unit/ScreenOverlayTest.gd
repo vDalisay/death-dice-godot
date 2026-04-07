@@ -25,8 +25,13 @@ func test_static_noise_shader_loads() -> void:
 func test_overlay_constants_are_sensible() -> void:
 	assert_float(ScreenOverlay.SCANLINE_INTENSITY).is_greater(0.0)
 	assert_float(ScreenOverlay.SCANLINE_INTENSITY).is_less(0.5)
+	assert_float(ScreenOverlay.SCANLINE_DRIFT_SPEED).is_greater(0.0)
+	assert_float(ScreenOverlay.SCANLINE_ROLL_STRENGTH).is_greater(0.0)
+	assert_float(ScreenOverlay.SCANLINE_HAZE_STRENGTH).is_greater(0.0)
+	assert_float(ScreenOverlay.SCANLINE_GRIME_STRENGTH).is_greater(0.0)
 	assert_float(ScreenOverlay.VIGNETTE_INTENSITY).is_greater(0.0)
 	assert_float(ScreenOverlay.VIGNETTE_INTENSITY).is_less(1.0)
+	assert_float(ScreenOverlay.VIGNETTE_PULSE_STRENGTH).is_greater(0.0)
 	assert_float(ScreenOverlay.CHROMATIC_BUST_PEAK).is_greater(0.0)
 	assert_float(ScreenOverlay.CHROMATIC_BUST_PEAK).is_less(0.05)
 	assert_float(ScreenOverlay.CHROMATIC_JACKPOT_PEAK).is_greater(0.0)
@@ -64,7 +69,23 @@ func test_scanline_material_uses_configured_intensity() -> void:
 	add_child(overlay)
 	await get_tree().process_frame
 	var intensity: float = overlay._scanline_material.get_shader_parameter("intensity") as float
+	var drift_speed: float = overlay._scanline_material.get_shader_parameter("drift_speed") as float
+	var roll_strength: float = overlay._scanline_material.get_shader_parameter("roll_strength") as float
+	var haze_strength: float = overlay._scanline_material.get_shader_parameter("haze_strength") as float
 	assert_float(intensity).is_equal(ScreenOverlay.SCANLINE_INTENSITY)
+	assert_float(drift_speed).is_equal(ScreenOverlay.SCANLINE_DRIFT_SPEED)
+	assert_float(roll_strength).is_equal(ScreenOverlay.SCANLINE_ROLL_STRENGTH)
+	assert_float(haze_strength).is_equal(ScreenOverlay.SCANLINE_HAZE_STRENGTH)
+
+
+func test_vignette_material_uses_configured_params() -> void:
+	var overlay: ScreenOverlay = auto_free(ScreenOverlay.new())
+	add_child(overlay)
+	await get_tree().process_frame
+	var intensity: float = overlay._vignette_material.get_shader_parameter("intensity") as float
+	var pulse_strength: float = overlay._vignette_material.get_shader_parameter("pulse_strength") as float
+	assert_float(intensity).is_equal(ScreenOverlay.VIGNETTE_INTENSITY)
+	assert_float(pulse_strength).is_equal(ScreenOverlay.VIGNETTE_PULSE_STRENGTH)
 
 
 func test_chromatic_rect_starts_hidden() -> void:

@@ -321,7 +321,8 @@ func test_contract_label_reflects_active_contract_progress() -> void:
 	await await_idle_frame()
 	var contract_label: Label = hud.get_node("InfoRow/RiskColumn/ContractLabel") as Label
 	assert_bool(contract_label.visible).is_true()
-	assert_str(contract_label.text).is_equal("Safe Hands 1/3")
+	assert_str(contract_label.text).contains("Bank 3 turns this loop with 0-1 effective stops.")
+	assert_str(contract_label.text).contains("Safe Hands 1/3")
 
 
 func test_seed_label_shows_for_unseeded_run_when_seed_exists() -> void:
@@ -343,6 +344,21 @@ func test_seed_copy_button_disabled_when_seed_missing() -> void:
 	await await_idle_frame()
 	assert_str(hud._seed_label.text).is_equal("SEED: -")
 	assert_bool(hud._seed_copy_button.disabled).is_true()
+
+
+func test_seed_copy_pushes_copied_to_clipboard_message() -> void:
+	GameManager.restore_run_identity("hud-copy-seed", false, 1)
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._on_seed_copy_pressed()
+	await await_idle_frame()
+	assert_int(hud._feed_container.get_child_count()).is_equal(1)
+	var badge: PanelContainer = hud._feed_container.get_child(0) as PanelContainer
+	var margin: MarginContainer = badge.get_child(0) as MarginContainer
+	var row: HBoxContainer = margin.get_child(0) as HBoxContainer
+	var message_label: Label = row.get_child(1) as Label
+	assert_str(message_label.text).contains("Copied to clipboard!")
 
 
 func _intro_card_round_trip_duration() -> float:

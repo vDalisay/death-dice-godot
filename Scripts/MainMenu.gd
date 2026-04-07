@@ -17,7 +17,7 @@ const BUTTON_FONT_SIZE: int = 18
 @onready var _settings_button: Button = $CenterContainer/Card/MarginContainer/Content/ButtonColumn/SettingsButton
 @onready var _career_panel: CareerPanel = $CareerPanel
 @onready var _codex_panel: DiceCodexPanel = $DiceCodexPanel
-@onready var _settings_panel: SettingsPanel = $SettingsPanel
+@onready var _settings_panel: PanelContainer = $SettingsPanel
 
 
 func _ready() -> void:

@@ -10,6 +10,7 @@ const BODY_FONT_SIZE: int = 15
 const LANGUAGE_LABEL_FONT_SIZE: int = 15
 const LANGUAGE_OPTION_FONT_SIZE: int = 14
 const CLOSE_BUTTON_FONT_SIZE: int = 14
+const LANGUAGE_POPUP_MAX_HEIGHT: float = 220.0
 
 @onready var _card: PanelContainer = $CenterContainer/Card
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
@@ -83,6 +84,11 @@ func _apply_theme() -> void:
 	_language_option.add_theme_color_override("font_hover_color", _UITheme.BRIGHT_TEXT)
 	_language_option.add_theme_color_override("font_pressed_color", _UITheme.BRIGHT_TEXT)
 	_language_option.add_theme_color_override("font_focus_color", _UITheme.BRIGHT_TEXT)
+	_language_option.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var popup: PopupMenu = _language_option.get_popup()
+	popup.max_size = Vector2(_language_option.custom_minimum_size.x, LANGUAGE_POPUP_MAX_HEIGHT)
+	popup.add_theme_font_override("font", _UITheme.font_stats())
+	popup.add_theme_font_size_override("font_size", LANGUAGE_OPTION_FONT_SIZE)
 
 
 func _populate_language_options() -> void:

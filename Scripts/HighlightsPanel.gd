@@ -261,7 +261,13 @@ func _count_up_card(refs: _StatCardRefs) -> void:
 		_show_best_badge(refs)
 		return
 	var count_tween: Tween = create_tween()
-	count_tween.tween_method(_set_stat_card_value.bind(value_label), 0.0, float(target), COUNT_DURATION)
+	count_tween.tween_method(
+		func(value: float) -> void:
+			_set_stat_card_value(value_label, value),
+		0.0,
+		float(target),
+		COUNT_DURATION
+	)
 	count_tween.tween_callback(_show_best_badge.bind(refs))
 
 
