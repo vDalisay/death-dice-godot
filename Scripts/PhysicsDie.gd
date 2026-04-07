@@ -666,10 +666,8 @@ func _handle_click(shift_held: bool = false) -> void:
 
 	var target_signal: Signal = shift_toggled_keep if shift_held else toggled_keep
 	if is_stopped:
-		# Pick up stopped die (Cubitos-style)
-		is_stopped = false
-		is_kept = false
-		target_signal.emit(die_index, false)
+		is_kept = not is_kept
+		target_signal.emit(die_index, is_kept)
 	elif is_kept:
 		is_kept = false
 		target_signal.emit(die_index, false)
@@ -836,13 +834,20 @@ func _apply_visual() -> void:
 	var text_color: Color = _UITheme.BRIGHT_TEXT
 	var glyph_color: Color = _UITheme.MUTED_TEXT
 
-	if is_stopped:
+	if is_stopped and not is_kept:
 		fill = FILL_STOPPED
 		border_color = BORDER_STOPPED
 		border_width = 3
 		text_color = _UITheme.DANGER_RED
 		glyph_color = _UITheme.DANGER_RED
 		start_glow_pulse(BORDER_STOPPED)
+	elif is_stopped and is_kept:
+		fill = FILL_KEPT
+		border_color = BORDER_KEPT
+		border_width = 3
+		text_color = _UITheme.SUCCESS_GREEN
+		glyph_color = _UITheme.SUCCESS_GREEN
+		_stop_glow_pulse()
 	elif is_keep_locked:
 		if current_face and current_face.type in [
 			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD,
@@ -875,7 +880,7 @@ func _apply_visual() -> void:
 		_stop_glow_pulse()
 
 	# Special: CURSED_STOP
-	if current_face and current_face.type == DiceFaceData.FaceType.CURSED_STOP and is_stopped:
+	if current_face and current_face.type == DiceFaceData.FaceType.CURSED_STOP and is_stopped and not is_kept:
 		fill = _UITheme.DIE_FILL_CURSED
 		border_color = _UITheme.NEON_PURPLE
 		glyph_color = _UITheme.NEON_PURPLE
@@ -890,6 +895,8 @@ func _apply_visual() -> void:
 			_opacity_tween.tween_property(self, "modulate:a", target_opacity, KEEP_OPACITY_TWEEN_DURATION)
 		else:
 			modulate.a = target_opacity
+	else:
+		modulate.a = target_opacity
 
 	# Apply panel stylebox
 	var sb := StyleBoxFlat.new()
@@ -909,7 +916,10 @@ func _apply_visual() -> void:
 		_glyph_label.add_theme_color_override("font_color", glyph_color)
 	if _tier_label:
 		_tier_label.visible = die_data != null and die_data.is_reroll_evolving()
-		_tier_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN if not is_stopped else _UITheme.DANGER_RED)
+		if is_stopped and not is_kept:
+			_tier_label.add_theme_color_override("font_color", _UITheme.DANGER_RED)
+		else:
+			_tier_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 
 
 func _set_random_glyph() -> void:

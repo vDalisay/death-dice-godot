@@ -50,6 +50,9 @@ func get_supported_locale_options() -> Array[Dictionary]:
 			"code": locale_code,
 			"label": str(LOCALE_DISPLAY_NAMES.get(locale_code, locale_code)),
 		})
+	options.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("label", "")).nocasecmp_to(str(b.get("label", ""))) < 0
+	)
 	return options
 
 

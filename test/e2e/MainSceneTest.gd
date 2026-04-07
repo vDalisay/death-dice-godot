@@ -177,6 +177,31 @@ func test_side_panels_have_spacing_from_dice_tray() -> void:
 	assert_float(risk_left - arena_right).is_greater(0.0)
 
 
+func test_long_contract_text_does_not_push_side_panels_offscreen() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var contract_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ContractOverlay") as PanelContainer
+	var contract_title: Label = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractTitleLabel") as Label
+	var contract_text: Label = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel") as Label
+	var arena_container: SubViewportContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/ArenaViewportContainer") as SubViewportContainer
+	var risk_overlay: PanelContainer = root.get_node("MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay") as PanelContainer
+	var viewport_width: float = root.get_viewport_rect().size.x
+	contract_text.text = "Bank once while exactly 1 stop from bust and then immediately clear a stage without busting while carrying a loop contract progress checkpoint forward."
+	contract_text.reset_size()
+	await runner.simulate_frames(2)
+	var contract_title_top_gap: float = contract_title.global_position.y - contract_overlay.global_position.y
+	var arena_bottom: float = arena_container.global_position.y + arena_container.size.y
+	var contract_bottom: float = contract_overlay.global_position.y + contract_overlay.size.y
+	var risk_right: float = risk_overlay.global_position.x + risk_overlay.size.x
+	assert_float(contract_overlay.size.x).is_less_equal(RollPhase.CONTRACT_OVERLAY_WIDTH + 0.1)
+	assert_float(absf(contract_bottom - arena_bottom)).is_less(0.1)
+	assert_float(contract_title_top_gap).is_less(40.0)
+	assert_float(risk_right).is_less_equal(viewport_width)
+	assert_float(contract_text.size.y).is_greater(0.0)
+	assert_int(contract_text.get_theme_font_size("font_size")).is_equal(14)
+
+
 func test_bank_button_starts_disabled() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)

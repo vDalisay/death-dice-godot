@@ -32,6 +32,8 @@ const META_HIGH_RISK_EXP_REWARD: int = 1
 const META_NEAR_DEATH_SHARD_REWARD: int = 1
 const RISK_TOWER_LIGHT_COUNT: int = 10
 const RISK_TOWER_STOP_DOT_COUNT: int = 4
+const CONTRACT_OVERLAY_WIDTH: float = 320.0
+const RISK_TOWER_OVERLAY_WIDTH: float = 128.0
 const SURFACE_ENTER_DURATION: float = 0.14
 const SURFACE_EXIT_DURATION: float = 0.12
 const STAGE_VARIANT_STATUS_COLOR: Color = Color(0.55, 0.9, 1.0)
@@ -72,7 +74,7 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 @onready var highlights_panel: HighlightsPanel = $HighlightsPanel
 @onready var forge_panel: ForgePanel = $ForgePanel
 @onready var stage_map_panel: StageMapPanel = $StageMapPanel
-@onready var settings_panel: SettingsPanel = $SettingsPanel
+@onready var settings_panel: PanelContainer = $SettingsPanel
 @onready var pause_menu: Control = $PauseMenu
 @onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay
 @onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
@@ -294,6 +296,9 @@ func _on_roll_pressed() -> void:
 			_roll_all_dice()
 		TurnState.ACTIVE:
 			_reroll_selected_dice()
+		TurnState.BUST:
+			_start_new_turn()
+			_roll_all_dice()
 
 func _on_bank_pressed() -> void:
 	if turn_state != TurnState.ACTIVE:
@@ -499,17 +504,16 @@ func _on_bank_pressed() -> void:
 
 func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 	if turn_state != TurnState.ACTIVE:
+		if turn_state != TurnState.BUST:
+			return
+	if turn_state == TurnState.BUST and not _run_active:
 		return
 	if dice_keep_locked[die_index]:
 		return
-	# Allow picking up stopped dice (Cubitos-style rerollable stops)
-	if dice_stopped[die_index] and not is_kept:
-		dice_stopped[die_index] = false
-		dice_keep[die_index] = false
+	if dice_stopped[die_index]:
+		dice_keep[die_index] = is_kept
 		_sync_all_dice()
 		_sync_ui()
-		return
-	if dice_stopped[die_index]:
 		return
 	dice_keep[die_index] = is_kept
 	_sync_ui()
@@ -517,6 +521,9 @@ func _on_die_toggled(die_index: int, is_kept: bool) -> void:
 
 func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 	if turn_state != TurnState.ACTIVE:
+		if turn_state != TurnState.BUST:
+			return
+	if turn_state == TurnState.BUST and not _run_active:
 		return
 	var clicked_face: DiceFaceData = current_results[die_index]
 	if clicked_face == null:
@@ -530,17 +537,12 @@ func _on_die_shift_toggled(die_index: int, is_kept: bool) -> void:
 			continue
 		if dice_keep_locked[i]:
 			continue
-		if is_kept and dice_stopped[i]:
-			# Can't keep a stopped die — skip.
-			continue
-		if not is_kept and dice_stopped[i]:
-			# Pick up stopped dice of matching type.
-			dice_stopped[i] = false
-			dice_keep[i] = false
+		if dice_stopped[i]:
+			dice_keep[i] = is_kept
 			var stopped_die: PhysicsDie = dice_arena.get_die(i)
 			if stopped_die:
-				stopped_die.is_stopped = false
-				stopped_die.is_kept = false
+				stopped_die.is_stopped = true
+				stopped_die.is_kept = is_kept
 			continue
 		dice_keep[i] = is_kept
 		var toggle_die: PhysicsDie = dice_arena.get_die(i)
@@ -917,7 +919,6 @@ func _apply_bust_outcome(effective_stops: int) -> void:
 	if insurance_payout > 0:
 		_push_feed_status("Insurance paid out: +%dg" % insurance_payout, Color(0.25, 0.95, 0.6))
 	_sync_buttons()
-	_schedule_auto_advance()
 
 func _get_turn_multiplier() -> int:
 	var multiplier: int = 1
@@ -1250,15 +1251,23 @@ func _get_idle_status_context() -> Dictionary:
 func _apply_contract_overlay_theme() -> void:
 	if _contract_overlay == null:
 		return
+	_contract_overlay.custom_minimum_size = Vector2(CONTRACT_OVERLAY_WIDTH, 0.0)
+	_contract_overlay.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_contract_overlay.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_contract_overlay.add_theme_stylebox_override(
 		"panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
 	)
 	_contract_overlay_check_label.add_theme_font_override("font", _UITheme.font_display())
 	_contract_overlay_check_label.add_theme_font_size_override("font_size", 14)
+	_contract_overlay_check_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_contract_overlay_text_label.add_theme_font_override("font", _UITheme.font_mono())
-	_contract_overlay_text_label.add_theme_font_size_override("font_size", 12)
+	_contract_overlay_text_label.add_theme_font_size_override("font_size", 14)
 	_contract_overlay_text_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
+	_contract_overlay_text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_contract_overlay_text_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_contract_overlay_text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_contract_overlay_text_label.clip_text = false
 
 
 func _build_risk_tower_lights() -> void:
@@ -1295,6 +1304,8 @@ func _build_risk_tower_stop_dots() -> void:
 func _apply_risk_tower_theme() -> void:
 	if _risk_tower_overlay == null:
 		return
+	_risk_tower_overlay.custom_minimum_size = Vector2(RISK_TOWER_OVERLAY_WIDTH, 0.0)
+	_risk_tower_overlay.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_risk_tower_overlay.add_theme_stylebox_override(
 		"panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
@@ -1362,13 +1373,17 @@ func _refresh_contract_overlay() -> void:
 	var completed: bool = bool(GameManager.active_loop_contract_progress.get("completed", false))
 	_contract_overlay_check_label.text = _UITheme.GLYPH_CHECK if completed else "[ ]"
 	_contract_overlay_check_label.modulate = _UITheme.SUCCESS_GREEN if completed else _UITheme.MUTED_TEXT
-	if _contract_progress_service == null:
-		_contract_overlay_text_label.text = contract.display_name
-		return
-	_contract_overlay_text_label.text = _contract_progress_service.format_progress_text(
-		GameManager.active_loop_contract_id,
-		GameManager.active_loop_contract_progress
-	)
+	var progress_text: String = ""
+	if _contract_progress_service != null:
+		progress_text = _contract_progress_service.format_progress_text(
+			GameManager.active_loop_contract_id,
+			GameManager.active_loop_contract_progress
+		)
+	if progress_text.is_empty():
+		_contract_overlay_text_label.text = contract.description
+	else:
+		_contract_overlay_text_label.text = "%s\n%s" % [contract.description, progress_text]
+	_contract_overlay_text_label.reset_size()
 
 
 func _on_loop_contract_overlay_changed(_active_contract_id: String) -> void:
@@ -1387,7 +1402,7 @@ func _on_run_ended() -> void:
 		"best_turn": SaveManager.career_best_turn_score,
 	}
 	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
-	_record_run_snapshot_if_needed()
+	_record_run_snapshot_if_needed(snapshot)
 	_run_active = false
 	roll_button.disabled = true
 	bank_button.disabled = true
@@ -1614,7 +1629,11 @@ func _sync_buttons() -> void:
 			roll_button.text     = tr("REROLL_FMT").format({"value": _get_rerollable_count()})
 			roll_button.disabled = _is_roll_animating
 			bank_button.disabled = _is_roll_animating
-		TurnState.BUST, TurnState.BANKED:
+		TurnState.BUST:
+			roll_button.text     = tr("ROLL_ALL")
+			roll_button.disabled = _is_roll_animating
+			bank_button.disabled = true
+		TurnState.BANKED:
 			roll_button.text     = tr("ROLL_ALL")
 			roll_button.disabled = true
 			bank_button.disabled = true
@@ -2736,12 +2755,12 @@ func _restore_rest_surface() -> void:
 	overlay.connect("continue_requested", _on_rest_overlay_continue.bind(overlay))
 
 
-func _record_run_snapshot_if_needed() -> void:
+func _record_run_snapshot_if_needed(snapshot: RunSaveData = null) -> void:
 	if _run_snapshot_recorded:
 		return
-	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
+	if snapshot == null:
+		snapshot = SaveManager.make_run_snapshot()
 	SaveManager.record_run(snapshot)
 	SaveManager.clear_active_run_snapshot()
-	GameManager.clear_active_run_identity()
 	AchievementManager.on_run_recorded(snapshot)
 	_run_snapshot_recorded = true

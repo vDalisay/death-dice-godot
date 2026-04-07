@@ -131,5 +131,32 @@ func test_banked_run_end_sequence_waits_for_delay_and_overlay() -> void:
 	assert_bool(root.highlights_panel.visible).is_true()
 
 
+func test_recording_run_snapshot_does_not_clear_seed_identity_before_post_run_ui() -> void:
+	GameManager.skip_archetype_picker = true
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.reset_run()
+	GameManager.restore_run_identity("post-run-seed", false, 1)
+	var root: RollPhase = auto_free(MainScene.instantiate()) as RollPhase
+	add_child(root)
+	await await_idle_frame()
+	var snapshot: RunSaveData = SaveManager.make_run_snapshot()
+	root._record_run_snapshot_if_needed(snapshot)
+	assert_str(GameManager.run_seed_text).is_equal("post-run-seed")
+
+
+func test_bust_state_keeps_roll_button_enabled_for_manual_continue() -> void:
+	GameManager.skip_archetype_picker = true
+	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
+	GameManager.reset_run()
+	var root: RollPhase = auto_free(MainScene.instantiate()) as RollPhase
+	add_child(root)
+	await await_idle_frame()
+	root.turn_state = RollPhase.TurnState.BUST
+	root._run_active = true
+	root._sync_buttons()
+	assert_bool(root.roll_button.disabled).is_false()
+	assert_bool(root.bank_button.disabled).is_true()
+
+
 func _run_end_overlay_duration() -> float:
 	return BustOverlayScript.PRE_FLASH_DELAY + BustOverlayScript.DROP_DURATION + 1.45

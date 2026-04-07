@@ -196,13 +196,16 @@ func _on_pressed() -> void:
 		_apply_visual()
 		toggled_keep.emit(die_index, true)
 	elif die_state == DieState.KEPT:
-		die_state = DieState.REROLLABLE
+		if _current_face != null and (_current_face.type == DiceFaceData.FaceType.STOP or _current_face.type == DiceFaceData.FaceType.CURSED_STOP):
+			die_state = DieState.STOPPED
+		else:
+			die_state = DieState.REROLLABLE
 		_apply_visual()
 		toggled_keep.emit(die_index, false)
 	elif die_state == DieState.STOPPED:
-		die_state = DieState.REROLLABLE
+		die_state = DieState.KEPT
 		_apply_visual()
-		toggled_keep.emit(die_index, false)
+		toggled_keep.emit(die_index, true)
 
 
 func _press_bounce() -> void:
@@ -259,8 +262,14 @@ func _apply_visual() -> void:
 			border_width = 3
 			disabled = false
 		DieState.KEPT:
-			fill = FILL_KEPT
-			border = BORDER_KEPT
+			if _current_face != null and (_current_face.type == DiceFaceData.FaceType.STOP or _current_face.type == DiceFaceData.FaceType.CURSED_STOP):
+				fill = FILL_KEPT
+				border = BORDER_KEPT
+				text_color = _UITheme.SUCCESS_GREEN
+				icon_color = _UITheme.SUCCESS_GREEN
+			else:
+				fill = FILL_KEPT
+				border = BORDER_KEPT
 			border_width = 3
 			corner_glyph = _UITheme.GLYPH_CHECK
 			icon_color = _UITheme.SUCCESS_GREEN

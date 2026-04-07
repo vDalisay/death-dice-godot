@@ -166,13 +166,13 @@ func test_manual_pickup_then_reroll() -> void:
 	root.dice_keep_locked[0] = false
 	root._sync_all_dice()
 
-	# Simulate clicking the stopped die to pick it up (toggle signal).
-	root.dice_arena.die_clicked.emit(0, false)
+	# Simulate clicking the stopped die to mark it for reroll (signal emits the new kept state).
+	root.dice_arena.die_clicked.emit(0, true)
 	await runner.simulate_frames(2)
 
-	# Die should no longer be stopped after pickup.
-	assert_bool(root.dice_stopped[0]).is_false()
-	assert_bool(root.dice_keep[0]).is_false()
+	# Clicking a stopped die now marks it for reroll while keeping the stopped result visible.
+	assert_bool(root.dice_stopped[0]).is_true()
+	assert_bool(root.dice_keep[0]).is_true()
 
 
 func test_kept_dice_stay_locked_after_reroll() -> void:
@@ -462,11 +462,12 @@ func test_pickup_does_not_reduce_accumulated_counter() -> void:
 
 	assert_int(root.accumulated_stop_count).is_equal(1)
 
-	# Player picks up the stopped die — counter must NOT decrease.
-	root.dice_arena.die_clicked.emit(0, false)
+	# Player marks the stopped die for reroll — counter must NOT decrease.
+	root.dice_arena.die_clicked.emit(0, true)
 	await runner.simulate_frames(2)
 
-	assert_bool(root.dice_stopped[0]).is_false()
+	assert_bool(root.dice_stopped[0]).is_true()
+	assert_bool(root.dice_keep[0]).is_true()
 	assert_int(root.accumulated_stop_count).is_equal(1)
 
 

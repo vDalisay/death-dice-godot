@@ -74,6 +74,23 @@ func test_score_card_shows_delta_vs_best() -> void:
 	assert_str(delta.text).is_equal(panel.tr("HIGHLIGHTS_DELTA_POS_FMT").format({"value": 50}))
 
 
+func test_show_highlights_counts_up_to_run_values() -> void:
+	var panel: HighlightsPanel = auto_free(HighlightsPanelScene.instantiate()) as HighlightsPanel
+	add_child(panel)
+	await await_idle_frame()
+	var run: RunSaveData = _make_run(500, 5, 2, 120, 3, 8)
+	var bests: Dictionary = {"highscore": 200, "best_stages": 3, "best_loop": 1, "best_turn": 80}
+	panel.show_highlights(run, bests)
+	await get_tree().create_timer(1.8).timeout
+	var stat_container: HFlowContainer = panel.find_child("StatCards", true, false) as HFlowContainer
+	var score_card: PanelContainer = stat_container.get_child(0) as PanelContainer
+	var bust_card: PanelContainer = stat_container.get_child(4) as PanelContainer
+	var score_value: Label = score_card.find_child("ValueLabel", true, false) as Label
+	var bust_value: Label = bust_card.find_child("ValueLabel", true, false) as Label
+	assert_str(score_value.text).is_equal("500")
+	assert_str(bust_value.text).is_equal("3")
+
+
 func test_close_button_hides_and_emits() -> void:
 	var panel: HighlightsPanel = auto_free(HighlightsPanelScene.instantiate()) as HighlightsPanel
 	add_child(panel)

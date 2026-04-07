@@ -320,14 +320,13 @@ func test_auto_advance_after_bust() -> void:
 
 	assert_int(root.turn_state).is_equal(RollPhase.TurnState.BUST)
 
-	# Poll with delta_milli to advance the SceneTree clock past the auto-advance delay.
+	# Bust should now remain on the field for inspection until the player chooses to reroll.
 	for _i: int in 20:
 		await runner.simulate_frames(1, 100)
 	await runner.simulate_frames(5)
 
-	# Should have auto-advanced (to IDLE if lives remain, or stayed BUST if run ended).
-	if GameManager.lives > 0:
-		assert_int(root.turn_state).is_equal(RollPhase.TurnState.IDLE)
+	assert_int(root.turn_state).is_equal(RollPhase.TurnState.BUST)
+	assert_bool(root.roll_button.disabled).is_false()
 
 
 func test_buttons_disabled_during_banked_state() -> void:
