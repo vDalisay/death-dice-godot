@@ -15,8 +15,6 @@ const DICE_BUTTON_HEIGHT: int = 76
 const MODAL_INTRO_DURATION: float = 0.22
 const MODAL_EXIT_DURATION: float = 0.16
 
-const RARITY_NAMES: Array[String] = ["Common", "Uncommon", "Rare", "Epic"]
-
 @onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
 @onready var _title_label: Label = $CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/TitleLabel
@@ -36,28 +34,32 @@ var _die_buttons: Array[Button] = []
 var _forging_done: bool = false
 var _transition_tween: Tween = null
 var _is_closing: bool = false
+var _result_message_key: String = ""
+var _result_message_args: Dictionary = {}
+var _result_message_color: Color = Color.WHITE
 
 
 func _ready() -> void:
 	visible = false
 	_forge_button.pressed.connect(_on_forge_pressed)
 	_skip_button.pressed.connect(_on_skip_pressed)
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	_apply_theme_styling()
+	_refresh_localized_labels()
 
 
 func open() -> void:
 	_selected_indices.clear()
 	_is_closing = false
 	_forging_done = false
-	_result_label.text = ""
+	_clear_result_message()
 	_result_card.visible = false
 	_forge_button.disabled = true
-	_forge_button.text = "Forge!"
-	_skip_button.text = "Skip"
 	_skip_button.disabled = false
 	_skip_button.visible = true
 	_refresh_grid()
-	_update_instruction()
+	_refresh_localized_labels()
 	visible = true
 	_play_open_transition()
 
@@ -80,8 +82,7 @@ func _on_forge_pressed() -> void:
 	if _selected_indices.size() != 2:
 		return
 	if not _can_forge_selection():
-		_result_label.text = "Cannot forge two Epic dice!"
-		_result_label.modulate = _UITheme.DANGER_RED
+		_set_result_message("FORGE_CANNOT_TWO_EPIC", {}, _UITheme.DANGER_RED)
 		_result_card.visible = true
 		return
 
@@ -98,7 +99,7 @@ func _on_forge_pressed() -> void:
 	var result_die: DiceData = _roll_forge_result(die_a.rarity, die_b.rarity)
 	result_die = _apply_reroll_affinity(result_die, die_a, die_b)
 	if result_die == null:
-		_result_label.text = "Cannot forge these dice!"
+		_set_result_message("FORGE_CANNOT_SELECTION", {}, _UITheme.DANGER_RED)
 		return
 
 	# Remove sacrificed dice.
@@ -109,13 +110,19 @@ func _on_forge_pressed() -> void:
 	GameManager.add_dice(result_die)
 	SaveManager.discover_die(result_die.dice_name)
 
-	_result_label.text = "Forged: %s (%s)" % [result_die.get_display_name(), RARITY_NAMES[result_die.rarity]]
-	_result_label.modulate = result_die.get_rarity_color_value()
+	_set_result_message(
+		"FORGE_RESULT_FMT",
+		{
+			"name": result_die.get_display_name(),
+			"rarity": _rarity_text(result_die.rarity),
+		},
+		result_die.get_rarity_color_value()
+	)
 	_result_card.visible = true
 	_animate_result_card()
 
 	_forging_done = true
-	_forge_button.text = "Continue"
+	_refresh_localized_labels()
 	_forge_button.disabled = false
 	_skip_button.visible = false
 	_selected_indices.clear()
@@ -146,7 +153,7 @@ func _play_close_transition() -> void:
 
 
 func _update_instruction() -> void:
-	_instruction_label.text = "Select 2 dice to sacrifice (%d / 2 selected)" % _selected_indices.size()
+	_instruction_label.text = tr("FORGE_INSTRUCTION_FMT").format({"selected": _selected_indices.size()})
 
 
 func _refresh_grid() -> void:
@@ -159,9 +166,9 @@ func _refresh_grid() -> void:
 		var die: DiceData = GameManager.dice_pool[i]
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(DICE_BUTTON_WIDTH, DICE_BUTTON_HEIGHT)
-		btn.text = "%s\n%s" % [die.get_display_name(), RARITY_NAMES[die.rarity]]
+		btn.text = "%s\n%s" % [die.get_display_name(), _rarity_text(die.rarity)]
 		btn.tooltip_text = "%s\nFaces: %s" % [
-			RARITY_NAMES[die.rarity],
+			_rarity_text(die.rarity),
 			_face_summary(die)
 		]
 		btn.add_theme_font_override("font", _UITheme.font_stats())
@@ -203,14 +210,13 @@ func _toggle_die(index: int) -> void:
 	if _selected_indices.size() == 2:
 		if not _can_forge_selection():
 			_forge_button.disabled = true
-			_result_label.text = "Cannot forge two Epic dice!"
-			_result_label.modulate = _UITheme.DANGER_RED
+			_set_result_message("FORGE_CANNOT_TWO_EPIC", {}, _UITheme.DANGER_RED)
 			_result_card.visible = true
 		else:
-			_result_label.text = ""
+			_clear_result_message()
 			_result_card.visible = false
 	else:
-		_result_label.text = ""
+		_clear_result_message()
 		_result_card.visible = false
 
 	_update_instruction()
@@ -296,6 +302,43 @@ func _apply_theme_styling() -> void:
 	_forge_button.add_theme_font_size_override("font_size", 12)
 	_skip_button.add_theme_font_override("font", _UITheme.font_display())
 	_skip_button.add_theme_font_size_override("font_size", 12)
+
+
+func _refresh_localized_labels() -> void:
+	_title_label.text = tr("FORGE_TITLE")
+	_cost_label.text = tr("FORGE_COST_LABEL")
+	_forge_button.text = tr("CONTINUE_ACTION") if _forging_done else tr("FORGE_ACTION")
+	_skip_button.text = tr("SKIP_ACTION")
+	_update_instruction()
+	_apply_result_message()
+
+
+func _set_result_message(message_key: String, args: Dictionary, color: Color) -> void:
+	_result_message_key = message_key
+	_result_message_args = args.duplicate(true)
+	_result_message_color = color
+	_apply_result_message()
+
+
+func _clear_result_message() -> void:
+	_result_message_key = ""
+	_result_message_args.clear()
+	_result_message_color = Color.WHITE
+	_result_label.text = ""
+
+
+func _apply_result_message() -> void:
+	if _result_message_key.is_empty():
+		_result_label.text = ""
+		return
+	_result_label.text = tr(_result_message_key).format(_result_message_args)
+	_result_label.modulate = _result_message_color
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_localized_labels()
+	if visible:
+		_refresh_grid()
 
 
 func _build_button_style(rarity_color: Color, selected: bool) -> StyleBoxFlat:
@@ -437,3 +480,16 @@ static func _random_die_of_rarity(rarity: DiceData.Rarity) -> DiceData:
 	if index < 0:
 		return candidates[0]
 	return candidates[index]
+
+
+func _rarity_text(rarity: DiceData.Rarity) -> String:
+	match rarity:
+		DiceData.Rarity.GREY:
+			return tr("RARITY_COMMON")
+		DiceData.Rarity.GREEN:
+			return tr("RARITY_UNCOMMON")
+		DiceData.Rarity.BLUE:
+			return tr("RARITY_RARE")
+		DiceData.Rarity.PURPLE:
+			return tr("RARITY_EPIC")
+	return tr("RARITY_COMMON")

@@ -72,6 +72,8 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 @onready var highlights_panel: HighlightsPanel = $HighlightsPanel
 @onready var forge_panel: ForgePanel = $ForgePanel
 @onready var stage_map_panel: StageMapPanel = $StageMapPanel
+@onready var settings_panel: SettingsPanel = $SettingsPanel
+@onready var pause_menu: Control = $PauseMenu
 @onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay
 @onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
 @onready var _contract_overlay_text_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel
@@ -129,6 +131,7 @@ var _risk_tower_hovered: bool = false
 var _surface_transition_tweens: Dictionary = {}
 var _pending_run_end_snapshot: RunSaveData = null
 var _pending_run_end_prior_bests: Dictionary = {}
+var _settings_opened_from_pause: bool = false
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -152,6 +155,7 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
+const MAIN_MENU_SCENE_PATH: String = "res://Scenes/MainMenu.tscn"
 
 func _ready() -> void:
 	_turn_score_service = TurnScoreServiceScript.new()
@@ -173,6 +177,10 @@ func _ready() -> void:
 	shop_panel.shop_closed.connect(_on_shop_closed)
 	career_panel.closed.connect(_on_career_closed)
 	codex_panel.closed.connect(_on_codex_closed)
+	settings_panel.closed.connect(_on_settings_closed)
+	pause_menu.connect("resume_requested", _on_pause_resume_requested)
+	pause_menu.connect("settings_requested", _on_pause_settings_requested)
+	pause_menu.connect("quit_requested", _on_pause_quit_requested)
 	highlights_panel.closed.connect(_on_highlights_closed)
 	forge_panel.forge_closed.connect(_on_forge_closed)
 	stage_map_panel.node_selected.connect(_on_map_node_selected)
@@ -202,6 +210,8 @@ func _ready() -> void:
 	_add_button_micro_tween(new_run_button)
 	_add_button_micro_tween(career_button)
 	_add_button_micro_tween(codex_button)
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	GameManager.loop_contract_changed.connect(_on_loop_contract_overlay_changed)
 	GameManager.loop_contract_progress_changed.connect(_on_loop_contract_overlay_progress_changed)
 	_refresh_contract_overlay()
@@ -214,6 +224,15 @@ func _ready() -> void:
 		_start_new_fresh_run(int(GameManager.RunMode.CLASSIC), int(GameManager.Archetype.CAUTION), false, "")
 	else:
 		_show_archetype_picker(false)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	if _is_picker_open() or pause_menu.visible or settings_panel.visible:
+		return
+	get_viewport().set_input_as_handled()
+	_open_pause_menu()
 
 
 func _notification(what: int) -> void:
@@ -1562,6 +1581,18 @@ func _on_codex_closed() -> void:
 	pass
 
 
+func _on_settings_closed() -> void:
+	if get_tree().paused and _settings_opened_from_pause:
+		_settings_opened_from_pause = false
+		pause_menu.call("open_panel")
+	_sync_buttons()
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_sync_buttons()
+	pause_menu.call("refresh_text")
+
+
 func _on_achievement_unlocked(_key: String, title: String) -> void:
 	var toast: PanelContainer = AchievementToastScene.instantiate() as PanelContainer
 	add_child(toast)
@@ -1576,17 +1607,54 @@ func _sync_buttons() -> void:
 		return
 	match turn_state:
 		TurnState.IDLE:
-			roll_button.text     = "Roll All"
+			roll_button.text     = tr("ROLL_ALL")
 			roll_button.disabled = _is_roll_animating
 			bank_button.disabled = true
 		TurnState.ACTIVE:
-			roll_button.text     = "Reroll %d" % _get_rerollable_count()
+			roll_button.text     = tr("REROLL_FMT").format({"value": _get_rerollable_count()})
 			roll_button.disabled = _is_roll_animating
 			bank_button.disabled = _is_roll_animating
 		TurnState.BUST, TurnState.BANKED:
-			roll_button.text     = "Roll All"
+			roll_button.text     = tr("ROLL_ALL")
 			roll_button.disabled = true
 			bank_button.disabled = true
+
+
+func _open_pause_menu() -> void:
+	if get_tree().paused:
+		return
+	_settings_opened_from_pause = false
+	get_tree().paused = true
+	pause_menu.call("open_panel")
+
+
+func _resume_from_pause() -> void:
+	_settings_opened_from_pause = false
+	pause_menu.call("close_panel")
+	if settings_panel.visible:
+		settings_panel.close_panel()
+	get_tree().paused = false
+	_sync_buttons()
+
+
+func _on_pause_resume_requested() -> void:
+	_resume_from_pause()
+
+
+func _on_pause_settings_requested() -> void:
+	_settings_opened_from_pause = true
+	pause_menu.call("close_panel")
+	settings_panel.open_panel()
+
+
+func _on_pause_quit_requested() -> void:
+	_settings_opened_from_pause = false
+	pause_menu.call("close_panel")
+	if settings_panel.visible:
+		settings_panel.close_panel()
+	get_tree().paused = false
+	_persist_active_run_snapshot()
+	get_tree().change_scene_to_file(MAIN_MENU_SCENE_PATH)
 
 
 func _begin_roll_animation_lock() -> void:

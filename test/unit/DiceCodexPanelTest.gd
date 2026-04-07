@@ -3,9 +3,17 @@ extends GdUnitTestSuite
 
 const CodexScene: PackedScene = preload("res://Scenes/DiceCodexPanel.tscn")
 
+var _saved_locale: String = ""
+
 
 func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
 	SaveManager.discovered_dice.clear()
+
+
+func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
 
 
 func test_open_panel_populates_all_known_dice_cards() -> void:

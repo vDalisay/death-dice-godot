@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://Scripts/RollPhase.gd" id="1"]
 [ext_resource type="PackedScene" path="res://Scenes/HUD.tscn" id="2"]
@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" path="res://Scenes/HighlightsPanel.tscn" id="7"]
 [ext_resource type="PackedScene" path="res://Scenes/ForgePanel.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://Scenes/StageMap.tscn" id="9"]
+[ext_resource type="PackedScene" path="res://Scenes/SettingsPanel.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://Scenes/PauseMenu.tscn" id="11"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -75,7 +77,7 @@ text = "[ ]"
 [node name="ContractTextLabel" type="Label" parent="MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "No contract"
+text = "NO_CONTRACT"
 autowrap_mode = 2
 
 [node name="ArenaViewportContainer" type="SubViewportContainer" parent="MarginContainer/VBoxContainer/ArenaRow"]
@@ -135,31 +137,31 @@ theme_override_constants/separation = 20
 [node name="RollButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 54)
-text = "Roll All"
+text = "ROLL_ALL"
 theme_override_font_sizes/font_size = 20
 
 [node name="BankButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 54)
-text = "Bank Score"
+text = "BANK_SCORE"
 theme_override_font_sizes/font_size = 20
 
 [node name="NewRunButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 54)
-text = "New Run"
+text = "NEW_RUN"
 theme_override_font_sizes/font_size = 20
 
 [node name="CareerButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 54)
-text = "Career"
+text = "CAREER"
 theme_override_font_sizes/font_size = 20
 
 [node name="CodexButton" type="Button" parent="MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 54)
-text = "Codex"
+text = "CODEX"
 theme_override_font_sizes/font_size = 20
 
 [node name="ShopPanel" parent="." instance=ExtResource("4")]
@@ -194,3 +196,9 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="SettingsPanel" parent="." instance=ExtResource("10")]
+layout_mode = 1
+
+[node name="PauseMenu" parent="." instance=ExtResource("11")]
+layout_mode = 1

@@ -3,12 +3,17 @@ extends GdUnitTestSuite
 
 const ShopPanelScene: PackedScene = preload("res://Scenes/ShopPanel.tscn")
 
+var _saved_locale: String = ""
+
 
 func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
 	GameManager.reset_run()
 
 
 func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
 	GameManager.reset_run()
 
 

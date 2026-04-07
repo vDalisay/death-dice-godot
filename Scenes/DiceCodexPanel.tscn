@@ -40,7 +40,7 @@ theme_override_constants/separation = 8
 
 [node name="TitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
 layout_mode = 2
-text = "DICE CODEX"
+text = ""
 
 [node name="HeaderSpacer" type="Control" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
 layout_mode = 2
@@ -58,7 +58,7 @@ theme_override_constants/margin_bottom = 6
 
 [node name="CompletionLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CompletionBadge/CompletionMargin"]
 layout_mode = 2
-text = "Discovered: 0 / 0 (0%)"
+text = ""
 
 [node name="HSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -77,4 +77,4 @@ theme_override_constants/v_separation = 12
 layout_mode = 2
 custom_minimum_size = Vector2(220, 56)
 size_flags_horizontal = 4
-text = "Close"
+text = ""

@@ -25,7 +25,10 @@ const FACE_LABEL_FONT_SIZE: int = 15
 func _ready() -> void:
 	visible = false
 	_close_button.pressed.connect(_on_close_pressed)
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	_apply_theme_styling()
+	_refresh_localized_labels()
 
 
 func open_panel() -> void:
@@ -56,7 +59,11 @@ func _refresh() -> void:
 	var pct: int = 0
 	if total_count > 0:
 		pct = int(float(discovered_count) / float(total_count) * 100.0)
-	_completion_label.text = "Discovered: %d / %d (%d%%)" % [discovered_count, total_count, pct]
+	_completion_label.text = tr("DICE_CODEX_DISCOVERED_FMT").format({
+		"discovered": discovered_count,
+		"total": total_count,
+		"percent": pct,
+	})
 
 
 func _build_entry(die: DiceData, discovered: bool) -> PanelContainer:
@@ -101,7 +108,7 @@ func _build_entry(die: DiceData, discovered: bool) -> PanelContainer:
 	rarity_label.name = "RarityLabel"
 	rarity_label.add_theme_font_override("font", _UITheme.font_mono())
 	rarity_label.add_theme_font_size_override("font_size", 14)
-	rarity_label.text = _rarity_text(die.rarity) if discovered else "LOCKED"
+	rarity_label.text = _rarity_text(die.rarity) if discovered else tr("DICE_CODEX_LOCKED")
 	rarity_label.add_theme_color_override("font_color", border_color)
 	header.add_child(rarity_label)
 
@@ -110,7 +117,7 @@ func _build_entry(die: DiceData, discovered: bool) -> PanelContainer:
 	subtitle.add_theme_font_override("font", _UITheme.font_body())
 	subtitle.add_theme_font_size_override("font_size", 14)
 	subtitle.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
-	subtitle.text = "Face Map" if discovered else "Undiscovered die"
+	subtitle.text = tr("DICE_CODEX_FACE_MAP") if discovered else tr("DICE_CODEX_UNDISCOVERED")
 	vbox.add_child(subtitle)
 
 	var faces_grid := GridContainer.new()
@@ -200,6 +207,17 @@ func _apply_theme_styling() -> void:
 	_close_button.add_theme_font_size_override("font_size", 12)
 
 
+func _refresh_localized_labels() -> void:
+	_title_label.text = tr("DICE_CODEX_TITLE")
+	_close_button.text = tr("CLOSE_ACTION")
+	if visible:
+		_refresh()
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_localized_labels()
+
+
 func _face_glyph(face_type: DiceFaceData.FaceType) -> String:
 	match face_type:
 		DiceFaceData.FaceType.NUMBER:
@@ -261,11 +279,11 @@ func _face_accent(face_type: DiceFaceData.FaceType) -> Color:
 func _rarity_text(rarity: DiceData.Rarity) -> String:
 	match rarity:
 		DiceData.Rarity.GREY:
-			return "COMMON"
+			return tr("RARITY_COMMON")
 		DiceData.Rarity.GREEN:
-			return "UNCOMMON"
+			return tr("RARITY_UNCOMMON")
 		DiceData.Rarity.BLUE:
-			return "RARE"
+			return tr("RARITY_RARE")
 		DiceData.Rarity.PURPLE:
-			return "EPIC"
-	return "COMMON"
+			return tr("RARITY_EPIC")
+	return tr("RARITY_COMMON")

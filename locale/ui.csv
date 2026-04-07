@@ -1,0 +1,197 @@
+,en,zh_CN
+ROLL_ALL,Roll All,全部掷骰
+REROLL_FMT,"Reroll {value}","重掷 {value}"
+BANK_SCORE,Bank Score,存分
+NEW_RUN,New Run,新一局
+CAREER,Career,生涯
+CODEX,Codex,图鉴
+SETTINGS,Settings,设置
+PLAY_ACTION,Play,开始
+RESUME_ACTION,Resume,继续
+QUIT_ACTION,Quit,退出
+PAUSED_TITLE,Paused,已暂停
+MAIN_MENU_TITLE,Death Dice,死亡骰局
+MAIN_MENU_STATUS_READY,Start a fresh run or jump back into your current one.,开始新一局，或回到你当前的进程。
+CONTRACT,CONTRACT,契约
+NO_CONTRACT,No contract,当前无契约
+RISK,RISK,风险
+CAREER_STATS_TITLE,CAREER STATS,生涯统计
+ACHIEVEMENTS_TITLE,ACHIEVEMENTS,成就
+CLOSE_ACTION,Close,关闭
+SETTINGS_HELP_TEXT,"Adjust language and future accessibility options here.","在此调整语言和未来的辅助功能选项。"
+LANGUAGE_LABEL,Language,语言
+BEST_LOOP_FMT,"Best Loop: {value}","最佳循环: {value}"
+BEST_TURN_SCORE_FMT,"Best Turn Score: {value}","最佳单回合分数: {value}"
+TOTAL_BUSTS_FMT,"Total Busts: {value}","总爆点次数: {value}"
+FAVORITE_DIE_FMT,"Favorite Die: {value}","最常用骰子: {value}"
+LIFETIME_RUNS_FMT,"Lifetime Runs: {value}","总对局数: {value}"
+TOTAL_STAGES_CLEARED_FMT,"Stages Cleared: {value}","已通关关卡: {value}"
+ACHIEVEMENTS_UNLOCKED_FMT,"{unlocked} / {total} unlocked","已解锁 {unlocked} / {total}"
+NO_FAVORITE_DIE,None,无
+DICE_CODEX_TITLE,DICE CODEX,骰子图鉴
+DICE_CODEX_DISCOVERED_FMT,"Discovered: {discovered} / {total} ({percent}%)","已发现: {discovered} / {total} ({percent}%)"
+DICE_CODEX_FACE_MAP,Face Map,面图
+DICE_CODEX_UNDISCOVERED,Undiscovered die,未发现的骰子
+DICE_CODEX_LOCKED,LOCKED,未解锁
+RARITY_COMMON,COMMON,普通
+RARITY_UNCOMMON,UNCOMMON,少见
+RARITY_RARE,RARE,稀有
+RARITY_EPIC,EPIC,史诗
+FORGE_TITLE,DICE FORGE,骰子熔炉
+FORGE_COST_LABEL,Cost: sacrifice 2 dice,代价：献祭 2 个骰子
+FORGE_INSTRUCTION_FMT,"Select 2 dice to sacrifice ({selected} / 2 selected)","选择 2 个骰子献祭（已选 {selected} / 2）"
+FORGE_ACTION,Forge!,熔铸！
+SKIP_ACTION,Skip,跳过
+CONTINUE_ACTION,Continue,继续
+FORGE_CANNOT_TWO_EPIC,Cannot forge two Epic dice!,无法熔铸两个史诗骰子！
+FORGE_CANNOT_SELECTION,Cannot forge these dice!,无法熔铸这些骰子！
+FORGE_RESULT_FMT,"Forged: {name} ({rarity})","熔铸结果：{name}（{rarity}）"
+SHOP_FALLBACK_TITLE,SHOP,商店
+SHOP_LOOP_COMPLETE_FMT,"LOOP {value} COMPLETE","第 {value} 轮完成"
+SHOP_STAGE_COMPLETE_FMT,"STAGE {value} COMPLETE","第 {value} 关完成"
+SHOP_START_LOOP_FMT,"Start Loop {value}","开始第 {value} 轮"
+SHOP_CONTINUE_STAGE_FMT,"Continue to Stage {value}","前往第 {value} 关"
+SHOP_OFFER_HINT,"Browse offers. Select a card to inspect it.","浏览商品，选择一张卡查看详情。"
+SHOP_AVAILABLE_DICE_FMT,"AVAILABLE DICE ({value})","可用骰子（{value}）"
+SHOP_PASSIVE_UPGRADES_FMT,"PASSIVE UPGRADES ({value})","被动升级（{value}）"
+SHOP_SIDE_BETS_FMT,"SIDE BETS ({value})","边注（{value}）"
+SHOP_DETAILS_LABEL,DETAILS,详情
+SHOP_SELECT_OFFER,Select an offer,选择一个商品
+SHOP_POOL_FMT,"Dice Pool: {dice_count}{mods_suffix}","骰池：{dice_count}{mods_suffix}"
+SHOP_POOL_MODS_FMT,"  |  Mods: {mods}","  |  改造：{mods}"
+SHOP_REFRESH_FMT,"Refresh Shop ({gold}{cost})","刷新商店（{gold}{cost}）"
+SHOP_PLAY_ACTION,Play,游玩
+SHOP_BUY_ACTION,Buy,购买
+SHOP_FREE,FREE,免费
+SHOP_KEYWORD_MOD_PASSIVE,MOD | PASSIVE,改造 | 被动
+SHOP_KEYWORD_FORGE_UPGRADE,FORGE | UPGRADE,熔铸 | 升级
+SHOP_KEYWORD_CLEANSE_CURSE,CLEANSE | CURSE,净化 | 诅咒
+SHOP_KEYWORD_BET_PLAY,BET | PLAY,下注 | 游玩
+SHOP_KEYWORD_DIE_BUY,DIE | BUY,骰子 | 购买
+SHOP_NEED_GOLD_FMT,"Need {gold}{value} more gold.","还需要 {gold}{value} 金币。"
+SHOP_MODIFIER_RACK_FULL,Modifier rack is full.,改造栏已满。
+SHOP_ALREADY_OWNED,Already owned.,已拥有。
+SHOP_DOUBLE_DOWN_NOTE,Wagers all current gold in the overlay.,会在该界面押上当前全部金币。
+SHOP_INSURANCE_NOTE,Loss is tracked as shop spend if you place the bet.,下注后若损失金币会计入商店消费。
+SHOP_HEAT_NOTE,Predict the exact banked stop count.,预测精确的存分停面数。
+SHOP_PARITY_NOTE,Parity checks your kept NUMBER faces.,会检查你保留的 NUMBER 面奇偶性。
+SHOP_READY_TO_PURCHASE,Ready to purchase.,可以购买。
+SHOP_NO_DICE_TO_UPGRADE,No dice to upgrade.,没有可升级的骰子。
+SHOP_NO_UPGRADEABLE_FACES,No upgradeable faces.,没有可升级的面。
+SHOP_UPGRADE_PREVIEW_FMT,"Upgrades one random weakest face. Candidates: {candidates}","会随机升级一个最弱面。候选项：{candidates}"
+SHOP_DD_DESC_FMT,"Wager all {gold}{value}. Win returns {gold}{reward}!","押上全部 {gold}{value}。获胜可获得 {gold}{reward}！"
+HIGHLIGHTS_TITLE,RUN HIGHLIGHTS,本局亮点
+HIGHLIGHTS_FIRST_RECORD,First record,首次记录
+HIGHLIGHTS_TIED_BEST,Tied best,追平最佳
+HIGHLIGHTS_DELTA_POS_FMT,"+{value} vs best","比最佳高 +{value}"
+HIGHLIGHTS_DELTA_NEG_FMT,"{value} vs best","比最佳低 {value}"
+HIGHLIGHTS_SCORE,Score,分数
+HIGHLIGHTS_STAGES,Stages,关卡
+HIGHLIGHTS_LOOPS,Loops,轮次
+HIGHLIGHTS_BEST_TURN,Best Turn,最佳回合
+HIGHLIGHTS_BUSTS,Busts,爆点
+HIGHLIGHTS_SKULLS,Skulls,骷髅
+HIGHLIGHTS_FINAL_DICE,Final Dice,最终骰子数
+HIGHLIGHTS_NEW_BEST_FMT,"{star} NEW BEST!","{star} 新纪录！"
+HIGHLIGHTS_PRESTIGE_ACTION,Visit Prestige Shop,前往声望商店
+STAGE_MAP_TITLE,ROUTE BOARD,路线板
+STAGE_MAP_STATUS_CHOOSE,CHOOSE THE NEXT MARK,选择下一个标记
+STAGE_MAP_STATUS_SURVEY,SURVEYING ROUTES,勘察路线中
+STAGE_MAP_STATUS_BRASS,BRASS TOKEN ARMED,黄铜标记已就绪
+STAGE_MAP_CONTEXT_FMT,"Loop {loop}  |  Stage {stage} / {total}  |  {status}","第 {loop} 轮  |  第 {stage} / {total} 关  |  {status}"
+STAGE_MAP_SELECTED_NODE,SELECTED NODE,已选节点
+STAGE_MAP_NO_NODE_SELECTED,No node selected,未选择节点
+STAGE_MAP_ROUTE_MARKER,Route marker,路线标记
+STAGE_MAP_HOVER_MARKED_ROUTE,Hover a marked route to inspect what it offers.,悬停在已标记路线以查看其内容。
+STAGE_MAP_DETAILS_LIVE,The map stays clean; the details live here.,地图保持简洁，详细信息会显示在这里。
+STAGE_MAP_RULE_PREVIEW_FMT,"Rule Preview: {value}","规则预览：{value}"
+STAGE_MAP_BOARD_LABEL,ROUTE GRID,路线网格
+STAGE_MAP_BOARD_REVEAL_FMT,"ROUTE GRID  |  LANTERN ON ROW {row}","路线网格  |  提灯照亮第 {row} 行"
+STAGE_MAP_LEGEND_DEFAULT,Hover routes for details.,悬停路线以查看详情。
+STAGE_MAP_LANTERN_EMPTY,Lantern found no future route data.,提灯未发现后续路线信息。
+STAGE_MAP_LANTERN_REVEAL_FMT,"Lantern reveal row {row} -> {details}","提灯揭示第 {row} 行 -> {details}"
+STAGE_MAP_STATE_INSPECT,Inspect,查看
+STAGE_MAP_STATE_VISITED,Visited,已访问
+STAGE_MAP_STATE_SPENT,Spent,已用尽
+STAGE_MAP_STATE_REROUTE,Reroute,改道
+STAGE_MAP_STATE_RESTRICTED,Restricted,受限
+STAGE_MAP_STATE_AVAILABLE,Available Now,当前可达
+STAGE_MAP_STATE_LOCKED,Path Locked,路径锁定
+STAGE_MAP_STATE_FUTURE,Future Route,未来路线
+STAGE_MAP_HINT_INTRO_FMT,"Stage {stage} / {total}  |  Lantern sweep in progress. Route interactions unlock when marks settle.","第 {stage} / {total} 关  |  提灯扫描进行中。标记稳定后即可与路线交互。"
+STAGE_MAP_HINT_BASE_FMT,"Stage {stage} / {total}  |  Inspect a route, then commit from the lit row.","第 {stage} / {total} 关  |  先查看路线，再从高亮行确认选择。"
+STAGE_MAP_HINT_SELECTED_FMT,"Stage {stage} / {total}  |  {description}","第 {stage} / {total} 关  |  {description}"
+STAGE_MAP_RESTRICTION_STANDARD,Quiet Table: standard route required.,静默牌桌：必须选择标准路线。
+STAGE_MAP_RESTRICTION_NO_HARD,Quiet Table: hard routes are barred.,静默牌桌：禁用高难路线。
+STAGE_MAP_HINT_REVEALED_FMT,"{base}  Loaded Lantern reveals row {row} ahead.","{base}  装填提灯揭示了前方第 {row} 行。"
+STAGE_MAP_HINT_REROUTE_LIVE_FMT,"{base}  Reroute preview is live; brass marks spend a token only if chosen.","{base}  改道预览已启用；只有选中黄铜标记才会消耗代币。"
+STAGE_MAP_HINT_REROUTE_READY_FMT,"{base}  {count} reroute token{s} ready.","{base}  已准备 {count} 个改道代币。"
+STAGE_MAP_ROUTE_HINT_VISITED_FMT,"Row {row} visited","第 {row} 行已访问"
+STAGE_MAP_ROUTE_HINT_REVEALED_FMT,"Row {row} lantern-revealed","第 {row} 行已被提灯揭示"
+STAGE_MAP_ROUTE_HINT_FUTURE_FMT,"Row {row} future path","第 {row} 行为未来路径"
+STAGE_MAP_ROUTE_HINT_RESTRICTED_FMT,"Row {row} restricted by Quiet Table","第 {row} 行受静默牌桌限制"
+STAGE_MAP_ROUTE_HINT_REROUTE_FMT,"Row {row} reroute path","第 {row} 行为改道路径"
+STAGE_MAP_ROUTE_HINT_REACHABLE_FMT,"Row {row} reachable now","第 {row} 行当前可达"
+STAGE_MAP_ROUTE_HINT_BLOCKED_FMT,"Row {row} blocked on this route","第 {row} 行在此路线中被阻断"
+STAGE_MAP_REROUTE_CANCEL,Cancel Reroute Preview,取消改道预览
+STAGE_MAP_REROUTE_PREVIEW_FMT,"Preview Reroute ({count})","预览改道（{count}）"
+STAGE_MAP_RULE_DEFAULT,RULE: NORMAL,规则：普通
+STAGE_MAP_RULE_SPECIAL_FALLBACK,SPECIAL,特殊
+STAGE_MAP_RULE_FMT,"RULE: {value}","规则：{value}"
+STAGE_MAP_NODE_STATUS_FUTURE,FUTURE,未来
+STAGE_MAP_NODE_STATUS_ASH,ASH,灰烬
+STAGE_MAP_NODE_STATUS_SPENT,SPENT,耗尽
+STAGE_MAP_NODE_STATUS_BRASS,BRASS,黄铜
+STAGE_MAP_NODE_STATUS_LIVE,LIVE,激活
+STAGE_MAP_NODE_STATUS_LOCKED,LOCKED,锁定
+STAGE_MAP_NODE_STATUS_SEEN,SEEN,已见
+BUST_GAME_OVER,GAME OVER,游戏结束
+BUST_HAND_LOSS_FMT,"BUST! -{loss} HAND","爆点！-{loss} 手牌"
+BUST_STAGE_FAILED,Stage failed.,关卡失败。
+BUST_SCORE_LOST,Your turn score was lost.,你本回合的分数已失去。
+DICE_REWARD_TITLE,Choose Your Reward,选择你的奖励
+DICE_REWARD_HINT,Pick one die to add to your run.,选择一个骰子加入本局。
+DICE_REWARD_REROLL_CHOICES,Reroll Choices,重掷选项
+DICE_REWARD_EVOLVES,Evolves from rerolls,由重掷进化
+DICE_REWARD_PICK,PICK,选择
+REST_STOP_TITLE,REST STOP,休整站
+REST_STOP_RECOVERED_FMT,"Recovered {life} hand and found {gold}g.","恢复了 {life} 手牌并找到 {gold}g。"
+REST_STOP_NO_HEAL_FMT,"No hand recovered, but you still found {gold}g.","未恢复手牌，但你仍找到了 {gold}g。"
+REST_STOP_HANDS_NEXT_FMT,"Hands: {before} -> {after}\nNext path opens when you continue.","手牌：{before} -> {after}\n继续后将开启下一条路径。"
+REST_STOP_CAPPED_FMT,"Hands: {before} -> {after}\nRecovery capped for the next stage. Continue when ready.","手牌：{before} -> {after}\n下一关的恢复已达上限。准备好后继续。"
+STAGE_CLEARED_TITLE,STAGE CLEARED!,关卡完成！
+LOOP_CLEARED_TITLE,LOOP CLEARED!,轮次完成！
+STAGE_CLEARED_SURPLUS_FMT,"Surplus: +{value}","盈余：+{value}"
+STAGE_CLEARED_GOLD_FMT,"Gold Earned: +{value}g","获得金币：+{value}g"
+STAGE_CLEARED_CONTINUE_LOOP,CONTINUE LOOP,继续轮次
+DOUBLE_DOWN_WAGER_FMT,"Wager: {gold}g - pick your side!","押注：{gold}g - 选择你的边！"
+DOUBLE_DOWN_ROLLING,Rolling...,掷骰中...
+DOUBLE_DOWN_EVEN,EVEN,双数
+DOUBLE_DOWN_ODD,ODD,单数
+DOUBLE_DOWN_EVEN_WORD,even,双数
+DOUBLE_DOWN_ODD_WORD,odd,单数
+DOUBLE_DOWN_WIN_FMT,"Rolled {roll} ({parity}) - YOU WIN! +{gold}g!","掷出 {roll}（{parity}）- 你赢了！+{gold}g！"
+DOUBLE_DOWN_LOSE_FMT,"Rolled {roll} ({parity}) - LOST! -{gold}g","掷出 {roll}（{parity}）- 输了！-{gold}g"
+EVEN_ODD_INFO,"At bank: count parity of kept NUMBER dice.\nMajority wins 2:1 payout.  Ties push (refund).","结算时：统计保留的数字骰面奇偶。\n多数方按 2:1 支付。平局则退还押注。"
+EVEN_ODD_ODDS,"~50/50 - ties push","约 50/50 - 平局退还"
+EVEN_ODD_CONFIRM,Confirm Bet,确认押注
+EVEN_ODD_WAGER_FMT,"Wager: {wager}g  ->  Win: {win}g","押注：{wager}g  ->  赢得：{win}g"
+EVEN_ODD_BET_FMT,"Bet {pick} for {wager}g","押注 {pick}，金额 {wager}g"
+HEAT_WAGER_FMT,"Wager: {wager}g  |  Payout on hit: {payout}g  (3:1)","押注：{wager}g  |  命中支付：{payout}g  （3:1）"
+HEAT_PICK_TARGET,Pick a stop count ->,选择一个停牌数 ->
+HEAT_CONFIRM_FMT,"Confirm Bet  (-{wager}g)","确认押注  (-{wager}g)"
+HEAT_PICKED_FMT,"Bet: exactly {count} stop{s} when banking","押注：结算时正好 {count} 个停牌{s}"
+HEAT_ODDS_0,0 stops: low chance (~10%),0 个停牌：低概率（约 10%）
+HEAT_ODDS_1,1 stop: common (~35%),1 个停牌：常见（约 35%）
+HEAT_ODDS_2,2 stops: likely (~30%),2 个停牌：较可能（约 30%）
+HEAT_ODDS_3,3 stops: risky (~20%),3 个停牌：有风险（约 20%）
+HEAT_ODDS_4,4 stops: very risky (~5%),4 个停牌：高风险（约 5%）
+INSURANCE_INFO_FMT,"Pay {premium}g now.\nIf you bust this stage -> recover {payout}g\n(Net gain on bust: +{net}g)","现在支付 {premium}g。\n如果本关爆点 -> 返还 {payout}g\n（爆点净收益：+{net}g）"
+INSURANCE_ONE_STAGE,One-stage coverage only. Clears on bank or bust.,仅覆盖本关。结算或爆点后失效。
+INSURANCE_BUY_FMT,"Buy Insurance  (-{premium}g)","购买保险  (-{premium}g)"
+NOT_ENOUGH_GOLD_FMT,"Not enough gold (need {gold}g)","金币不足（需要 {gold}g）"
+NO_THANKS,No Thanks,不了
+DOUBLE_DOWN_TITLE,DOUBLE DOWN,双倍下注
+EVEN_ODD_TITLE,EVEN / ODD BET,单双押注
+HEAT_BET_TITLE,HEAT BET,热度押注
+INSURANCE_BET_TITLE,INSURANCE BET,保险押注

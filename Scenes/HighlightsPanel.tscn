@@ -36,7 +36,7 @@ theme_override_constants/separation = 14
 
 [node name="TitleLabel" type="Label" parent="CenterContainer/Card/MarginContainer/Content"]
 layout_mode = 2
-text = "RUN HIGHLIGHTS"
+text = ""
 horizontal_alignment = 1
 
 [node name="TitleSeparator" type="HSeparator" parent="CenterContainer/Card/MarginContainer/Content"]
@@ -52,4 +52,4 @@ alignment = 1
 layout_mode = 2
 custom_minimum_size = Vector2(220, 56)
 size_flags_horizontal = 4
-text = "Continue"
+text = ""

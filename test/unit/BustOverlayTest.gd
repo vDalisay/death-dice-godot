@@ -3,6 +3,17 @@ extends GdUnitTestSuite
 
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
 
+var _saved_locale: String = ""
+
+
+func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
+
+
+func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
+
 
 func test_play_shows_bust_text_when_lives_remain() -> void:
 	GameManager.lives = 2
@@ -23,7 +34,7 @@ func test_play_shows_game_over_when_out_of_lives() -> void:
 	overlay.call("play", 1)
 	await await_millis(850)
 	var message_label: Label = overlay.get_node("CenterContainer/Card/MarginContainer/Content/MessageLabel") as Label
-	assert_str(message_label.text).is_equal("GAME OVER")
+	assert_str(message_label.text).is_equal(overlay.tr("BUST_GAME_OVER"))
 
 
 func test_play_sets_drop_from_top_card_state() -> void:

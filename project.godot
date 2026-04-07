@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="DeathDice"
-run/main_scene="res://Scenes/Main.tscn"
+run/main_scene="res://Scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 ThemeManager="*res://Scripts/ThemeManager.gd"
 GameManager="*res://Scripts/GameManager.gd"
 SaveManager="*res://Scripts/SaveManager.gd"
+LocalizationManager="*res://Scripts/LocalizationManager.gd"
 SFXManager="*res://Scripts/SFXManager.gd"
 AchievementManager="*res://Scripts/AchievementManager.gd"
 RollComboRegistry="*res://Scripts/RollComboRegistry.gd"
@@ -41,6 +42,10 @@ project/assembly_name="DeathDice"
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://locale/ui.en.translation", "res://locale/ui.zh_CN.translation")
 
 [physics]
 

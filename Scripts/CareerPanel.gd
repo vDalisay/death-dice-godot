@@ -39,7 +39,10 @@ const LOCKED_BADGE_BORDER_WIDTH: int = 0
 func _ready() -> void:
 	visible = false
 	_close_button.pressed.connect(_on_close_pressed)
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	_apply_theme()
+	_refresh_localized_labels()
 
 
 func open_panel() -> void:
@@ -89,17 +92,34 @@ func _apply_theme() -> void:
 	_UITheme.apply_label_style(_close_button, _UITheme.font_display(), CLOSE_BUTTON_FONT_SIZE, _UITheme.BRIGHT_TEXT)
 
 
+func _refresh_localized_labels() -> void:
+	_title_label.text = tr("CAREER_STATS_TITLE")
+	_achievements_header.text = tr("ACHIEVEMENTS_TITLE")
+	_close_button.text = tr("CLOSE_ACTION")
+	_refresh()
+
+
 func _refresh() -> void:
-	_best_loop_label.text = "Best Loop: %d" % SaveManager.career_best_loop
-	_best_turn_label.text = "Best Turn Score: %d" % SaveManager.career_best_turn_score
-	_total_busts_label.text = "Total Busts: %d" % SaveManager.total_busts
-	_favorite_die_label.text = "Favorite Die: %s" % SaveManager.get_favorite_die_type()
-	_lifetime_runs_label.text = "Lifetime Runs: %d" % SaveManager.total_runs
-	_stages_cleared_label.text = "Stages Cleared: %d" % SaveManager.total_stages_cleared
+	_best_loop_label.text = tr("BEST_LOOP_FMT").format({"value": SaveManager.career_best_loop})
+	_best_turn_label.text = tr("BEST_TURN_SCORE_FMT").format({"value": SaveManager.career_best_turn_score})
+	_total_busts_label.text = tr("TOTAL_BUSTS_FMT").format({"value": SaveManager.total_busts})
+	var favorite_die: String = SaveManager.get_favorite_die_type()
+	if favorite_die == "None":
+		favorite_die = tr("NO_FAVORITE_DIE")
+	_favorite_die_label.text = tr("FAVORITE_DIE_FMT").format({"value": favorite_die})
+	_lifetime_runs_label.text = tr("LIFETIME_RUNS_FMT").format({"value": SaveManager.total_runs})
+	_stages_cleared_label.text = tr("TOTAL_STAGES_CLEARED_FMT").format({"value": SaveManager.total_stages_cleared})
 	var total_achievements: int = AchievementManager.get_total_achievement_count()
 	var unlocked: int = SaveManager.get_unlocked_achievement_count()
-	_achievements_label.text = "%d / %d unlocked" % [unlocked, total_achievements]
+	_achievements_label.text = tr("ACHIEVEMENTS_UNLOCKED_FMT").format({
+		"unlocked": unlocked,
+		"total": total_achievements,
+	})
 	_build_achievement_badges(unlocked, total_achievements)
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_localized_labels()
 
 
 func _build_achievement_badges(unlocked: int, total: int) -> void:

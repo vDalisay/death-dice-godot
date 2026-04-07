@@ -81,6 +81,8 @@ var _hb_used_this_shop: bool = false
 var _eo_used_this_shop: bool = false
 var _transition_tween: Tween = null
 var _is_closing: bool = false
+var _current_stage_cleared: int = 0
+var _current_is_loop_complete: bool = false
 
 
 func _ready() -> void:
@@ -88,7 +90,10 @@ func _ready() -> void:
 	_continue_button.pressed.connect(_on_continue_pressed)
 	_refresh_button.pressed.connect(_on_refresh_pressed)
 	GameManager.gold_changed.connect(_on_gold_changed)
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	_apply_responsive_layout()
+	_refresh_localized_labels()
 	visible = false
 
 
@@ -103,16 +108,13 @@ func _notification(what: int) -> void:
 
 func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	GameManager.on_shop_entered()
+	_current_stage_cleared = stage_just_cleared
+	_current_is_loop_complete = is_loop_complete
 	_dd_used_this_shop = false
 	_ib_used_this_shop = false
 	_hb_used_this_shop = false
 	_eo_used_this_shop = false
-	if is_loop_complete:
-		_title_label.text = "LOOP %d COMPLETE" % (GameManager.current_loop - 1)
-		_continue_button.text = "Start Loop %d" % GameManager.current_loop
-	else:
-		_title_label.text = "STAGE %d COMPLETE" % stage_just_cleared
-		_continue_button.text = "Continue to Stage %d" % (stage_just_cleared + 1)
+	_apply_header_text()
 	_generate_items()
 	_refresh_display()
 	_main_content_scroll.scroll_vertical = 0
@@ -126,11 +128,12 @@ func open_from_resume(snapshot: Dictionary) -> void:
 	_ib_used_this_shop = bool(snapshot.get("ib_used_this_shop", false))
 	_hb_used_this_shop = bool(snapshot.get("hb_used_this_shop", false))
 	_eo_used_this_shop = bool(snapshot.get("eo_used_this_shop", false))
-	_title_label.text = str(snapshot.get("title", "SHOP"))
-	_continue_button.text = str(snapshot.get("continue_text", "Continue"))
+	_current_stage_cleared = int(snapshot.get("stage_just_cleared", GameManager.current_stage))
+	_current_is_loop_complete = bool(snapshot.get("is_loop_complete", false))
 	_dice_items = _deserialize_item_array(snapshot.get("dice_items", []) as Array)
 	_modifier_items = _deserialize_item_array(snapshot.get("modifier_items", []) as Array)
 	_build_item_cards()
+	_apply_header_text()
 	_refresh_display()
 	var selected_index: int = int(snapshot.get("selected_card_index", -1))
 	if selected_index >= 0 and selected_index < _all_items.size():
@@ -143,8 +146,8 @@ func open_from_resume(snapshot: Dictionary) -> void:
 
 func build_resume_snapshot() -> Dictionary:
 	return {
-		"title": _title_label.text,
-		"continue_text": _continue_button.text,
+		"stage_just_cleared": _current_stage_cleared,
+		"is_loop_complete": _current_is_loop_complete,
 		"dd_used_this_shop": _dd_used_this_shop,
 		"ib_used_this_shop": _ib_used_this_shop,
 		"hb_used_this_shop": _hb_used_this_shop,
@@ -214,11 +217,38 @@ func _apply_theme_styling() -> void:
 	_pool_label.add_theme_font_size_override("font_size", 18)
 	_pool_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 
-	_refresh_button.text = "Refresh Shop (%s%d)" % [_UITheme.GLYPH_GOLD, REFRESH_COST]
+	_refresh_button.text = tr("SHOP_REFRESH_FMT").format({
+		"gold": _UITheme.GLYPH_GOLD,
+		"cost": REFRESH_COST,
+	})
 	_refresh_button.add_theme_font_override("font", _UITheme.font_display())
 	_refresh_button.add_theme_font_size_override("font_size", 12)
 	_continue_button.add_theme_font_override("font", _UITheme.font_display())
 	_continue_button.add_theme_font_size_override("font_size", 12)
+
+
+func _refresh_localized_labels() -> void:
+	_details_eyebrow_label.text = tr("SHOP_DETAILS_LABEL")
+	_refresh_button.text = tr("SHOP_REFRESH_FMT").format({
+		"gold": _UITheme.GLYPH_GOLD,
+		"cost": REFRESH_COST,
+	})
+	_apply_header_text()
+	if visible:
+		_refresh_display()
+
+
+func _apply_header_text() -> void:
+	if _current_is_loop_complete:
+		_title_label.text = tr("SHOP_LOOP_COMPLETE_FMT").format({"value": GameManager.current_loop - 1})
+		_continue_button.text = tr("SHOP_START_LOOP_FMT").format({"value": GameManager.current_loop})
+		return
+	_title_label.text = tr("SHOP_STAGE_COMPLETE_FMT").format({"value": _current_stage_cleared})
+	_continue_button.text = tr("SHOP_CONTINUE_STAGE_FMT").format({"value": _current_stage_cleared + 1})
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_localized_labels()
 
 
 func _apply_responsive_layout() -> void:
@@ -375,13 +405,13 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 	keyword_label.add_theme_color_override("font_color", accent_color)
 
 	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
-		buy_button.text = "Play"
+		buy_button.text = tr("SHOP_PLAY_ACTION")
 	elif item.item_type == ShopItemData.ItemType.INSURANCE_BET or \
 		item.item_type == ShopItemData.ItemType.HEAT_BET or \
 		item.item_type == ShopItemData.ItemType.EVEN_ODD_BET:
-		buy_button.text = "Play"
+		buy_button.text = tr("SHOP_PLAY_ACTION")
 	else:
-		buy_button.text = "Buy"
+		buy_button.text = tr("SHOP_BUY_ACTION")
 	buy_button.custom_minimum_size = Vector2(120, 44)
 	buy_button.add_theme_font_override("font", _UITheme.font_display())
 	buy_button.add_theme_font_size_override("font_size", 11)
@@ -390,7 +420,7 @@ func _make_item_card(item: ShopItemData) -> PanelContainer:
 	if item.cost > 0:
 		price_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, item.cost]
 	else:
-		price_label.text = "FREE"
+		price_label.text = tr("SHOP_FREE")
 	price_label.add_theme_font_override("font", _UITheme.font_stats())
 	price_label.add_theme_font_size_override("font_size", ITEM_FONT_SIZE)
 	price_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
@@ -416,36 +446,39 @@ func _item_description(item: ShopItemData) -> String:
 func _item_keyword_summary(item: ShopItemData) -> String:
 	match item.item_type:
 		ShopItemData.ItemType.BUY_MODIFIER:
-			return "MOD | PASSIVE"
+			return tr("SHOP_KEYWORD_MOD_PASSIVE")
 		ShopItemData.ItemType.UPGRADE_DIE:
-			return "FORGE | UPGRADE"
+			return tr("SHOP_KEYWORD_FORGE_UPGRADE")
 		ShopItemData.ItemType.CLEANSE_CURSE:
-			return "CLEANSE | CURSE"
+			return tr("SHOP_KEYWORD_CLEANSE_CURSE")
 		ShopItemData.ItemType.DOUBLE_DOWN, ShopItemData.ItemType.INSURANCE_BET, ShopItemData.ItemType.HEAT_BET, ShopItemData.ItemType.EVEN_ODD_BET:
-			return "BET | PLAY"
+			return tr("SHOP_KEYWORD_BET_PLAY")
 		_:
-			return "DIE | BUY"
+			return tr("SHOP_KEYWORD_DIE_BUY")
 
 
 func _item_state_text(item: ShopItemData) -> String:
 	var notes: Array[String] = []
 	if GameManager.gold < item.cost:
-		notes.append("Need %s%d more gold." % [_UITheme.GLYPH_GOLD, item.cost - GameManager.gold])
+		notes.append(tr("SHOP_NEED_GOLD_FMT").format({
+			"gold": _UITheme.GLYPH_GOLD,
+			"value": item.cost - GameManager.gold,
+		}))
 	if item.item_type == ShopItemData.ItemType.BUY_MODIFIER:
 		if not GameManager.can_add_modifier():
-			notes.append("Modifier rack is full.")
+			notes.append(tr("SHOP_MODIFIER_RACK_FULL"))
 		elif item.modifier != null and GameManager.has_modifier(item.modifier.modifier_type):
-			notes.append("Already owned.")
+			notes.append(tr("SHOP_ALREADY_OWNED"))
 	if item.item_type == ShopItemData.ItemType.DOUBLE_DOWN:
-		notes.append("Wagers all current gold in the overlay.")
+		notes.append(tr("SHOP_DOUBLE_DOWN_NOTE"))
 	if item.item_type == ShopItemData.ItemType.INSURANCE_BET:
-		notes.append("Loss is tracked as shop spend if you place the bet.")
+		notes.append(tr("SHOP_INSURANCE_NOTE"))
 	if item.item_type == ShopItemData.ItemType.HEAT_BET:
-		notes.append("Predict the exact banked stop count.")
+		notes.append(tr("SHOP_HEAT_NOTE"))
 	if item.item_type == ShopItemData.ItemType.EVEN_ODD_BET:
-		notes.append("Parity checks your kept NUMBER faces.")
+		notes.append(tr("SHOP_PARITY_NOTE"))
 	if notes.is_empty():
-		return "Ready to purchase."
+		return tr("SHOP_READY_TO_PURCHASE")
 	return " ".join(notes)
 
 
@@ -481,7 +514,7 @@ func _refresh_details() -> void:
 
 
 func _clear_details() -> void:
-	_details_title_label.text = "Select an offer"
+	_details_title_label.text = tr("SHOP_SELECT_OFFER")
 	_details_keyword_label.text = ""
 	_details_description_label.text = ""
 	_details_state_label.text = ""
@@ -606,17 +639,20 @@ func _on_gold_changed(_new_gold: int) -> void:
 
 func _refresh_display() -> void:
 	_gold_label.text = "%s %d" % [_UITheme.GLYPH_GOLD, GameManager.gold]
-	_offer_summary_label.text = "%d dice | %d modifiers | %d bets" % [_dice_items.size(), _modifier_items.size(), _bet_items.size()]
-	_dice_section_header.text = "AVAILABLE DICE (%d)" % _dice_items.size()
-	_modifiers_section_header.text = "PASSIVE UPGRADES (%d)" % _modifier_items.size()
-	_bets_section_header.text = "SIDE BETS (%d)" % _bet_items.size()
+	_offer_summary_label.text = tr("SHOP_OFFER_HINT")
+	_dice_section_header.text = tr("SHOP_AVAILABLE_DICE_FMT").format({"value": _dice_items.size()})
+	_modifiers_section_header.text = tr("SHOP_PASSIVE_UPGRADES_FMT").format({"value": _modifier_items.size()})
+	_bets_section_header.text = tr("SHOP_SIDE_BETS_FMT").format({"value": _bet_items.size()})
 	var mod_text: String = ""
 	if not GameManager.active_modifiers.is_empty():
 		var names: Array[String] = []
 		for m: RunModifier in GameManager.active_modifiers:
 			names.append(m.modifier_name)
-		mod_text = "  |  Mods: %s" % ", ".join(names)
-	_pool_label.text = "Dice Pool: %d%s" % [GameManager.dice_pool.size(), mod_text]
+		mod_text = tr("SHOP_POOL_MODS_FMT").format({"mods": ", ".join(names)})
+	_pool_label.text = tr("SHOP_POOL_FMT").format({
+		"dice_count": GameManager.dice_pool.size(),
+		"mods_suffix": mod_text,
+	})
 	_refresh_buy_buttons()
 	_refresh_details()
 
@@ -649,7 +685,7 @@ func _on_refresh_pressed() -> void:
 
 func _get_upgrade_preview() -> String:
 	if GameManager.dice_pool.is_empty():
-		return "No dice to upgrade."
+		return tr("SHOP_NO_DICE_TO_UPGRADE")
 	var previews: Array[String] = []
 	for die: DiceData in GameManager.dice_pool:
 		var worst_index: int = -1
@@ -667,8 +703,8 @@ func _get_upgrade_preview() -> String:
 			if preview not in previews:
 				previews.append(preview)
 	if previews.is_empty():
-		return "No upgradeable faces."
-	return "Upgrades one random weakest face. Candidates: %s" % ", ".join(previews)
+		return tr("SHOP_NO_UPGRADEABLE_FACES")
+	return tr("SHOP_UPGRADE_PREVIEW_FMT").format({"candidates": ", ".join(previews)})
 
 
 func _any_die_has_cursed_stop() -> bool:
@@ -698,13 +734,12 @@ func _cleanse_random_cursed_die() -> void:
 			break
 
 
-static func _dd_desc_text() -> String:
-	return "Wager all %s%d. Win returns %s%d!" % [
-		_UITheme.GLYPH_GOLD,
-		GameManager.gold,
-		_UITheme.GLYPH_GOLD,
-		GameManager.gold * 2,
-	]
+func _dd_desc_text() -> String:
+	return tr("SHOP_DD_DESC_FMT").format({
+		"gold": _UITheme.GLYPH_GOLD,
+		"value": GameManager.gold,
+		"reward": GameManager.gold * 2,
+	})
 
 
 func _open_double_down() -> void:

@@ -49,12 +49,13 @@ func _apply_theme_styling() -> void:
 
 func open() -> void:
 	var can_afford: bool = GameManager.gold >= PREMIUM
-	_info_label.text = "Pay %dg now.\nIf you bust this stage → recover %dg\n(Net gain on bust: +%dg)" \
-		% [PREMIUM, PAYOUT, PAYOUT - PREMIUM]
-	_odds_label.text = "One-stage coverage only. Clears on bank or bust."
+	_title_label.text = tr("INSURANCE_BET_TITLE")
+	_close_button.text = tr("NO_THANKS")
+	_info_label.text = tr("INSURANCE_INFO_FMT").format({"premium": PREMIUM, "payout": PAYOUT, "net": PAYOUT - PREMIUM})
+	_odds_label.text = tr("INSURANCE_ONE_STAGE")
 	_confirm_button.disabled = not can_afford
-	_confirm_button.text = "Buy Insurance  (-%dg)" % PREMIUM if can_afford \
-		else "Not enough gold (need %dg)" % PREMIUM
+	_confirm_button.text = tr("INSURANCE_BUY_FMT").format({"premium": PREMIUM}) if can_afford \
+		else tr("NOT_ENOUGH_GOLD_FMT").format({"gold": PREMIUM})
 	_close_button.visible = true
 	visible = true
 

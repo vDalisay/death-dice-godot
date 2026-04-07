@@ -66,11 +66,11 @@ func _apply_theme_styling() -> void:
 
 
 func setup(bonus_gold: int, surplus: int, is_loop: bool) -> void:
-	_target_title_text = "LOOP CLEARED!" if is_loop else "STAGE CLEARED!"
+	_target_title_text = tr("LOOP_CLEARED_TITLE") if is_loop else tr("STAGE_CLEARED_TITLE")
 	_title_label.text = build_glitch_text(_target_title_text, 0.0)
 	_surplus_label.visible = surplus > 0
 	if surplus > 0:
-		_surplus_label.text = "Surplus: +0"
+		_surplus_label.text = tr("STAGE_CLEARED_SURPLUS_FMT").format({"value": 0})
 	_breakdown_title.modulate.a = 0.0
 	_gold_label.modulate.a = 0.0
 	_surplus_label.modulate.a = 0.0
@@ -144,14 +144,14 @@ func _set_title_glitch_progress(progress: float) -> void:
 
 func _show_reward_rows(bonus_gold: int, surplus: int) -> void:
 	_reveal_row(_gold_label)
-	_animate_value(_gold_label, "Gold Earned: +", bonus_gold, "g")
+	_animate_value(_gold_label, tr("STAGE_CLEARED_GOLD_FMT").format({"value": "{value}"}).replace("{value}", ""), bonus_gold, "g")
 	if surplus > 0:
 		_reveal_row(_surplus_label)
-		_animate_value(_surplus_label, "Surplus: +", surplus, "")
+		_animate_value(_surplus_label, tr("STAGE_CLEARED_SURPLUS_FMT").format({"value": "{value}"}).replace("{value}", ""), surplus, "")
 
 
 func _show_proceed_button(is_loop: bool) -> void:
-	_proceed_button.text = "CONTINUE LOOP" if is_loop else "Continue"
+	_proceed_button.text = tr("STAGE_CLEARED_CONTINUE_LOOP") if is_loop else tr("CONTINUE_ACTION")
 	_proceed_button.modulate.a = 1.0
 	_proceed_button.disabled = false
 	_start_button_pulse()

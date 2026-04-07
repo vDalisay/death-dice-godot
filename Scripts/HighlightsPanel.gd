@@ -39,10 +39,14 @@ func _ready() -> void:
 	visible = false
 	_close_button.pressed.connect(_on_close_pressed)
 	_add_prestige_button()
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	_apply_theme()
+	_refresh_localized_labels()
 
 
 func show_highlights(run: RunSaveData, prior_bests: Dictionary) -> void:
+	_refresh_localized_labels()
 	_build_stat_cards(run, prior_bests)
 	visible = true
 	_animate_reveal()
@@ -58,13 +62,13 @@ func _format_stat(stat_name: String, value: int, prior_best: int) -> String:
 
 func _format_delta(value: int, prior_best: int) -> String:
 	if prior_best <= 0:
-		return "First record"
+		return tr("HIGHLIGHTS_FIRST_RECORD")
 	var delta: int = value - prior_best
 	if delta > 0:
-		return "+%d vs best" % delta
+		return tr("HIGHLIGHTS_DELTA_POS_FMT").format({"value": delta})
 	if delta < 0:
-		return "%d vs best" % delta
-	return "Tied best"
+		return tr("HIGHLIGHTS_DELTA_NEG_FMT").format({"value": delta})
+	return tr("HIGHLIGHTS_TIED_BEST")
 
 
 func _on_close_pressed() -> void:
@@ -79,6 +83,17 @@ func _apply_theme() -> void:
 	_UITheme.apply_label_style(_close_button, _UITheme.font_display(), 12, _UITheme.BRIGHT_TEXT)
 	if _prestige_button != null:
 		_UITheme.apply_label_style(_prestige_button, _UITheme.font_display(), 12, _UITheme.BRIGHT_TEXT)
+
+
+func _refresh_localized_labels() -> void:
+	_title_label.text = tr("HIGHLIGHTS_TITLE")
+	_close_button.text = tr("CONTINUE_ACTION")
+	if _prestige_button != null:
+		_prestige_button.text = tr("HIGHLIGHTS_PRESTIGE_ACTION")
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_localized_labels()
 
 
 ## Data structure for a single stat card.
@@ -132,21 +147,21 @@ func _build_stat_cards(run: RunSaveData, prior_bests: Dictionary) -> void:
 	var turn_best: int = prior_bests.get("best_turn", 0) as int
 
 	var stats: Array[_StatDef] = []
-	stats.append(_StatDef.new("Score", _UITheme.GLYPH_STAR, run.score,
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_SCORE"), _UITheme.GLYPH_STAR, run.score,
 		run.score >= score_best and run.score > 0,
 		_UITheme.SCORE_GOLD, score_best, true))
-	stats.append(_StatDef.new("Stages", _UITheme.GLYPH_CHECK, run.stages_cleared,
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_STAGES"), _UITheme.GLYPH_CHECK, run.stages_cleared,
 		run.stages_cleared >= stages_best and run.stages_cleared > 0,
 		_UITheme.SUCCESS_GREEN, stages_best, true))
-	stats.append(_StatDef.new("Loops", _UITheme.GLYPH_FIRE, run.loops_completed,
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_LOOPS"), _UITheme.GLYPH_FIRE, run.loops_completed,
 		run.loops_completed >= loop_best and run.loops_completed > 0,
 		_UITheme.EXPLOSION_ORANGE, loop_best, true))
-	stats.append(_StatDef.new("Best Turn", _UITheme.GLYPH_EXPLODE, run.best_turn_score,
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_BEST_TURN"), _UITheme.GLYPH_EXPLODE, run.best_turn_score,
 		run.best_turn_score >= turn_best and run.best_turn_score > 0,
 		_UITheme.ROSE_ACCENT, turn_best, true))
-	stats.append(_StatDef.new("Busts", _UITheme.GLYPH_STOP, run.busts, false, _UITheme.DANGER_RED))
-	stats.append(_StatDef.new("Skulls", _UITheme.GLYPH_STAR, run.prestige_skulls_earned, false, _UITheme.ACTION_CYAN))
-	stats.append(_StatDef.new("Final Dice", _UITheme.GLYPH_DIE, run.final_dice_names.size(), false, _UITheme.ACTION_CYAN))
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_BUSTS"), _UITheme.GLYPH_STOP, run.busts, false, _UITheme.DANGER_RED))
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_SKULLS"), _UITheme.GLYPH_STAR, run.prestige_skulls_earned, false, _UITheme.ACTION_CYAN))
+	stats.append(_StatDef.new(tr("HIGHLIGHTS_FINAL_DICE"), _UITheme.GLYPH_DIE, run.final_dice_names.size(), false, _UITheme.ACTION_CYAN))
 
 	for stat: _StatDef in stats:
 		var refs: _StatCardRefs = _create_stat_card(stat)
@@ -214,7 +229,7 @@ func _create_stat_card(stat: _StatDef) -> _StatCardRefs:
 	if stat.is_best:
 		best_badge = Label.new()
 		best_badge.name = "BestBadge"
-		best_badge.text = "%s NEW BEST!" % _UITheme.GLYPH_STAR
+		best_badge.text = tr("HIGHLIGHTS_NEW_BEST_FMT").format({"star": _UITheme.GLYPH_STAR})
 		best_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_UITheme.apply_label_style(best_badge, _UITheme.font_display(), BEST_BADGE_SIZE, _UITheme.SCORE_GOLD)
 		best_badge.modulate.a = 0.0
@@ -267,7 +282,7 @@ func _show_best_badge(refs: _StatCardRefs) -> void:
 
 func _add_prestige_button() -> void:
 	_prestige_button = Button.new()
-	_prestige_button.text = "Visit Prestige Shop"
+	_prestige_button.text = tr("HIGHLIGHTS_PRESTIGE_ACTION")
 	_prestige_button.custom_minimum_size = Vector2(240, 40)
 	_prestige_button.pressed.connect(_on_prestige_pressed)
 	_close_button.get_parent().add_child(_prestige_button)

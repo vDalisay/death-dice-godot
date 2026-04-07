@@ -77,7 +77,7 @@ func _build_wager_buttons() -> void:
 
 func _build_pick_buttons() -> void:
 	_even_button = Button.new()
-	_even_button.text = "EVEN"
+	_even_button.text = tr("DOUBLE_DOWN_EVEN")
 	_even_button.custom_minimum_size = Vector2(160, 56)
 	_even_button.add_theme_font_override("font", _UITheme.font_display())
 	_even_button.add_theme_font_size_override("font_size", 18)
@@ -85,7 +85,7 @@ func _build_pick_buttons() -> void:
 	_pick_row.add_child(_even_button)
 
 	_odd_button = Button.new()
-	_odd_button.text = "ODD"
+	_odd_button.text = tr("DOUBLE_DOWN_ODD")
 	_odd_button.custom_minimum_size = Vector2(160, 56)
 	_odd_button.add_theme_font_override("font", _UITheme.font_display())
 	_odd_button.add_theme_font_size_override("font_size", 18)
@@ -97,10 +97,14 @@ func open() -> void:
 	_wager = 5
 	_pick_even = true
 	_pick_confirmed = false
-	_info_label.text = "At bank: count parity of kept NUMBER dice.\nMajority wins 2:1 payout.  Ties push (refund)."
-	_odds_label.text = "~50/50 — ties push"
+	_title_label.text = tr("EVEN_ODD_TITLE")
+	_close_button.text = tr("NO_THANKS")
+	_even_button.text = tr("DOUBLE_DOWN_EVEN")
+	_odd_button.text = tr("DOUBLE_DOWN_ODD")
+	_info_label.text = tr("EVEN_ODD_INFO")
+	_odds_label.text = tr("EVEN_ODD_ODDS")
 	_confirm_button.disabled = true
-	_confirm_button.text = "Confirm Bet"
+	_confirm_button.text = tr("EVEN_ODD_CONFIRM")
 	_close_button.visible = true
 	_refresh_wager_display()
 	_refresh_pick_display()
@@ -123,7 +127,7 @@ func _on_pick_selected(is_even: bool) -> void:
 
 
 func _refresh_wager_display() -> void:
-	_wager_label.text = "Wager: %dg  →  Win: %dg" % [_wager, _wager * 2]
+	_wager_label.text = tr("EVEN_ODD_WAGER_FMT").format({"wager": _wager, "win": _wager * 2})
 	for i: int in _wager_buttons.size():
 		var amount: int = WAGER_STEPS[i]
 		_wager_buttons[i].disabled = GameManager.gold < amount
@@ -138,7 +142,9 @@ func _refresh_pick_display() -> void:
 func _update_confirm_state() -> void:
 	_confirm_button.disabled = not _pick_confirmed or GameManager.gold < _wager
 	if _pick_confirmed:
-		_confirm_button.text = "Bet %s for %dg" % ["EVEN" if _pick_even else "ODD", _wager]
+		_confirm_button.text = tr("EVEN_ODD_BET_FMT").format({"pick": tr("DOUBLE_DOWN_EVEN") if _pick_even else tr("DOUBLE_DOWN_ODD"), "wager": _wager})
+	else:
+		_confirm_button.text = tr("EVEN_ODD_CONFIRM")
 
 
 func _on_confirm_pressed() -> void:
