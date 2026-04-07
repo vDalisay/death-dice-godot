@@ -30,7 +30,7 @@ const STATE_FONT_SIZE: int = _UITheme.STAGE_MAP_STATE_FONT_SIZE
 const PANEL_INTRO_DURATION: float = _UITheme.STAGE_MAP_PANEL_INTRO_DURATION
 const NODE_REVEAL_STAGGER: float = _UITheme.STAGE_MAP_NODE_REVEAL_STAGGER
 const NODE_REVEAL_DURATION: float = _UITheme.STAGE_MAP_NODE_REVEAL_DURATION
-const RULE_HEADER_DEFAULT: String = "RULE: NORMAL"
+const RULE_HEADER_DEFAULT_KEY: String = "STAGE_MAP_RULE_DEFAULT"
 
 @onready var _backdrop: ColorRect = $AtmosphereLayer/Backdrop
 @onready var _content: VBoxContainer = $MarginContainer/RootVBox
@@ -78,7 +78,10 @@ var _route_visual_policy: RouteNodeVisualPolicyScript = RouteNodeVisualPolicyScr
 
 func _ready() -> void:
     visible = false
+    if LocalizationManager != null:
+        LocalizationManager.locale_changed.connect(_on_locale_changed)
     _apply_theme_styling()
+    _on_locale_changed(TranslationServer.get_locale())
     _route_state_machine.finish_close()
     if not _reroute_button.pressed.is_connected(_on_reroute_button_pressed):
         _reroute_button.pressed.connect(_on_reroute_button_pressed)
@@ -94,7 +97,7 @@ func open(stage_map: Resource, current_row: int, previous_col: int, reroute_uses
     _selected_node = null
     _reroute_uses = reroute_uses if _current_row > 0 else 0
     _reroute_enabled = false
-    _title_label.text = "ROUTE BOARD"
+    _title_label.text = tr("STAGE_MAP_TITLE")
     _route_restriction = int(GameManager.event_next_route_restriction)
     _next_row_reveal_active = GameManager.consume_next_map_row_reveal()
     modulate.a = 1.0
@@ -403,7 +406,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
     var border_width: int = 1
     var accent_color: Color = Color(node_color, 0.55)
     var stamp_color: Color = Color("#E9DEC2")
-    var state_text: String = "FUTURE"
+    var state_text: String = tr("STAGE_MAP_NODE_STATUS_FUTURE")
     var state_color: Color = Color("#7D756D")
     var button_alpha: float = 1.0
     if node.visited:
@@ -411,7 +414,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
         border_color = Color("#625446", 0.75)
         accent_color = Color("#6D5D4B", 0.70)
         stamp_color = Color("#938777")
-        state_text = "ASH"
+        state_text = tr("STAGE_MAP_NODE_STATUS_ASH")
         state_color = Color("#8A7868")
         button_alpha = VISITED_ALPHA
     elif row < _current_row:
@@ -419,7 +422,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
         border_color = Color("#2B262C")
         accent_color = Color("#4A413B", 0.55)
         stamp_color = Color("#7E746A")
-        state_text = "SPENT"
+        state_text = tr("STAGE_MAP_NODE_STATUS_SPENT")
         state_color = Color("#685F58")
         button_alpha = 0.32
     elif is_reroute_target:
@@ -427,21 +430,21 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
         border_color = REROUTE_GLOW
         accent_color = REROUTE_GLOW
         stamp_color = Color("#F6E3BC")
-        state_text = "BRASS"
+        state_text = tr("STAGE_MAP_NODE_STATUS_BRASS")
         state_color = REROUTE_GLOW
     elif is_available_now:
         fill_color = Color("#162026")
         border_color = CURRENT_ROW_GLOW
         accent_color = CURRENT_ROW_GLOW
         stamp_color = Color("#E8F3F2")
-        state_text = "LIVE"
+        state_text = tr("STAGE_MAP_NODE_STATUS_LIVE")
         state_color = CURRENT_ROW_GLOW
     elif is_current_row:
         fill_color = Color("#19161C")
         border_color = Color("#4A3D33")
         accent_color = Color("#6C5845")
         stamp_color = Color("#A59A88")
-        state_text = "LOCKED"
+        state_text = tr("STAGE_MAP_NODE_STATUS_LOCKED")
         state_color = Color("#8B7051")
         button_alpha = UNREACHABLE_ALPHA
     elif is_revealed_future_row:
@@ -449,7 +452,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
         border_color = Color("#5B7A92")
         accent_color = Color("#8EC7F2")
         stamp_color = Color("#D8EEF8")
-        state_text = "SEEN"
+        state_text = tr("STAGE_MAP_NODE_STATUS_SEEN")
         state_color = Color("#8EC7F2")
         button_alpha = 0.95
     else:
@@ -457,7 +460,7 @@ func _apply_button_visuals(btn: Button, node: MapNodeData, row: int, col: int) -
         border_color = Color("#2A252D")
         accent_color = Color(node_color, 0.38)
         stamp_color = Color("#8D8376")
-        state_text = "FUTURE"
+        state_text = tr("STAGE_MAP_NODE_STATUS_FUTURE")
         state_color = Color("#736A63")
         button_alpha = FUTURE_ALPHA
     if is_selected:
@@ -623,26 +626,26 @@ func _ensure_selected_node() -> void:
 
 
 func _refresh_context_label() -> void:
-    var route_state_text: String = "CHOOSE THE NEXT MARK"
+    var route_state_text: String = tr("STAGE_MAP_STATUS_CHOOSE")
     if _route_state_machine.is_intro_reveal():
-        route_state_text = "SURVEYING ROUTES"
+        route_state_text = tr("STAGE_MAP_STATUS_SURVEY")
     elif _reroute_enabled:
-        route_state_text = "BRASS TOKEN ARMED"
-    _context_label.text = "Loop %d  |  Stage %d / %d  |  %s" % [
-        GameManager.current_loop,
-        _current_row + 1,
-        StageMapData.ROWS_PER_LOOP,
-        route_state_text,
-    ]
+        route_state_text = tr("STAGE_MAP_STATUS_BRASS")
+    _context_label.text = tr("STAGE_MAP_CONTEXT_FMT").format({
+        "loop": GameManager.current_loop,
+        "stage": _current_row + 1,
+        "total": StageMapData.ROWS_PER_LOOP,
+        "status": route_state_text,
+    })
     _header_seal.text = _build_rule_header_text()
 
 
 func _refresh_selected_node_panel() -> void:
     if _selected_node == null:
-        _selected_node_title.text = "No node selected"
-        _selected_node_type.text = "Route marker"
-        _selected_node_flavor.text = "Hover a marked route to inspect what it offers."
-        _selected_node_summary.text = "The map stays clean; the details live here."
+        _selected_node_title.text = tr("STAGE_MAP_NO_NODE_SELECTED")
+        _selected_node_type.text = tr("STAGE_MAP_ROUTE_MARKER")
+        _selected_node_flavor.text = tr("STAGE_MAP_HOVER_MARKED_ROUTE")
+        _selected_node_summary.text = tr("STAGE_MAP_DETAILS_LIVE")
         _selected_node_rule.visible = false
         return
     var node_state: String = _get_selected_node_state_text(_selected_row, _selected_col)
@@ -652,16 +655,16 @@ func _refresh_selected_node_panel() -> void:
     _selected_node_summary.text = _selected_node.get_inspector_summary()
     var special_preview: String = _selected_node.get_special_rule_preview()
     _selected_node_rule.visible = special_preview != ""
-    _selected_node_rule.text = "Rule Preview: %s" % special_preview
+    _selected_node_rule.text = tr("STAGE_MAP_RULE_PREVIEW_FMT").format({"value": special_preview})
 
 
 func _refresh_reveal_preview() -> void:
     var revealed_row_index: int = _get_revealed_row_index()
     if revealed_row_index < 0 or _stage_map == null:
-        _board_label.text = "ROUTE GRID"
-        _legend_label.text = "Hover routes for details."
+        _board_label.text = tr("STAGE_MAP_BOARD_LABEL")
+        _legend_label.text = tr("STAGE_MAP_LEGEND_DEFAULT")
         return
-    _board_label.text = "ROUTE GRID  |  LANTERN ON ROW %d" % (revealed_row_index + 1)
+    _board_label.text = tr("STAGE_MAP_BOARD_REVEAL_FMT").format({"row": revealed_row_index + 1})
     _legend_label.text = _build_revealed_row_preview(revealed_row_index)
 
 
@@ -682,26 +685,29 @@ func _build_revealed_row_preview(row_index: int) -> String:
             continue
         parts.append("%s: %s" % [node.get_display_name(), node.get_hover_description()])
     if parts.is_empty():
-        return "Lantern found no future route data."
-    return "Lantern reveal row %d -> %s" % [row_index + 1, "  |  ".join(parts)]
+        return tr("STAGE_MAP_LANTERN_EMPTY")
+    return tr("STAGE_MAP_LANTERN_REVEAL_FMT").format({
+        "row": row_index + 1,
+        "details": "  |  ".join(parts),
+    })
 
 
 func _get_selected_node_state_text(row: int, col: int) -> String:
     if _selected_node == null:
-        return "Inspect"
+        return tr("STAGE_MAP_STATE_INSPECT")
     if _selected_node.visited:
-        return "Visited"
+        return tr("STAGE_MAP_STATE_VISITED")
     if row < _current_row:
-        return "Spent"
+        return tr("STAGE_MAP_STATE_SPENT")
     if row == _current_row and _reroute_enabled and not _is_reachable_without_reroute(row, col):
-        return "Reroute"
+        return tr("STAGE_MAP_STATE_REROUTE")
     if row == _current_row and not _is_route_allowed(row, col):
-        return "Restricted"
+        return tr("STAGE_MAP_STATE_RESTRICTED")
     if row == _current_row and _can_reach(row, col):
-        return "Available Now"
+        return tr("STAGE_MAP_STATE_AVAILABLE")
     if row == _current_row:
-        return "Path Locked"
-    return "Future Route"
+        return tr("STAGE_MAP_STATE_LOCKED")
+    return tr("STAGE_MAP_STATE_FUTURE")
 
 
 func _prepare_nodes_for_intro() -> void:
@@ -763,27 +769,41 @@ func _reveal_node_button_by_index(row_index: int, col_index: int) -> void:
 
 func _refresh_hint_label() -> void:
     if _route_state_machine.is_intro_reveal():
-        _hint_label.text = "Stage %d / %d  |  Lantern sweep in progress. Route interactions unlock when marks settle." % [
-            _current_row + 1,
-            StageMapData.ROWS_PER_LOOP,
-        ]
+        _hint_label.text = tr("STAGE_MAP_HINT_INTRO_FMT").format({
+            "stage": _current_row + 1,
+            "total": StageMapData.ROWS_PER_LOOP,
+        })
         _refresh_context_label()
         return
-    var base_text: String = "Stage %d / %d  |  Inspect a route, then commit from the lit row." % [_current_row + 1, StageMapData.ROWS_PER_LOOP]
+    var base_text: String = tr("STAGE_MAP_HINT_BASE_FMT").format({
+        "stage": _current_row + 1,
+        "total": StageMapData.ROWS_PER_LOOP,
+    })
     if _selected_node != null:
-        base_text = "Stage %d / %d  |  %s" % [_current_row + 1, StageMapData.ROWS_PER_LOOP, _selected_node.get_hover_description()]
+        base_text = tr("STAGE_MAP_HINT_SELECTED_FMT").format({
+            "stage": _current_row + 1,
+            "total": StageMapData.ROWS_PER_LOOP,
+            "description": _selected_node.get_hover_description(),
+        })
     if _is_route_restriction_active_for_current_row():
-        var restriction_text: String = "Quiet Table: standard route required."
+        var restriction_text: String = tr("STAGE_MAP_RESTRICTION_STANDARD")
         if _route_restriction == GameManager.NextRouteRestriction.NO_HARD:
-            restriction_text = "Quiet Table: hard routes are barred."
+            restriction_text = tr("STAGE_MAP_RESTRICTION_NO_HARD")
         base_text = "%s  %s" % [base_text, restriction_text]
     var revealed_row_index: int = _get_revealed_row_index()
     if revealed_row_index >= 0:
-        base_text = "%s  Loaded Lantern reveals row %d ahead." % [base_text, revealed_row_index + 1]
+        base_text = tr("STAGE_MAP_HINT_REVEALED_FMT").format({
+            "base": base_text,
+            "row": revealed_row_index + 1,
+        })
     if _reroute_enabled:
-        _hint_label.text = "%s  Reroute preview is live; brass marks spend a token only if chosen." % base_text
+        _hint_label.text = tr("STAGE_MAP_HINT_REROUTE_LIVE_FMT").format({"base": base_text})
     elif _reroute_uses > 0:
-        _hint_label.text = "%s  %d reroute token%s ready." % [base_text, _reroute_uses, "" if _reroute_uses == 1 else "s"]
+        _hint_label.text = tr("STAGE_MAP_HINT_REROUTE_READY_FMT").format({
+            "base": base_text,
+            "count": _reroute_uses,
+            "s": "" if _reroute_uses == 1 else "s",
+        })
     else:
         _hint_label.text = base_text
     _refresh_context_label()
@@ -901,13 +921,15 @@ func _clear_hover_pulse_tweens() -> void:
 
 func _build_rule_header_text() -> String:
     if _selected_node == null:
-        return RULE_HEADER_DEFAULT
+        return tr(RULE_HEADER_DEFAULT_KEY)
     if _selected_node.type == MapNodeData.SPECIAL_STAGE_TYPE:
         var special_name: String = _selected_node.get_display_name().strip_edges()
-        return "RULE: %s" % (special_name.to_upper() if not special_name.is_empty() else "SPECIAL")
+        return tr("STAGE_MAP_RULE_FMT").format({
+            "value": special_name.to_upper() if not special_name.is_empty() else tr("STAGE_MAP_RULE_SPECIAL_FALLBACK"),
+        })
     if _selected_node.has_special_stage_variant():
-        return "RULE: %s" % _selected_node.get_display_name().to_upper()
-    return RULE_HEADER_DEFAULT
+        return tr("STAGE_MAP_RULE_FMT").format({"value": _selected_node.get_display_name().to_upper()})
+    return tr(RULE_HEADER_DEFAULT_KEY)
 
 
 func _on_intro_reveal_finished() -> void:
@@ -918,23 +940,33 @@ func _on_intro_reveal_finished() -> void:
 
 func _get_route_hint(row: int, col: int) -> String:
     if row < _current_row:
-        return "Row %d visited" % (row + 1)
+        return tr("STAGE_MAP_ROUTE_HINT_VISITED_FMT").format({"row": row + 1})
     if row > _current_row:
         if row == _get_revealed_row_index():
-            return "Row %d lantern-revealed" % (row + 1)
-        return "Row %d future path" % (row + 1)
+            return tr("STAGE_MAP_ROUTE_HINT_REVEALED_FMT").format({"row": row + 1})
+        return tr("STAGE_MAP_ROUTE_HINT_FUTURE_FMT").format({"row": row + 1})
     if not _is_route_allowed(row, col):
-        return "Row %d restricted by Quiet Table" % (row + 1)
+        return tr("STAGE_MAP_ROUTE_HINT_RESTRICTED_FMT").format({"row": row + 1})
     if _reroute_enabled and not _is_reachable_without_reroute(row, col):
-        return "Row %d reroute path" % (row + 1)
+        return tr("STAGE_MAP_ROUTE_HINT_REROUTE_FMT").format({"row": row + 1})
     if _is_reachable_without_reroute(row, col):
-        return "Row %d reachable now" % (row + 1)
-    return "Row %d blocked on this route" % (row + 1)
+        return tr("STAGE_MAP_ROUTE_HINT_REACHABLE_FMT").format({"row": row + 1})
+    return tr("STAGE_MAP_ROUTE_HINT_BLOCKED_FMT").format({"row": row + 1})
 
 
 func _refresh_reroute_button() -> void:
     _reroute_button.visible = _reroute_uses > 0
-    _reroute_button.text = "Cancel Reroute Preview" if _reroute_enabled else "Preview Reroute (%d)" % _reroute_uses
+    _reroute_button.text = tr("STAGE_MAP_REROUTE_CANCEL") if _reroute_enabled else tr("STAGE_MAP_REROUTE_PREVIEW_FMT").format({"count": _reroute_uses})
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+    _title_label.text = tr("STAGE_MAP_TITLE")
+    _inspector_eyebrow.text = tr("STAGE_MAP_SELECTED_NODE")
+    _refresh_context_label()
+    _refresh_selected_node_panel()
+    _refresh_reveal_preview()
+    _refresh_hint_label()
+    _refresh_reroute_button()
 
 
 func _on_reroute_button_pressed() -> void:

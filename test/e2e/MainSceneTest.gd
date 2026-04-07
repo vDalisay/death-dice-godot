@@ -4,12 +4,25 @@ extends GdUnitTestSuite
 
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 
+var _saved_locale: String = ""
+
 
 func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
+	SaveManager.clear_active_run_snapshot()
 	GameManager.skip_archetype_picker = true
 	GameManager.chosen_archetype = GameManager.Archetype.CAUTION
 	GameManager.active_modifiers.clear()
 	GameManager.reset_run()
+
+
+func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
+	SaveManager.clear_active_run_snapshot()
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree != null:
+		tree.paused = false
 
 
 func _get_root(runner: GdUnitSceneRunner) -> RollPhase:
@@ -28,6 +41,42 @@ func test_scene_loads_with_correct_structure() -> void:
 	assert_object(root.dice_arena).is_not_null()
 	assert_object(root.roll_button).is_not_null()
 	assert_object(root.bank_button).is_not_null()
+	assert_object(root.pause_menu).is_not_null()
+
+
+func test_pause_menu_opens_and_pauses_tree() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	root._open_pause_menu()
+	await runner.simulate_frames(1)
+	assert_bool(root.get_tree().paused).is_true()
+	assert_bool(root.pause_menu.visible).is_true()
+
+
+func test_pause_resume_restores_gameplay() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	root._open_pause_menu()
+	await runner.simulate_frames(1)
+	root._on_pause_resume_requested()
+	await runner.simulate_frames(1)
+	assert_bool(root.get_tree().paused).is_false()
+	assert_bool(root.pause_menu.visible).is_false()
+
+
+func test_pause_quit_saves_snapshot_and_returns_to_main_menu() -> void:
+	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
+	await runner.simulate_frames(2)
+	var root: RollPhase = _get_root(runner)
+	var tree: SceneTree = root.get_tree()
+	root._open_pause_menu()
+	await runner.simulate_frames(1)
+	root._on_pause_quit_requested()
+	await runner.simulate_frames(3)
+	assert_bool(SaveManager.has_active_run_snapshot()).is_true()
+	assert_str(tree.current_scene.scene_file_path).is_equal("res://Scenes/MainMenu.tscn")
 
 
 func test_initial_state_is_idle() -> void:

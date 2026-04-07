@@ -6,9 +6,53 @@ extends Node
 
 # Steam App ID (set this to your game's Steam App ID when publishing)
 const STEAM_APP_ID: int = 0  # 0 = offline/testing mode
+const API_LANGUAGE_LOCALE_MAP: Dictionary = {
+	"arabic": "ar",
+	"brazilian": "pt_BR",
+	"bulgarian": "bg",
+	"czech": "cs",
+	"danish": "da",
+	"dutch": "nl",
+	"english": "en",
+	"finnish": "fi",
+	"french": "fr",
+	"german": "de",
+	"greek": "el",
+	"hungarian": "hu",
+	"indonesian": "id",
+	"italian": "it",
+	"japanese": "ja",
+	"koreana": "ko",
+	"latam": "es_419",
+	"norwegian": "no",
+	"polish": "pl",
+	"portuguese": "pt",
+	"romanian": "ro",
+	"russian": "ru",
+	"schinese": "zh_CN",
+	"spanish": "es",
+	"swedish": "sv",
+	"tchinese": "zh_TW",
+	"thai": "th",
+	"turkish": "tr",
+	"ukrainian": "uk",
+	"vietnamese": "vi",
+}
 
 # Track which Steam achievements have been unlocked this session
 var _unlocked_achievements: Dictionary = {}
+
+
+static func get_current_game_language_api_code() -> String:
+	# TODO: Query Steamworks ISteamApps.GetCurrentGameLanguage once the SDK layer is wired.
+	return ""
+
+
+static func map_api_language_to_locale(api_language_code: String) -> String:
+	var normalized_code: String = api_language_code.strip_edges().to_lower()
+	if normalized_code.is_empty():
+		return ""
+	return str(API_LANGUAGE_LOCALE_MAP.get(normalized_code, normalized_code))
 
 
 func _ready() -> void:

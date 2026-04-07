@@ -18,6 +18,7 @@ const CARD_SCALE_START: float = 1.1
 
 func _ready() -> void:
 	_apply_theme_styling()
+	_continue_button.text = tr("CONTINUE_ACTION")
 	_continue_button.pressed.connect(_on_continue_pressed)
 
 
@@ -41,13 +42,14 @@ func _apply_theme_styling() -> void:
 
 func open(heal_lives: int, gold_bonus: int, lives_before: int, lives_after: int) -> void:
 	var life_gain: int = maxi(0, lives_after - lives_before)
-	_title_label.text = "REST STOP"
-	_summary_label.text = "Recovered %d hand and found %dg." % [life_gain, gold_bonus]
+	_title_label.text = tr("REST_STOP_TITLE")
+	_summary_label.text = tr("REST_STOP_RECOVERED_FMT").format({"life": life_gain, "gold": gold_bonus})
 	if life_gain == 0:
-		_summary_label.text = "No hand recovered, but you still found %dg." % gold_bonus
-	_detail_label.text = "Hands: %d -> %d\nNext path opens when you continue." % [lives_before, lives_after]
+		_summary_label.text = tr("REST_STOP_NO_HEAL_FMT").format({"gold": gold_bonus})
+	_detail_label.text = tr("REST_STOP_HANDS_NEXT_FMT").format({"before": lives_before, "after": lives_after})
 	if life_gain > 0 and life_gain != heal_lives:
-		_detail_label.text = "Hands: %d -> %d\nRecovery capped for the next stage. Continue when ready." % [lives_before, lives_after]
+		_detail_label.text = tr("REST_STOP_CAPPED_FMT").format({"before": lives_before, "after": lives_after})
+	_continue_button.text = tr("CONTINUE_ACTION")
 	color = Color(0, 0, 0, 0)
 	_card.modulate.a = 0.0
 	_card.scale = Vector2(CARD_SCALE_START, CARD_SCALE_START)

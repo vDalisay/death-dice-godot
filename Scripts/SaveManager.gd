@@ -22,6 +22,7 @@ signal highscore_changed(new_highscore: int)
 signal prestige_currency_changed(new_total: int)
 signal experience_currency_changed(new_total: int)
 signal stop_shard_currency_changed(new_total: int)
+signal preferred_locale_changed(new_locale: String)
 
 var highscore: int = 0
 var gauntlet_highscore: int = 0
@@ -44,6 +45,7 @@ var prestige_unlocks: Array[String] = []
 var experience_currency: int = 0
 var stop_shard_currency: int = 0
 var permanent_upgrade_unlocks: Array[String] = []
+var preferred_locale: String = ""
 var active_run_snapshot: Resource = null
 
 func _ready() -> void:
@@ -115,6 +117,27 @@ func has_active_run_snapshot() -> bool:
 
 func get_active_run_snapshot() -> Resource:
 	return active_run_snapshot
+
+
+func get_preferred_locale() -> String:
+	return preferred_locale
+
+
+func set_preferred_locale(locale_code: String) -> void:
+	var normalized_locale: String = locale_code.strip_edges()
+	if preferred_locale == normalized_locale:
+		return
+	preferred_locale = normalized_locale
+	_save()
+	preferred_locale_changed.emit(preferred_locale)
+
+
+func clear_preferred_locale() -> void:
+	if preferred_locale.is_empty():
+		return
+	preferred_locale = ""
+	_save()
+	preferred_locale_changed.emit(preferred_locale)
 
 
 func build_active_run_snapshot(resume_surface: String, resume_payload: Dictionary, roll_phase_state: Dictionary) -> Resource:
@@ -465,6 +488,7 @@ func _save() -> void:
 		"experience_currency": experience_currency,
 		"stop_shard_currency": stop_shard_currency,
 		"permanent_upgrade_unlocks": permanent_upgrade_unlocks,
+		"preferred_locale": preferred_locale,
 		"active_run_snapshot": active_run_data,
 		"runs": runs_array,
 	}
@@ -503,6 +527,7 @@ func _load() -> void:
 	prestige_currency = data.get("prestige_currency", 0) as int
 	experience_currency = data.get("experience_currency", 0) as int
 	stop_shard_currency = data.get("stop_shard_currency", 0) as int
+	preferred_locale = str(data.get("preferred_locale", ""))
 	prestige_unlocks.clear()
 	for unlock: Variant in data.get("prestige_unlocks", []) as Array:
 		prestige_unlocks.append(unlock as String)

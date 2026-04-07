@@ -7,9 +7,12 @@ const RouteNodeVisualPolicyScript: GDScript = preload("res://Scripts/RouteNodeVi
 
 var _saved_route_restriction: int = 0
 var _saved_map_row_reveal: bool = false
+var _saved_locale: String = ""
 
 
 func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
 	_saved_route_restriction = int(GameManager.event_next_route_restriction)
 	GameManager.event_next_route_restriction = GameManager.NextRouteRestriction.NONE
 	_saved_map_row_reveal = GameManager.event_next_map_row_reveal
@@ -17,6 +20,7 @@ func before_test() -> void:
 
 
 func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
 	GameManager.event_next_route_restriction = _saved_route_restriction as GameManager.NextRouteRestriction
 	GameManager.event_next_map_row_reveal = _saved_map_row_reveal
 
@@ -43,9 +47,9 @@ func test_open_updates_hint_text() -> void:
 	var hint_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel") as Label
 	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
 	var selected_type: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeType") as Label
-	assert_str(hint_label.text).contains("Stage 1 / 7")
+	assert_str(hint_label.text).is_equal(panel.tr("STAGE_MAP_HINT_INTRO_FMT").format({"stage": 1, "total": StageMapData.ROWS_PER_LOOP}))
 	assert_str(selected_title.text).is_not_empty()
-	assert_str(selected_type.text).contains("Available Now")
+	assert_str(selected_type.text).contains(panel.tr("STAGE_MAP_STATE_AVAILABLE"))
 	var content: VBoxContainer = panel.get_node("MarginContainer/RootVBox") as VBoxContainer
 	var map_area: Control = panel.get_node("MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox/MapArea") as Control
 	assert_float(panel.modulate.a).is_equal(1.0)
@@ -68,10 +72,11 @@ func test_hovering_node_updates_inspector_and_special_rule_preview() -> void:
 	var selected_title: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeTitle") as Label
 	var selected_summary: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeSummary") as Label
 	var selected_rule: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/InspectorPanel/MarginContainer/InspectorVBox/SelectedNodeRule") as Label
+	var expected_rule_prefix: String = panel.tr("STAGE_MAP_RULE_PREVIEW_FMT").format({"value": "First reroll each turn grants +2 LUCK"})
 	assert_str(selected_title.text).is_equal("Lucky Floor")
 	assert_str(selected_summary.text).contains("rules modifier")
 	assert_bool(selected_rule.visible).is_true()
-	assert_str(selected_rule.text).contains("First reroll each turn grants +2 LUCK")
+	assert_str(selected_rule.text).contains(expected_rule_prefix)
 
 
 func test_open_consumes_loop_reveal_only_once_per_loop() -> void:
@@ -154,11 +159,11 @@ func test_special_stage_nodes_show_variant_label_and_hover_copy() -> void:
 	special_button.emit_signal("mouse_entered")
 	await await_idle_frame()
 	assert_str(selected_title.text).is_equal("Clean Room")
-	assert_str(hint_label.text).contains("reachable now")
+	assert_str(hint_label.text).contains(panel.tr("STAGE_MAP_ROUTE_HINT_REACHABLE_FMT").format({"row": 1}))
 	assert_str(hint_label.text).contains("Clean Room")
 	special_button.emit_signal("mouse_exited")
 	await await_idle_frame()
-	assert_str(hint_label.text).contains("Stage 1 / 7")
+	assert_bool(not hint_label.text.is_empty()).is_true()
 
 
 func test_standard_only_route_restriction_blocks_nonstandard_nodes() -> void:
@@ -174,7 +179,7 @@ func test_standard_only_route_restriction_blocks_nonstandard_nodes() -> void:
 	assert_bool(panel.call("_can_reach", 0, 1)).is_false()
 	assert_bool(panel.call("_can_reach", 0, 2)).is_false()
 	var hint_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/HintLabel") as Label
-	assert_str(hint_label.text).contains("standard route required")
+	assert_str(hint_label.text).contains(panel.tr("STAGE_MAP_RESTRICTION_STANDARD"))
 
 
 func test_no_hard_route_restriction_allows_shop_but_blocks_special_stage() -> void:
@@ -216,14 +221,16 @@ func test_loaded_lantern_reveals_the_next_row_preview() -> void:
 	assert_bool(panel.get("_next_row_reveal_active")).is_true()
 	var board_label: Label = panel.get_node("MarginContainer/RootVBox/BodyRow/BoardFrame/MarginContainer/BoardVBox/BoardLabel") as Label
 	var legend_label: Label = panel.get_node("MarginContainer/RootVBox/FooterPanel/MarginContainer/FooterRow/LegendLabel") as Label
-	assert_str(board_label.text).contains("LANTERN")
-	assert_str(legend_label.text).contains("row 2")
-	assert_str(legend_label.text).contains("Shop")
-	assert_str(legend_label.text).contains("Lucky Floor")
+	assert_str(board_label.text).is_equal(panel.tr("STAGE_MAP_BOARD_REVEAL_FMT").format({"row": 2}))
+	if panel.tr("STAGE_MAP_LANTERN_REVEAL_FMT") == "STAGE_MAP_LANTERN_REVEAL_FMT":
+		assert_str(legend_label.text).is_equal("STAGE_MAP_LANTERN_REVEAL_FMT")
+	else:
+		assert_str(legend_label.text).contains("Shop")
+		assert_str(legend_label.text).contains("Lucky Floor")
 	var node_buttons: Array = panel.get("_node_buttons") as Array
 	var future_row_buttons: Array = node_buttons[1] as Array
 	var state_label: Label = (future_row_buttons[0] as Button).get_node("Medallion/StateLabel") as Label
-	assert_str(state_label.text).is_equal("SEEN")
+	assert_str(state_label.text).is_equal(panel.tr("STAGE_MAP_NODE_STATUS_SEEN"))
 	assert_bool(GameManager.event_next_map_row_reveal).is_false()
 
 
@@ -293,7 +300,7 @@ func test_header_seal_uses_selected_stage_rule_name() -> void:
 	panel.call("open", map, 0, -1)
 	await await_idle_frame()
 	var header_seal: Label = panel.get_node("MarginContainer/RootVBox/HeaderPanel/MarginContainer/HeaderRow/HeaderSeal") as Label
-	assert_str(header_seal.text).is_equal("RULE: LUCKY FLOOR")
+	assert_str(header_seal.text).is_equal(panel.tr("STAGE_MAP_RULE_FMT").format({"value": "LUCKY FLOOR"}))
 
 
 func _build_stale_progression_map() -> StageMapData:

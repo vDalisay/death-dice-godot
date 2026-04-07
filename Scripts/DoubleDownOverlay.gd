@@ -30,6 +30,10 @@ var _confetti_nodes: Array[Node] = []
 func _ready() -> void:
 	_apply_theme_styling()
 	visible = false
+	_title_label.text = tr("DOUBLE_DOWN_TITLE")
+	_even_button.text = tr("DOUBLE_DOWN_EVEN")
+	_odd_button.text = tr("DOUBLE_DOWN_ODD")
+	_close_button.text = tr("CONTINUE_ACTION")
 	_even_button.pressed.connect(_on_even_pressed)
 	_odd_button.pressed.connect(_on_odd_pressed)
 	_close_button.pressed.connect(_on_close_pressed)
@@ -65,8 +69,12 @@ func _apply_theme_styling() -> void:
 func open(gold_at_stake: int) -> void:
 	_gold_at_stake = gold_at_stake
 	_rolling = false
+	_title_label.text = tr("DOUBLE_DOWN_TITLE")
+	_even_button.text = tr("DOUBLE_DOWN_EVEN")
+	_odd_button.text = tr("DOUBLE_DOWN_ODD")
+	_close_button.text = tr("CONTINUE_ACTION")
 	_die_label.text = _UITheme.GLYPH_DIE
-	_prompt_label.text = "Wager: %dg — pick your side!" % gold_at_stake
+	_prompt_label.text = tr("DOUBLE_DOWN_WAGER_FMT").format({"gold": gold_at_stake})
 	_result_label.text = ""
 	_result_label.modulate = _UITheme.BRIGHT_TEXT
 	_even_button.visible = true
@@ -95,7 +103,7 @@ func _start_roll() -> void:
 	_rolling = true
 	_even_button.disabled = true
 	_odd_button.disabled = true
-	_prompt_label.text = "Rolling..."
+	_prompt_label.text = tr("DOUBLE_DOWN_ROLLING")
 	_final_roll = GameManager.rng_randi_range("shop", 1, 6)
 	_animate_roll()
 
@@ -128,16 +136,17 @@ func _finish_roll() -> void:
 	_odd_button.visible = false
 	var is_even: bool = _final_roll % 2 == 0
 	var won: bool = (_player_picked_even and is_even) or (not _player_picked_even and not is_even)
+	var parity_text: String = tr("DOUBLE_DOWN_EVEN_WORD") if is_even else tr("DOUBLE_DOWN_ODD_WORD")
 	if won:
 		GameManager.add_gold(_gold_at_stake)
-		_result_label.text = "Rolled %d (%s) — YOU WIN! +%dg!" % [_final_roll, "even" if is_even else "odd", _gold_at_stake]
+		_result_label.text = tr("DOUBLE_DOWN_WIN_FMT").format({"roll": _final_roll, "parity": parity_text, "gold": _gold_at_stake})
 		_result_label.modulate = _UITheme.SUCCESS_GREEN
 		SFXManager.play_double_down_win()
 		_spawn_confetti()
 	else:
 		var loss: int = mini(_gold_at_stake, GameManager.gold)
 		GameManager.add_gold(-loss)
-		_result_label.text = "Rolled %d (%s) — LOST! -%dg" % [_final_roll, "even" if is_even else "odd", loss]
+		_result_label.text = tr("DOUBLE_DOWN_LOSE_FMT").format({"roll": _final_roll, "parity": parity_text, "gold": loss})
 		_result_label.modulate = _UITheme.DANGER_RED
 		SFXManager.play_bust()
 		_play_loss_shake()

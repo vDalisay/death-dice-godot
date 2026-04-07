@@ -3,12 +3,17 @@ extends GdUnitTestSuite
 
 const ForgeScene: PackedScene = preload("res://Scenes/ForgePanel.tscn")
 
+var _saved_locale: String = ""
+
 
 func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
 	GameManager.dice_pool.clear()
 
 
 func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
 	GameManager.dice_pool.clear()
 
 

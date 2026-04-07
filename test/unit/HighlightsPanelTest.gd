@@ -2,6 +2,18 @@ extends GdUnitTestSuite
 ## Unit tests for the redesigned HighlightsPanel.
 
 const HighlightsPanelScene: PackedScene = preload("res://Scenes/HighlightsPanel.tscn")
+const UITheme := preload("res://Scripts/UITheme.gd")
+
+var _saved_locale: String = ""
+
+
+func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
+
+
+func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
 
 
 func _make_run(score: int, stages: int, loops: int, best_turn: int, busts: int, dice_count: int) -> RunSaveData:
@@ -44,7 +56,7 @@ func test_new_best_badge_exists_when_beating_record() -> void:
 	var first_card: PanelContainer = stat_container.get_child(0) as PanelContainer
 	var badge: Label = first_card.find_child("BestBadge", true, false) as Label
 	assert_object(badge).is_not_null()
-	assert_str(badge.text).contains("NEW BEST")
+	assert_str(badge.text).is_equal(panel.tr("HIGHLIGHTS_NEW_BEST_FMT").format({"star": UITheme.GLYPH_STAR}))
 
 
 func test_score_card_shows_delta_vs_best() -> void:
@@ -59,7 +71,7 @@ func test_score_card_shows_delta_vs_best() -> void:
 	var first_card: PanelContainer = stat_container.get_child(0) as PanelContainer
 	var delta: Label = first_card.find_child("DeltaLabel", true, false) as Label
 	assert_object(delta).is_not_null()
-	assert_str(delta.text).contains("+50")
+	assert_str(delta.text).is_equal(panel.tr("HIGHLIGHTS_DELTA_POS_FMT").format({"value": 50}))
 
 
 func test_close_button_hides_and_emits() -> void:

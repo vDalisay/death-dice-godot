@@ -46,8 +46,11 @@ var _current_luck: int = 0
 
 
 func _ready() -> void:
+	if LocalizationManager != null:
+		LocalizationManager.locale_changed.connect(_on_locale_changed)
 	_apply_theme_styling()
 	_build_reroll_button()
+	_refresh_localized_labels()
 
 
 func _apply_theme_styling() -> void:
@@ -65,6 +68,7 @@ func _apply_theme_styling() -> void:
 
 func open(luck: int) -> void:
 	_current_luck = luck
+	_refresh_localized_labels()
 	_rebuild_reward_cards(luck)
 	if _reroll_button != null:
 		_reroll_button.visible = GameManager.prestige_reward_reroll_available
@@ -115,7 +119,7 @@ func _rebuild_reward_cards(luck: int) -> void:
 
 func _build_reroll_button() -> void:
 	_reroll_button = Button.new()
-	_reroll_button.text = "Reroll Choices"
+	_reroll_button.text = tr("DICE_REWARD_REROLL_CHOICES")
 	_reroll_button.custom_minimum_size = Vector2(220, 38)
 	_reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_reroll_button.visible = false
@@ -123,6 +127,17 @@ func _build_reroll_button() -> void:
 	_reroll_button.add_theme_font_size_override("font_size", 12)
 	_reroll_button.pressed.connect(_on_reroll_pressed)
 	_content.add_child(_reroll_button)
+
+
+func _refresh_localized_labels() -> void:
+	_title_label.text = tr("DICE_REWARD_TITLE")
+	_hint_label.text = tr("DICE_REWARD_HINT")
+	if _reroll_button != null:
+		_reroll_button.text = tr("DICE_REWARD_REROLL_CHOICES")
+
+
+func _on_locale_changed(_new_locale: String) -> void:
+	_refresh_localized_labels()
 
 
 func _on_reroll_pressed() -> void:
@@ -165,7 +180,7 @@ static func _pick_die_for_rarity(rarity: DiceData.Rarity) -> DiceData:
 	var pool: Array[String] = []
 	match rarity:
 		DiceData.Rarity.GREY:
-			pool = GREY_POOL
+				pool = GREY_POOL
 		DiceData.Rarity.GREEN:
 			pool = GREEN_POOL
 		DiceData.Rarity.BLUE:
@@ -212,7 +227,7 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 
 	# Rarity label
 	var rarity_label := Label.new()
-	rarity_label.text = _rarity_name(die.rarity)
+	rarity_label.text = _localized_rarity_name(die.rarity)
 	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rarity_label.add_theme_font_override("font", _UITheme.font_body())
 	rarity_label.add_theme_font_size_override("font_size", 11)
@@ -230,7 +245,7 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 
 	if die.is_reroll_evolving():
 		var tier_label := Label.new()
-		tier_label.text = "Evolves from rerolls"
+		tier_label.text = tr("DICE_REWARD_EVOLVES")
 		tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tier_label.add_theme_font_override("font", _UITheme.font_mono())
 		tier_label.add_theme_font_size_override("font_size", 11)
@@ -263,7 +278,7 @@ func _build_card(die: DiceData, index: int) -> PanelContainer:
 
 	# Pick button
 	var pick_button := Button.new()
-	pick_button.text = "PICK"
+	pick_button.text = tr("DICE_REWARD_PICK")
 	pick_button.custom_minimum_size = Vector2(0, 44)
 	pick_button.add_theme_font_override("font", _UITheme.font_display())
 	pick_button.add_theme_font_size_override("font_size", 13)
@@ -344,6 +359,17 @@ static func _rarity_name(rarity: DiceData.Rarity) -> String:
 			return "EPIC"
 	return "COMMON"
 
+func _localized_rarity_name(rarity: DiceData.Rarity) -> String:
+	match rarity:
+		DiceData.Rarity.GREY:
+			return tr("RARITY_COMMON")
+		DiceData.Rarity.GREEN:
+			return tr("RARITY_UNCOMMON")
+		DiceData.Rarity.BLUE:
+			return tr("RARITY_RARE")
+		DiceData.Rarity.PURPLE:
+			return tr("RARITY_EPIC")
+	return tr("RARITY_COMMON")
 
 static func _face_color(face: DiceFaceData) -> Color:
 	match face.type:

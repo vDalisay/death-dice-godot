@@ -12,11 +12,11 @@ const MAX_TARGET: int = 4
 const _UITheme := preload("res://Scripts/UITheme.gd")
 ## Rough % flavor labels per stop target (illustrative, not exact probability).
 const TARGET_ODDS_LABEL: Array[String] = [
-	"0 stops: low chance (~10%)",
-	"1 stop: common (~35%)",
-	"2 stops: likely (~30%)",
-	"3 stops: risky (~20%)",
-	"4 stops: very risky (~5%)",
+	"HEAT_ODDS_0",
+	"HEAT_ODDS_1",
+	"HEAT_ODDS_2",
+	"HEAT_ODDS_3",
+	"HEAT_ODDS_4",
 ]
 
 @onready var _modal: PanelContainer = $CenterContainer/Modal
@@ -83,13 +83,15 @@ func _build_target_buttons() -> void:
 func open() -> void:
 	var can_afford: bool = GameManager.gold >= WAGER
 	_picked_target = -1
-	_wager_label.text = "Wager: %dg  |  Payout on hit: %dg  (3:1)" % [WAGER, PAYOUT]
-	_picked_label.text = "Pick a stop count →"
+	_title_label.text = tr("HEAT_BET_TITLE")
+	_close_button.text = tr("NO_THANKS")
+	_wager_label.text = tr("HEAT_WAGER_FMT").format({"wager": WAGER, "payout": PAYOUT})
+	_picked_label.text = tr("HEAT_PICK_TARGET")
 	_odds_label.text = ""
 	_confirm_button.disabled = true
-	_confirm_button.text = "Confirm Bet  (-%dg)" % WAGER
+	_confirm_button.text = tr("HEAT_CONFIRM_FMT").format({"wager": WAGER})
 	if not can_afford:
-		_confirm_button.text = "Not enough gold (need %dg)" % WAGER
+		_confirm_button.text = tr("NOT_ENOUGH_GOLD_FMT").format({"gold": WAGER})
 	for btn: Button in _target_buttons:
 		btn.disabled = not can_afford
 		btn.modulate = _UITheme.BRIGHT_TEXT
@@ -99,10 +101,11 @@ func open() -> void:
 
 func _on_target_picked(target: int) -> void:
 	_picked_target = target
-	_picked_label.text = "Bet: exactly %d stop%s when banking" % [target, "s" if target != 1 else ""]
+	_picked_label.text = tr("HEAT_PICKED_FMT").format({"count": target, "s": "s" if target != 1 else ""})
 	if target < TARGET_ODDS_LABEL.size():
-		_odds_label.text = TARGET_ODDS_LABEL[target]
+		_odds_label.text = tr(TARGET_ODDS_LABEL[target])
 	_confirm_button.disabled = false
+	_confirm_button.text = tr("HEAT_CONFIRM_FMT").format({"wager": WAGER})
 	for i: int in _target_buttons.size():
 		_target_buttons[i].modulate = _UITheme.ACTION_CYAN if i == target else _UITheme.MUTED_TEXT
 

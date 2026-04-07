@@ -40,7 +40,7 @@ theme_override_constants/separation = 8
 
 [node name="TitleLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
 layout_mode = 2
-text = "DICE FORGE"
+text = ""
 
 [node name="HeaderSpacer" type="Control" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow"]
 layout_mode = 2
@@ -58,11 +58,11 @@ theme_override_constants/margin_bottom = 6
 
 [node name="CostLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CostBadge/CostMargin"]
 layout_mode = 2
-text = "Cost: sacrifice 2 dice"
+text = ""
 
 [node name="InstructionLabel" type="Label" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
-text = "Select 2 dice to sacrifice (0 / 2 selected)"
+text = ""
 
 [node name="HSeparator" type="HSeparator" parent="CenterContainer/Modal/MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -101,12 +101,12 @@ theme_override_constants/separation = 12
 [node name="ForgeButton" type="Button" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(240, 56)
-text = "Forge!"
+text = ""
 
 [node name="SkipButton" type="Button" parent="CenterContainer/Modal/MarginContainer/VBoxContainer/ButtonRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(220, 56)
-text = "Skip"
+text = ""
 
 [node name="SelectionSparks" type="CPUParticles2D" parent="CenterContainer/Modal"]
 emitting = false

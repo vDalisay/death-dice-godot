@@ -3,6 +3,17 @@ extends GdUnitTestSuite
 ## Tests for the Highlights Reel feature: end-of-run summary with career
 ## best comparisons.
 
+var _saved_locale: String = ""
+
+
+func before_test() -> void:
+	_saved_locale = LocalizationManager.get_current_locale()
+	LocalizationManager.set_locale("en", false)
+
+
+func after_test() -> void:
+	LocalizationManager.set_locale(_saved_locale, false)
+
 
 func test_format_stat_new_best() -> void:
 	var panel_script: GDScript = preload("res://Scripts/HighlightsPanel.gd")
