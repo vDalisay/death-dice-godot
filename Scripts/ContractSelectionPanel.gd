@@ -17,6 +17,12 @@ var _transition_tween: Tween = null
 var _interaction_locked: bool = false
 
 
+func _exit_tree() -> void:
+	if _transition_tween != null and _transition_tween.is_valid():
+		_transition_tween.custom_step(99.0)
+		_transition_tween = null
+
+
 func _ready() -> void:
 	_apply_theme()
 

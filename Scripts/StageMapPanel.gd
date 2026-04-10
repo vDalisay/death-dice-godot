@@ -67,6 +67,14 @@ var _reroute_enabled: bool = false
 var _transition_tween: Tween = null
 var _last_open_used_loop_reveal: bool = false
 var _is_closing: bool = false
+
+
+func _exit_tree() -> void:
+    if _transition_tween != null and _transition_tween.is_valid():
+        _transition_tween.custom_step(99.0)
+        _transition_tween = null
+
+
 var _route_restriction: int = GameManager.NextRouteRestriction.NONE
 var _next_row_reveal_active: bool = false
 var _hovered_row: int = -1

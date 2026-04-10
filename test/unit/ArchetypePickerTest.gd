@@ -84,3 +84,5 @@ func test_continue_button_press_locks_interaction_for_continue_path() -> void:
 	var continue_button: Button = picker.get("_continue_button") as Button
 	continue_button.pressed.emit()
 	assert_bool(bool(picker.get("_interaction_locked"))).is_true()
+	# Wait for close transition tween to finish so the awaited GDScriptFunctionState resolves
+	await await_millis(300)

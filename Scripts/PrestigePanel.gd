@@ -23,6 +23,12 @@ var _transition_tween: Tween = null
 var _is_closing: bool = false
 
 
+func _exit_tree() -> void:
+	if _transition_tween != null and _transition_tween.is_valid():
+		_transition_tween.custom_step(99.0)
+		_transition_tween = null
+
+
 func _ready() -> void:
 	_apply_theme_styling()
 	_close_button.pressed.connect(_on_close_pressed)

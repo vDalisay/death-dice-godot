@@ -39,6 +39,12 @@ var _result_message_args: Dictionary = {}
 var _result_message_color: Color = Color.WHITE
 
 
+func _exit_tree() -> void:
+	if _transition_tween != null and _transition_tween.is_valid():
+		_transition_tween.custom_step(99.0)
+		_transition_tween = null
+
+
 func _ready() -> void:
 	visible = false
 	_forge_button.pressed.connect(_on_forge_pressed)

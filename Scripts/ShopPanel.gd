@@ -85,6 +85,12 @@ var _current_stage_cleared: int = 0
 var _current_is_loop_complete: bool = false
 
 
+func _exit_tree() -> void:
+	if _transition_tween != null and _transition_tween.is_valid():
+		_transition_tween.custom_step(99.0)
+		_transition_tween = null
+
+
 func _ready() -> void:
 	_apply_theme_styling()
 	_continue_button.pressed.connect(_on_continue_pressed)
