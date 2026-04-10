@@ -55,6 +55,10 @@ const RECENT_BANK_CHUNK_FADE_DURATION: float = 0.22
 const RECENT_BANK_OVERFLOW_DRAIN_DURATION: float = 0.55
 const OVERFLOW_BREAK_THRESHOLD_RATIO: float = 1.2
 const OVERFLOW_DROPLET_COUNT: int = 10
+const SCORE_FILL_BASE_ALPHA: float = 0.18
+const SCORE_FILL_MAX_ALPHA: float = 0.34
+const SCORE_HINT_SIDE_PADDING: float = 16.0
+const SCORE_HINT_BOTTOM_PADDING: float = 8.0
 
 enum OverflowState { NONE, CRACK, BREAK }
 
@@ -85,13 +89,14 @@ enum OverflowState { NONE, CRACK, BREAK }
 @onready var _score_incoming_label: Label = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TurnScoreVBox/ScoreDialClip/ScoreIncomingLabel
 @onready var _target_caption_label: Label = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TargetVBox/TargetCaptionLabel
 @onready var target_label: Label       = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/TurnScoreMargin/ScoreObjectiveRow/TargetVBox/TargetLabel
+@onready var _counter_streak_slot: Control = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/CounterStreakSlot
 @onready var progress_track: Control   = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack
 @onready var progress_bar: ProgressBar = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/ProgressBar
 @onready var _recent_bank_chunk: PanelContainer = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/RecentBankChunk
 @onready var _chunk_hit_area: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/RecentBankChunk/ChunkHitArea
 @onready var _overflow_tip: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/ProgressTrack/OverflowTip
 @onready var progress_hint_label: Label = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressHintLabel
-@onready var _streak_slot: Control = $ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot
+@onready var _streak_slot: Control = $ScoreRow/ScoreObjectiveCenter/TurnScorePanel/CounterStreakSlot
 
 # -- Info row --
 @onready var lives_label: Label           = $InfoRow/RiskColumn/HandsLabel
@@ -144,6 +149,9 @@ var _pinned_status_text: String = ""
 var _pinned_status_color: Color = Color.WHITE
 var _stage_intro_layer: Control = null
 var _overflow_fx_layer: Control = null
+var _score_fill_layer: Control = null
+var _score_overlay_layer: Control = null
+var _score_fill_rect: ColorRect = null
 var _intro_hidden_resident_labels: Dictionary = {}
 var _intro_resident_label_modulates: Dictionary = {}
 var _recent_bank_amount: int = 0
@@ -156,6 +164,7 @@ func _ready() -> void:
 	_create_seed_label()
 	_ensure_stage_intro_layer()
 	_ensure_overflow_fx_layer()
+	_configure_score_progress_surface()
 	_apply_theme_styling()
 	_contract_progress_service = ContractProgressServiceScript.new()
 	_progress_bar_base_size = progress_bar.custom_minimum_size
@@ -202,12 +211,14 @@ func _ready() -> void:
 	highscore_label.text = "HI: %d" % SaveManager.get_mode_highscore(int(GameManager.run_mode))
 	_set_total_score_label(float(GameManager.total_score))
 	_score_feedback_display_total = GameManager.total_score
+	_update_score_progress_surface_layout()
 
 
 func _process(_delta: float) -> void:
 	_prune_expired_feed_entries()
 	if _score_tween == null or not _score_tween.is_valid():
 		_layout_score_dial_labels()
+	_update_score_progress_surface_layout()
 	_update_progress_overlay_layout()
 	if _stage_intro_layer == null or not is_instance_valid(_stage_intro_layer):
 		if _overflow_fx_layer != null and is_instance_valid(_overflow_fx_layer):
@@ -261,6 +272,7 @@ func _apply_theme_styling() -> void:
 	# Turn score panel (HERO element)
 	_turn_score_panel.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_CARD, 2))
+	_update_score_fill_color()
 	turn_score_label.add_theme_font_override("font", _UITheme.font_mono())
 	turn_score_label.add_theme_font_size_override("font_size", 18)
 	turn_score_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
@@ -493,6 +505,7 @@ func attach_streak_display(display: Control) -> void:
 	_streak_slot.add_child(display)
 	if display.has_method("set_embedded_layout"):
 		display.call("set_embedded_layout")
+	display.position = Vector2.ZERO
 
 
 func flash_combo(combo_name: String, colour: Color, combo_id: String = "") -> void:
@@ -1313,6 +1326,7 @@ func _stop_progress_tween() -> void:
 
 func _set_progress_bar_value(value: float) -> void:
 	progress_bar.value = value
+	_update_score_progress_surface_layout()
 	_update_progress_overlay_layout()
 	_update_progress_state(value / 100.0)
 
@@ -1327,10 +1341,9 @@ func _score_to_progress_value(score_total: int) -> float:
 
 
 func _get_progress_hit_position(progress_value: float) -> Vector2:
-	_sync_progress_bar_layout()
+	var progress_rect: Rect2 = get_progress_visual_rect()
 	var ratio: float = clampf(progress_value / 100.0, 0.06, 1.0)
-	var fill_width: float = maxf(progress_bar.size.x, progress_bar.custom_minimum_size.x)
-	return progress_bar.global_position + Vector2(fill_width * ratio, progress_bar.size.y * 0.5)
+	return progress_rect.position + Vector2(progress_rect.size.x * ratio, progress_rect.size.y * 0.5)
 
 
 func _apply_score_feedback_step(old_total: int, new_total: int, score_value: int) -> void:
@@ -1345,14 +1358,16 @@ func _play_progress_hit(score_value: int) -> void:
 	if _progress_hit_tween != null and _progress_hit_tween.is_valid():
 		_progress_hit_tween.kill()
 	var hit_boost: float = minf(1.0, float(maxi(score_value, 1)) / 18.0)
-	progress_bar.modulate = Color.WHITE
+	if _score_fill_rect != null:
+		_score_fill_rect.modulate = Color.WHITE
 	_progress_hit_tween = create_tween()
-	_progress_hit_tween.tween_property(progress_bar, "modulate", Color(1.0, 0.92 + hit_boost * 0.04, 0.7 + hit_boost * 0.1), 0.08)
-	_progress_hit_tween.tween_property(progress_bar, "modulate", Color.WHITE, 0.16)
+	if _score_fill_rect != null:
+		_progress_hit_tween.tween_property(_score_fill_rect, "modulate", Color(1.0, 0.92 + hit_boost * 0.04, 0.7 + hit_boost * 0.1), 0.08)
+		_progress_hit_tween.tween_property(_score_fill_rect, "modulate", Color.WHITE, 0.16)
 	var border_width: int = 1 + int(round(hit_boost * 2.0))
-	_progress_panel.add_theme_stylebox_override(
+	_turn_score_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, border_width)
+		_UITheme.make_panel_stylebox(_UITheme.STAGE_FAMILY_BOARD_FILL, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, border_width)
 	)
 	if _score_feedback_is_reroll:
 		var growth: float = minf(PROGRESS_THICKEN_STEP + float(score_value) * 0.08, PROGRESS_THICKEN_STEP * 2.0)
@@ -1370,6 +1385,7 @@ func _animate_progress_bar_thickness(target_height: float, duration: float) -> v
 
 func _set_progress_bar_thickness(height: float) -> void:
 	progress_bar.custom_minimum_size = Vector2(_progress_bar_base_size.x, height)
+	_update_score_fill_color()
 	_update_progress_overlay_layout()
 
 
@@ -1398,9 +1414,9 @@ func _on_progress_deflate_finished() -> void:
 func _restore_progress_panel_style() -> void:
 	if _progress_pulse_tween != null and _progress_pulse_tween.is_valid():
 		return
-	_progress_panel.add_theme_stylebox_override(
+	_turn_score_panel.add_theme_stylebox_override(
 		"panel",
-		_UITheme.make_panel_stylebox(_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD)
+		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_CARD, 2)
 	)
 
 
@@ -1422,22 +1438,25 @@ func _update_progress_state(ratio: float) -> void:
 func _start_progress_pulse() -> void:
 	if _progress_pulse_tween != null and _progress_pulse_tween.is_valid():
 		return
-	progress_bar.modulate = Color.WHITE
+	if _score_fill_rect != null:
+		_score_fill_rect.modulate = Color.WHITE
 	_progress_pulse_tween = create_tween().set_loops()
-	_progress_pulse_tween.tween_property(progress_bar, "modulate", Color(1.0, 0.88, 0.6), 0.25)
-	_progress_pulse_tween.tween_property(progress_bar, "modulate", Color.WHITE, 0.25)
+	if _score_fill_rect != null:
+		_progress_pulse_tween.tween_property(_score_fill_rect, "modulate", Color(1.0, 0.88, 0.6), 0.25)
+		_progress_pulse_tween.tween_property(_score_fill_rect, "modulate", Color.WHITE, 0.25)
 	# Add glow border on progress panel
 	var glow_style: StyleBoxFlat = _UITheme.make_panel_stylebox(
-		_UITheme.PANEL_SURFACE, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 2
+		_UITheme.STAGE_FAMILY_BOARD_FILL, _UITheme.CORNER_RADIUS_CARD, _UITheme.SCORE_GOLD, 2
 	)
-	_progress_panel.add_theme_stylebox_override("panel", glow_style)
+	_turn_score_panel.add_theme_stylebox_override("panel", glow_style)
 
 
 func _stop_progress_pulse() -> void:
 	if _progress_pulse_tween != null and _progress_pulse_tween.is_valid():
 		_progress_pulse_tween.kill()
 	_progress_pulse_tween = null
-	progress_bar.modulate = Color.WHITE
+	if _score_fill_rect != null:
+		_score_fill_rect.modulate = Color.WHITE
 	_restore_progress_panel_style()
 
 
@@ -1459,7 +1478,6 @@ func _queue_recent_bank_feedback(start_total: int, final_total: int, delay: floa
 func _show_recent_bank_chunk(start_total: int, final_total: int, overflow_state: int) -> void:
 	if _recent_bank_amount <= 0:
 		return
-	_sync_progress_bar_layout()
 	var target_value: float = maxf(float(GameManager.stage_target_score), 1.0)
 	var start_ratio: float = clampf(float(start_total) / target_value, 0.0, OVERFLOW_BREAK_THRESHOLD_RATIO)
 	var end_ratio: float = clampf(float(final_total) / target_value, 0.0, OVERFLOW_BREAK_THRESHOLD_RATIO)
@@ -1589,10 +1607,16 @@ func _set_overflow_visual_state(state: int) -> void:
 
 
 func _update_progress_overlay_layout() -> void:
-	if progress_track == null or progress_bar == null:
+	if _turn_score_panel == null:
 		return
-	_sync_progress_bar_layout()
 	var bar_rect: Rect2 = _get_progress_bar_display_rect()
+	if progress_hint_label != null:
+		var hint_size: Vector2 = progress_hint_label.get_combined_minimum_size()
+		progress_hint_label.size = Vector2(maxf(hint_size.x, 120.0), maxf(hint_size.y, 22.0))
+		progress_hint_label.position = Vector2(
+			bar_rect.size.x - progress_hint_label.size.x - SCORE_HINT_SIDE_PADDING,
+			bar_rect.size.y - progress_hint_label.size.y - SCORE_HINT_BOTTOM_PADDING
+		)
 	if _overflow_tip != null and _overflow_tip.visible:
 		var tip_local_x: float = _get_progress_track_width() - 6.0
 		var tip_y: float = bar_rect.position.y + (bar_rect.size.y - _overflow_tip.size.y) * 0.5
@@ -1604,37 +1628,34 @@ func _update_progress_overlay_layout() -> void:
 
 
 func _sync_progress_bar_layout() -> void:
-	if progress_track == null or progress_bar == null:
-		return
-	var bar_height: float = _get_progress_bar_display_height()
-	var bar_offset_top: float = _get_progress_bar_vertical_offset()
-	progress_bar.offset_left = 0.0
-	progress_bar.offset_right = 0.0
-	progress_bar.offset_top = bar_offset_top
-	progress_bar.offset_bottom = bar_offset_top + bar_height
+	_update_score_progress_surface_layout()
 
 
 func _get_progress_bar_display_rect() -> Rect2:
-	return Rect2(Vector2(0.0, _get_progress_bar_vertical_offset()), Vector2(_get_progress_track_width(), _get_progress_bar_display_height()))
+	return Rect2(Vector2.ZERO, Vector2(_get_progress_track_width(), _get_progress_bar_display_height()))
 
 
 func _get_progress_bar_display_height() -> float:
-	return maxf(progress_bar.custom_minimum_size.y, _progress_bar_base_size.y)
+	if _turn_score_panel == null:
+		return 0.0
+	return maxf(_turn_score_panel.size.y, _turn_score_panel.get_combined_minimum_size().y)
 
 
 func _get_progress_bar_vertical_offset() -> float:
-	var track_height: float = maxf(progress_track.size.y, progress_track.custom_minimum_size.y)
-	return floorf((track_height - _get_progress_bar_display_height()) * 0.5)
+	return 0.0
 
 
 func _get_progress_track_width() -> float:
-	return maxf(maxf(progress_bar.size.x, progress_track.size.x), progress_track.custom_minimum_size.x)
+	if _turn_score_panel == null:
+		return 0.0
+	return maxf(_turn_score_panel.size.x, _turn_score_panel.custom_minimum_size.x)
 
 
 func _spawn_overflow_droplets() -> void:
 	if _overflow_fx_layer == null or not is_instance_valid(_overflow_fx_layer):
 		return
-	var tip_position: Vector2 = progress_bar.global_position + Vector2(_get_progress_track_width(), progress_bar.size.y * 0.5)
+	var progress_rect: Rect2 = get_progress_visual_rect()
+	var tip_position: Vector2 = progress_rect.position + Vector2(progress_rect.size.x, progress_rect.size.y * 0.5)
 	for _index: int in OVERFLOW_DROPLET_COUNT:
 		var droplet := ColorRect.new()
 		var droplet_size: float = _overflow_rng.randf_range(3.0, 7.0)
@@ -1648,6 +1669,65 @@ func _spawn_overflow_droplets() -> void:
 		droplet_tween.tween_property(droplet, "position", droplet.position + drift, _overflow_rng.randf_range(0.28, 0.52))
 		droplet_tween.parallel().tween_property(droplet, "modulate:a", 0.0, _overflow_rng.randf_range(0.24, 0.5))
 		droplet_tween.tween_callback(droplet.queue_free)
+
+
+func get_progress_visual_rect() -> Rect2:
+	if _turn_score_panel == null:
+		return Rect2()
+	return Rect2(_turn_score_panel.global_position, Vector2(_get_progress_track_width(), _get_progress_bar_display_height()))
+
+
+func _configure_score_progress_surface() -> void:
+	if _turn_score_panel == null:
+		return
+	_turn_score_panel.clip_contents = true
+	_score_fill_layer = Control.new()
+	_score_fill_layer.name = "ScoreFillLayer"
+	_score_fill_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_score_fill_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_turn_score_panel.add_child(_score_fill_layer)
+	_turn_score_panel.move_child(_score_fill_layer, 0)
+	_score_fill_rect = ColorRect.new()
+	_score_fill_rect.name = "ScoreFillRect"
+	_score_fill_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_score_fill_layer.add_child(_score_fill_rect)
+	_score_overlay_layer = Control.new()
+	_score_overlay_layer.name = "ScoreOverlayLayer"
+	_score_overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_score_overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_turn_score_panel.add_child(_score_overlay_layer)
+	_turn_score_panel.move_child(_score_overlay_layer, 1)
+	_move_score_overlay_node(_recent_bank_chunk)
+	_move_score_overlay_node(_overflow_tip)
+	_move_score_overlay_node(progress_hint_label)
+	if _counter_streak_slot != null:
+		_counter_streak_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_turn_score_panel.move_child(_counter_streak_slot, _turn_score_panel.get_child_count() - 1)
+	_progress_panel.visible = false
+	_update_score_fill_color()
+
+
+func _move_score_overlay_node(node: Control) -> void:
+	if node == null or _score_overlay_layer == null:
+		return
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.reparent(_score_overlay_layer, false)
+
+
+func _update_score_progress_surface_layout() -> void:
+	if _score_fill_layer == null or _score_fill_rect == null or _score_overlay_layer == null:
+		return
+	var panel_size: Vector2 = Vector2(_get_progress_track_width(), _get_progress_bar_display_height())
+	_score_fill_rect.position = Vector2.ZERO
+	_score_fill_rect.size = Vector2(panel_size.x * clampf(progress_bar.value / 100.0, 0.0, 1.0), panel_size.y)
+
+
+func _update_score_fill_color() -> void:
+	if _score_fill_rect == null:
+		return
+	var height_delta: float = maxf(progress_bar.custom_minimum_size.y - _progress_bar_base_size.y, 0.0)
+	var alpha_ratio: float = clampf(height_delta / maxf(PROGRESS_THICKEN_CAP, 1.0), 0.0, 1.0)
+	_score_fill_rect.color = Color(_UITheme.SCORE_GOLD, lerpf(SCORE_FILL_BASE_ALPHA, SCORE_FILL_MAX_ALPHA, alpha_ratio))
 
 
 func _refresh_modifier_display() -> void:

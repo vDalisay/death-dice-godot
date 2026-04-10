@@ -170,7 +170,7 @@ func test_multiplier_vfx_anchor_is_left_of_progress_bar() -> void:
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
 	var anchor: Vector2 = root._get_multiplier_vfx_anchor_global_position()
-	var bar_rect := Rect2(root.hud.progress_bar.global_position, root.hud.progress_bar.size)
+	var bar_rect: Rect2 = root.hud.get_progress_visual_rect()
 	assert_float(anchor.x).is_less(bar_rect.position.x)
 	assert_float(anchor.x).is_greater(bar_rect.position.x - 40.0)
 	assert_float(absf(anchor.y - (bar_rect.position.y + bar_rect.size.y * 0.5))).is_less(0.1)

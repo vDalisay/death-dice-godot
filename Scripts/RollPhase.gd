@@ -1914,8 +1914,10 @@ func _burst_vertical_offset(effect_index: int) -> float:
 
 
 func _get_multiplier_vfx_anchor_global_position() -> Vector2:
-	if hud != null and hud.progress_bar != null:
-		return hud.progress_bar.global_position + Vector2(-MULTIPLIER_BURST_BAR_OFFSET, hud.progress_bar.size.y * 0.5)
+	if hud != null:
+		var progress_rect: Rect2 = hud.get_progress_visual_rect()
+		if progress_rect.size != Vector2.ZERO:
+			return progress_rect.position + Vector2(-MULTIPLIER_BURST_BAR_OFFSET, progress_rect.size.y * 0.5)
 	var arena_origin: Vector2 = _arena_viewport_container.global_position
 	var arena_size: Vector2 = _arena_viewport_container.size
 	return arena_origin + Vector2(MULTIPLIER_BURST_BAR_OFFSET, arena_size.y * 0.5)
