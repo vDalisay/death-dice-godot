@@ -6,6 +6,7 @@ extends Node2D
 
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const PhysicsDieScene: PackedScene = preload("res://Scenes/PhysicsDie.tscn")
+const DeerSkullDecorScript: GDScript = preload("res://Scripts/DeerSkullDecor.gd")
 
 signal all_dice_settled()
 signal die_clicked(die_index: int, is_kept: bool)
@@ -133,6 +134,7 @@ var instant_mode: bool = false
 func _ready() -> void:
 	_build_background()
 	_build_walls()
+	_build_deer_skulls()
 	_build_dice_bag()
 	_update_centering()
 	_refresh_popup_bounds_for_dice()
@@ -808,6 +810,21 @@ func _build_background() -> void:
 	_bg_panel.add_theme_stylebox_override("panel", _bg_style)
 	add_child(_bg_panel)
 	move_child(_bg_panel, 0)
+
+
+func _build_deer_skulls() -> void:
+	var positions: Array[Vector2] = [
+		Vector2(WALL_THICKNESS + 60.0, ARENA_HEIGHT * 0.5),
+		Vector2(ARENA_WIDTH - WALL_THICKNESS - 60.0, ARENA_HEIGHT * 0.5),
+		Vector2(ARENA_WIDTH * 0.5, WALL_THICKNESS + 50.0),
+		Vector2(ARENA_WIDTH * 0.35, ARENA_HEIGHT - WALL_THICKNESS - 40.0),
+		Vector2(ARENA_WIDTH * 0.65, ARENA_HEIGHT - WALL_THICKNESS - 40.0),
+	]
+	for i: int in positions.size():
+		var skull: Node2D = DeerSkullDecorScript.new()
+		skull.position = positions[i]
+		skull.flip_h = (i % 2 == 1)
+		add_child(skull)
 
 
 func _build_dice_bag() -> void:

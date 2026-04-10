@@ -199,7 +199,7 @@ func test_long_contract_text_does_not_push_side_panels_offscreen() -> void:
 	assert_float(contract_title_top_gap).is_less(40.0)
 	assert_float(risk_right).is_less_equal(viewport_width)
 	assert_float(contract_text.size.y).is_greater(0.0)
-	assert_int(contract_text.get_theme_font_size("font_size")).is_equal(14)
+	assert_int(contract_text.get_theme_font_size("font_size")).is_equal(28)
 
 
 func test_bank_button_starts_disabled() -> void:

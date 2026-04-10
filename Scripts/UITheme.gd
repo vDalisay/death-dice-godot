@@ -450,12 +450,12 @@ static func build_theme() -> Theme:
 
 	# -- Default font --
 	t.default_font = font_body()
-	t.default_font_size = 16
+	t.default_font_size = 18
 
 	# -- Label --
 	t.set_color("font_color", "Label", BRIGHT_TEXT)
 	t.set_font("font", "Label", font_body())
-	t.set_font_size("font_size", "Label", 16)
+	t.set_font_size("font_size", "Label", 18)
 
 	# -- Button --
 	var btn_normal := make_panel_stylebox(PANEL_SURFACE, CORNER_RADIUS_CARD, ACTION_CYAN, 2)
@@ -488,7 +488,7 @@ static func build_theme() -> Theme:
 	t.set_color("font_pressed_color", "Button", ACTION_CYAN)
 	t.set_color("font_disabled_color", "Button", MUTED_TEXT)
 	t.set_font("font", "Button", font_display())
-	t.set_font_size("font_size", "Button", 14)
+	t.set_font_size("font_size", "Button", 16)
 
 	# -- ProgressBar --
 	var pb_bg := make_panel_stylebox(ELEVATED, CORNER_RADIUS_BADGE)

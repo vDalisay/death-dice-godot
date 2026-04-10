@@ -231,64 +231,64 @@ func _apply_theme_styling() -> void:
 	_top_bar.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("header", _UITheme.CORNER_RADIUS_CARD, 1))
 	stage_label.add_theme_font_override("font", _UITheme.font_display())
-	stage_label.add_theme_font_size_override("font_size", 12)
+	stage_label.add_theme_font_size_override("font_size", 14)
 	stage_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
 	_rule_header_label.add_theme_font_override("font", _UITheme.font_mono())
-	_rule_header_label.add_theme_font_size_override("font_size", 12)
+	_rule_header_label.add_theme_font_size_override("font_size", 14)
 	_rule_header_label.add_theme_color_override("font_color", Color.WHITE)
 	gold_label.add_theme_font_override("font", _UITheme.font_stats())
-	gold_label.add_theme_font_size_override("font_size", 20)
+	gold_label.add_theme_font_size_override("font_size", 22)
 	gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
-	highscore_label.add_theme_font_size_override("font_size", 16)
+	highscore_label.add_theme_font_size_override("font_size", 18)
 	highscore_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 
 	# Modifier row + tooltip
 	_modifier_title.add_theme_font_override("font", _UITheme.font_display())
-	_modifier_title.add_theme_font_size_override("font_size", 10)
+	_modifier_title.add_theme_font_size_override("font_size", 12)
 	_modifier_title.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 	_modifier_tooltip.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1))
 	_modifier_tooltip_name_label.add_theme_font_override("font", _UITheme.font_display())
-	_modifier_tooltip_name_label.add_theme_font_size_override("font_size", 10)
+	_modifier_tooltip_name_label.add_theme_font_size_override("font_size", 12)
 	_modifier_tooltip_name_label.add_theme_color_override("font_color", _UITheme.STAGE_MAP_GLOW_CURRENT_ROW)
 	_modifier_tooltip_desc_label.add_theme_font_override("font", _UITheme.font_body())
-	_modifier_tooltip_desc_label.add_theme_font_size_override("font_size", 14)
+	_modifier_tooltip_desc_label.add_theme_font_size_override("font_size", 16)
 	_modifier_tooltip_desc_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
 	_feed_title.add_theme_font_override("font", _UITheme.font_display())
-	_feed_title.add_theme_font_size_override("font_size", 10)
+	_feed_title.add_theme_font_size_override("font_size", 12)
 	_feed_title.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 
 	# Turn score panel (HERO element)
 	_turn_score_panel.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_CARD, 2))
 	turn_score_label.add_theme_font_override("font", _UITheme.font_mono())
-	turn_score_label.add_theme_font_size_override("font_size", 16)
+	turn_score_label.add_theme_font_size_override("font_size", 18)
 	turn_score_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 	score_label.add_theme_font_override("font", _UITheme.font_stats())
-	score_label.add_theme_font_size_override("font_size", 52)
+	score_label.add_theme_font_size_override("font_size", 54)
 	score_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	score_label.add_theme_color_override("font_outline_color", Color("#06070C"))
 	score_label.add_theme_constant_override("outline_size", 6)
 	score_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_score_incoming_label.add_theme_font_override("font", _UITheme.font_stats())
-	_score_incoming_label.add_theme_font_size_override("font_size", 52)
+	_score_incoming_label.add_theme_font_size_override("font_size", 54)
 	_score_incoming_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	_score_incoming_label.add_theme_color_override("font_outline_color", Color("#06070C"))
 	_score_incoming_label.add_theme_constant_override("outline_size", 6)
 	_score_incoming_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_target_caption_label.add_theme_font_override("font", _UITheme.font_mono())
-	_target_caption_label.add_theme_font_size_override("font_size", 15)
+	_target_caption_label.add_theme_font_size_override("font_size", 17)
 	_target_caption_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 
 	# Progress panel
 	_progress_panel.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("board", _UITheme.CORNER_RADIUS_CARD, 1))
 	target_label.add_theme_font_override("font", _UITheme.font_stats())
-	target_label.add_theme_font_size_override("font_size", 32)
+	target_label.add_theme_font_size_override("font_size", 34)
 	target_label.add_theme_color_override("font_color", _UITheme.BRIGHT_TEXT)
 	target_label.add_theme_color_override("font_outline_color", Color("#06070C"))
 	target_label.add_theme_constant_override("outline_size", 4)
-	progress_hint_label.add_theme_font_size_override("font_size", 16)
+	progress_hint_label.add_theme_font_size_override("font_size", 18)
 	progress_hint_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	_recent_bank_chunk.add_theme_stylebox_override(
 		"panel",
@@ -297,7 +297,7 @@ func _apply_theme_styling() -> void:
 	_chunk_tooltip.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1))
 	_chunk_tooltip_label.add_theme_font_override("font", _UITheme.font_body())
-	_chunk_tooltip_label.add_theme_font_size_override("font_size", 13)
+	_chunk_tooltip_label.add_theme_font_size_override("font_size", 15)
 	_chunk_tooltip_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
 	for child: Node in _overflow_tip.get_children():
 		var crack_line: ColorRect = child as ColorRect
@@ -305,32 +305,32 @@ func _apply_theme_styling() -> void:
 			crack_line.color = _UITheme.SCORE_GOLD
 
 	# Info row
-	lives_label.add_theme_font_size_override("font_size", 18)
+	lives_label.add_theme_font_size_override("font_size", 20)
 	lives_label.add_theme_color_override("font_color", _UITheme.DANGER_RED)
 	_risk_meta_label.add_theme_font_override("font", _UITheme.font_mono())
-	_risk_meta_label.add_theme_font_size_override("font_size", 11)
+	_risk_meta_label.add_theme_font_size_override("font_size", 13)
 	_risk_meta_label.add_theme_color_override("font_color", _UITheme.MUTED_TEXT)
 	_contract_label.add_theme_font_override("font", _UITheme.font_mono())
-	_contract_label.add_theme_font_size_override("font_size", 11)
+	_contract_label.add_theme_font_size_override("font_size", 13)
 	_contract_label.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 	if _seed_label != null:
 		_seed_label.add_theme_font_override("font", _UITheme.font_mono())
-		_seed_label.add_theme_font_size_override("font_size", 11)
+		_seed_label.add_theme_font_size_override("font_size", 13)
 		_seed_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 	if _seed_copy_button != null:
 		_seed_copy_button.add_theme_font_override("font", _UITheme.font_mono())
-		_seed_copy_button.add_theme_font_size_override("font_size", 12)
+		_seed_copy_button.add_theme_font_size_override("font_size", 14)
 		_seed_copy_button.add_theme_color_override("font_color", _UITheme.ACTION_CYAN)
 		_seed_copy_button.custom_minimum_size = Vector2(24, 20)
 		_seed_copy_button.tooltip_text = "Copy seed"
 	_risk_tooltip.add_theme_stylebox_override("panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1))
 	_risk_tooltip_label.add_theme_font_override("font", _UITheme.font_body())
-	_risk_tooltip_label.add_theme_font_size_override("font_size", 13)
+	_risk_tooltip_label.add_theme_font_size_override("font_size", 15)
 	_risk_tooltip_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
 
 	# Status
-	status_label.add_theme_font_size_override("font_size", 18)
+	status_label.add_theme_font_size_override("font_size", 20)
 
 
 func _create_seed_label() -> void:

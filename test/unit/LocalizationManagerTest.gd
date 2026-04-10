@@ -24,19 +24,19 @@ func test_find_supported_locale_falls_back_to_language_code() -> void:
 	assert_str(_manager.find_supported_locale("zh-Hans", supported_locales)).is_equal("zh_CN")
 
 
-func test_resolve_initial_locale_prioritizes_saved_locale_over_steam_and_os() -> void:
+func test_resolve_initial_locale_uses_saved_user_preference_when_present() -> void:
 	var supported_locales: PackedStringArray = PackedStringArray(["en", "fr", "de"])
-	var resolved_locale: String = _manager.resolve_initial_locale("fr", "german", "en_US", supported_locales)
+	var resolved_locale: String = _manager.resolve_initial_locale("fr", supported_locales)
 	assert_str(resolved_locale).is_equal("fr")
 
 
-func test_resolve_initial_locale_defaults_to_english_when_no_saved_locale() -> void:
+func test_resolve_initial_locale_defaults_to_english_when_no_saved_preference_exists() -> void:
 	var supported_locales: PackedStringArray = PackedStringArray(["en", "de", "ja"])
-	var resolved_locale: String = _manager.resolve_initial_locale("", "japanese", "de_DE", supported_locales)
+	var resolved_locale: String = _manager.resolve_initial_locale("", supported_locales)
 	assert_str(resolved_locale).is_equal("en")
 
 
-func test_resolve_initial_locale_falls_back_to_default_when_no_source_matches() -> void:
+func test_resolve_initial_locale_falls_back_to_default_when_saved_preference_is_unsupported() -> void:
 	var supported_locales: PackedStringArray = PackedStringArray(["en", "fr"])
-	var resolved_locale: String = _manager.resolve_initial_locale("", "", "pl_PL", supported_locales)
+	var resolved_locale: String = _manager.resolve_initial_locale("pl_PL", supported_locales)
 	assert_str(resolved_locale).is_equal("en")

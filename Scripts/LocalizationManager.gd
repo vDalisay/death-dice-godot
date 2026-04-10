@@ -1,8 +1,6 @@
 extends Node
 ## Central locale selection and runtime switching.
 
-const SteamIntegrationScript: GDScript = preload("res://Scripts/SteamIntegration.gd")
-
 const DEFAULT_LOCALE: String = "en"
 const LOCALE_DISPLAY_NAMES: Dictionary = {
 	"en": "English",
@@ -21,12 +19,7 @@ func _ready() -> void:
 
 func apply_startup_locale() -> String:
 	var saved_locale: String = SaveManager.get_preferred_locale()
-	var resolved_locale: String = resolve_initial_locale(
-		saved_locale,
-		SteamIntegrationScript.get_current_game_language_api_code(),
-		OS.get_locale(),
-		SUPPORTED_LOCALES
-	)
+	var resolved_locale: String = resolve_initial_locale(saved_locale, SUPPORTED_LOCALES)
 	_apply_locale(resolved_locale, false)
 	return current_locale
 
@@ -71,8 +64,6 @@ func clear_preferred_locale() -> String:
 
 func resolve_initial_locale(
 	saved_locale: String,
-	_steam_api_language: String,
-	_os_locale: String,
 	supported_locales: PackedStringArray = SUPPORTED_LOCALES
 ) -> String:
 	var resolved_saved_locale: String = find_supported_locale(saved_locale, supported_locales)

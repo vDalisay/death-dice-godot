@@ -32,7 +32,7 @@ const META_HIGH_RISK_EXP_REWARD: int = 1
 const META_NEAR_DEATH_SHARD_REWARD: int = 1
 const RISK_TOWER_LIGHT_COUNT: int = 10
 const RISK_TOWER_STOP_DOT_COUNT: int = 4
-const CONTRACT_OVERLAY_WIDTH: float = 320.0
+const CONTRACT_OVERLAY_WIDTH: float = 420.0
 const RISK_TOWER_OVERLAY_WIDTH: float = 128.0
 const SURFACE_ENTER_DURATION: float = 0.14
 const SURFACE_EXIT_DURATION: float = 0.12
@@ -77,6 +77,7 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 @onready var settings_panel: PanelContainer = $SettingsPanel
 @onready var pause_menu: Control = $PauseMenu
 @onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay
+@onready var _contract_overlay_title_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractTitleLabel
 @onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
 @onready var _contract_overlay_text_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel
 @onready var _risk_tower_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/RiskTowerOverlay
@@ -1258,11 +1259,14 @@ func _apply_contract_overlay_theme() -> void:
 		"panel",
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
 	)
+	_contract_overlay_title_label.add_theme_font_override("font", _UITheme.font_display())
+	_contract_overlay_title_label.add_theme_font_size_override("font_size", 32)
+	_contract_overlay_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
 	_contract_overlay_check_label.add_theme_font_override("font", _UITheme.font_display())
-	_contract_overlay_check_label.add_theme_font_size_override("font_size", 14)
+	_contract_overlay_check_label.add_theme_font_size_override("font_size", 28)
 	_contract_overlay_check_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_contract_overlay_text_label.add_theme_font_override("font", _UITheme.font_mono())
-	_contract_overlay_text_label.add_theme_font_size_override("font_size", 14)
+	_contract_overlay_text_label.add_theme_font_size_override("font_size", 28)
 	_contract_overlay_text_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
 	_contract_overlay_text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_contract_overlay_text_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -1295,7 +1299,7 @@ func _build_risk_tower_stop_dots() -> void:
 		dot.text = "●"
 		dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		dot.add_theme_font_override("font", _UITheme.font_display())
-		dot.add_theme_font_size_override("font_size", 16)
+		dot.add_theme_font_size_override("font_size", 18)
 		dot.modulate = Color("#40252A")
 		_risk_tower_stop_dots_column.add_child(dot)
 		_risk_tower_stop_dots.append(dot)
@@ -1311,10 +1315,10 @@ func _apply_risk_tower_theme() -> void:
 		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
 	)
 	_risk_tower_title_label.add_theme_font_override("font", _UITheme.font_display())
-	_risk_tower_title_label.add_theme_font_size_override("font_size", 11)
+	_risk_tower_title_label.add_theme_font_size_override("font_size", 13)
 	_risk_tower_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
 	_risk_tower_percent_label.add_theme_font_override("font", _UITheme.font_mono())
-	_risk_tower_percent_label.add_theme_font_size_override("font_size", 28)
+	_risk_tower_percent_label.add_theme_font_size_override("font_size", 30)
 	_risk_tower_percent_label.add_theme_color_override("font_color", _UITheme.SUCCESS_GREEN)
 	_refresh_risk_tower(0.0, 0, "")
 
