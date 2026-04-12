@@ -22,6 +22,9 @@ const SHAKE_BIG_BANK: float = 4.0
 const CHAIN_SHAKE_BASE: float = 2.0
 const CHAIN_SHAKE_STEP: float = 0.5
 const CHAIN_SHAKE_DURATION: float = 0.1
+const EXPLODE_DISPLACEMENT_RADIUS: float = 118.0
+const AFTERSHOCK_RADIUS_BONUS: float = 24.0
+const CLUSTER_CHILD_OFFSET: float = 54.0
 const SCORE_ANIM_SPEEDUP_THRESHOLD: int = 6
 const SCORE_ANIM_SPEEDUP_PER_DIE: float = 0.06
 const SCORE_ANIM_BASE_INTERVAL_FLOOR: float = 0.05
@@ -95,6 +98,8 @@ var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
 var _die_reroll_counts: Array[int] = []
+var _was_displaced: Array[bool] = []
+var _cluster_child_flags: Array[bool] = []
 
 ## Running total of STOP faces rolled this turn. Only increases; resets on
 ## bank, bust, or new turn. Used for the accumulated bust check.
@@ -154,6 +159,7 @@ const RollResolutionServiceScript: GDScript = preload("res://Scripts/RollResolut
 const ContractProgressServiceScript: GDScript = preload("res://Scripts/ContractProgressService.gd")
 const StageFlowCoordinatorScript: GDScript = preload("res://Scripts/StageFlowCoordinator.gd")
 const FlowTransitionScript: GDScript = preload("res://Scripts/FlowTransition.gd")
+const ClusterDieHelperScript: GDScript = preload("res://Scripts/ClusterDieHelper.gd")
 const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
@@ -271,6 +277,10 @@ func _start_new_turn() -> void:
 	current_results.fill(null)
 	_die_reroll_counts.resize(count)
 	_die_reroll_counts.fill(0)
+	_was_displaced.resize(count)
+	_was_displaced.fill(false)
+	_cluster_child_flags.resize(count)
+	_cluster_child_flags.fill(false)
 	dice_stopped.resize(count)
 	dice_stopped.fill(false)
 	dice_keep.resize(count)
@@ -560,7 +570,7 @@ func _roll_all_dice() -> void:
 	_begin_roll_animation_lock()
 	_shake_screen(SHAKE_ROLL, 0.15)
 	# Throw all dice into the arena — faces are rolled inside throw_dice
-	dice_arena.throw_dice(GameManager.dice_pool)
+	dice_arena.throw_dice(_typed_dice_pool())
 	# Results will be processed when all_dice_settled signal fires
 
 func _reroll_selected_dice() -> void:
@@ -596,7 +606,7 @@ func _reroll_selected_dice() -> void:
 	if GameManager.has_modifier(RunModifier.ModifierType.RECYCLER):
 		GameManager.add_gold(rerolled.size())
 	_begin_roll_animation_lock()
-	dice_arena.reroll_dice(rerolled, GameManager.dice_pool)
+	dice_arena.reroll_dice(rerolled, _typed_dice_pool())
 	# Results will be processed when all_dice_settled signal fires
 
 
@@ -613,8 +623,8 @@ func _on_all_dice_settled() -> void:
 		if not dice_keep_locked[i]:
 			rolled_indices.append(i)
 	if rolled_indices.is_empty():
-		rolled_indices = range(GameManager.dice_pool.size()) as Array[int]
-	_process_roll_results(rolled_indices)
+		rolled_indices = _all_dice_indices()
+	_process_roll_results(_sort_indices_by_category_and_position(rolled_indices))
 
 
 ## Called when a collision reroll happens during the rolling phase (cosmetic only).
@@ -636,7 +646,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
 				dice_stopped[i] = true
 				dice_keep[i] = false
-			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.LUCK:
+			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.LUCK:
 				dice_keep[i] = true
 				dice_keep_locked[i] = true
 			DiceFaceData.FaceType.EXPLODE:
@@ -662,13 +672,14 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 				else:
 					SFXManager.play_stop_face()
 			if face and (face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD \
-					or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT \
+					or face.type == DiceFaceData.FaceType.MULTIPLY \
 					or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.EXPLODE \
 					or face.type == DiceFaceData.FaceType.LUCK):
 				die.pop()
 
-	# Accumulated bust check: add new stops from this roll to running total
-	accumulated_stop_count += _count_stops_in(rolled_indices)
+	# Recompute effective stops using proximity multipliers rather than a flat STOP count.
+	_maybe_spawn_cluster_children(rolled_indices)
+	accumulated_stop_count = _count_stops_in(_all_dice_indices())
 	_register_rolled_shields(rolled_indices)
 	var shield_count: int = _count_shields()
 	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
@@ -687,7 +698,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			turn_state = TurnState.ACTIVE
 		RollBustOutcome.INSURANCE_SAVE:
 			_consume_insurance_face(insurance_index)
-			_sync_arena_die_state(insurance_index)
+				accumulated_stop_count = _count_stops_in(_all_dice_indices())
 			turn_state = TurnState.BANKED
 			bank_streak = 0
 			_update_streak_display()
@@ -782,6 +793,10 @@ func _calculate_turn_score() -> int:
 	return _turn_score_service.calculate_turn_score(
 		current_results,
 		dice_stopped,
+		_get_die_positions(),
+		_get_multiplies_stops_flags(),
+		_was_displaced,
+		GameManager.has_modifier(RunModifier.ModifierType.SHRAPNEL),
 		GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON),
 		GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER),
 		GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE),
@@ -821,10 +836,170 @@ func _count_stops() -> int:
 ## Count stops only among the specified dice indices (per-roll bust check).
 ## CURSED_STOP counts as 2 stops.
 func _count_stops_in(indices: Array[int]) -> int:
-	return _get_roll_resolution_service().count_stops_in(indices, dice_stopped, current_results)
+	var effective_stop_counts: Array[int] = _turn_score_service.calculate_effective_stop_counts(
+		current_results,
+		dice_stopped,
+		_get_die_positions(),
+		_get_multiplies_stops_flags()
+	)
+	var total: int = 0
+	for index: int in indices:
+		if index < 0 or index >= effective_stop_counts.size():
+			continue
+		total += effective_stop_counts[index]
+	return total
 
 func _count_shields() -> int:
 	return accumulated_shield_count
+
+
+func _resolve_face_outcome(index: int, face: DiceFaceData, chain_targets: Array[int], allow_explode_chain: bool) -> void:
+	if index < 0 or index >= GameManager.dice_pool.size() or face == null:
+		return
+	current_results[index] = face
+	dice_stopped[index] = false
+	dice_keep[index] = false
+	dice_keep_locked[index] = false
+	match face.type:
+		DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
+			dice_stopped[index] = true
+		DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE, DiceFaceData.FaceType.LUCK:
+			dice_keep[index] = true
+			dice_keep_locked[index] = true
+			if allow_explode_chain and face.type == DiceFaceData.FaceType.EXPLODE:
+				chain_targets.append(index)
+	var die: PhysicsDie = dice_arena.get_die(index)
+	if die == null:
+		return
+	die.tumble(face)
+	if face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
+		die.play_stop_impact(face.type == DiceFaceData.FaceType.CURSED_STOP)
+	elif face.type == DiceFaceData.FaceType.EXPLODE:
+		die.play_explode_charge()
+		die.show_chain_label(1)
+	elif face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.LUCK]:
+		die.pop()
+	_sync_arena_die_state(index)
+
+
+func _is_displacement_immune(index: int) -> bool:
+	if index < 0 or index >= current_results.size():
+		return true
+	var face: DiceFaceData = current_results[index]
+	if face == null:
+		return false
+	if GameManager.has_modifier(RunModifier.ModifierType.HEAVY_DICE) and (dice_keep[index] or dice_keep_locked[index]):
+		return true
+	if GameManager.has_modifier(RunModifier.ModifierType.BLAST_SHIELD) and face.type == DiceFaceData.FaceType.SHIELD:
+		return true
+	if GameManager.has_modifier(RunModifier.ModifierType.ANCHORED_HEARTS) and face.type == DiceFaceData.FaceType.HEART:
+		return true
+	return false
+
+
+func _apply_explode_displacement(source_index: int, chain_targets: Array[int], touched_indices: Array[int], radius_bonus: float = 0.0) -> void:
+	var hit_indices: Array[int] = dice_arena.detonate_around(source_index, EXPLODE_DISPLACEMENT_RADIUS + radius_bonus)
+	var allow_sympathetic: bool = GameManager.has_modifier(RunModifier.ModifierType.SYMPATHETIC_DETONATION)
+	for hit_index: int in hit_indices:
+		if not touched_indices.has(hit_index):
+			touched_indices.append(hit_index)
+		if _is_displacement_immune(hit_index):
+			continue
+		_was_displaced[hit_index] = true
+		var hit_die_data: DiceData = GameManager.dice_pool[hit_index]
+		if hit_die_data != null and GameManager.has_modifier(RunModifier.ModifierType.SPARK_SCATTER) and hit_die_data.is_reroll_evolving():
+			_die_reroll_counts[hit_index] += 1
+		var new_face: DiceFaceData = hit_die_data.roll() if hit_die_data != null else null
+		_resolve_face_outcome(hit_index, new_face, chain_targets, allow_sympathetic)
+
+
+func _maybe_spawn_cluster_children(indices: Array[int]) -> void:
+	var pending: Array[int] = indices.duplicate()
+	while not pending.is_empty():
+		var index: int = pending.pop_front()
+		if index < 0 or index >= GameManager.dice_pool.size() or index >= current_results.size():
+			continue
+		if _cluster_child_flags[index]:
+			continue
+		var die_data: DiceData = GameManager.dice_pool[index]
+		var face: DiceFaceData = current_results[index]
+		if die_data == null or face == null or not die_data.is_cluster or face.type != DiceFaceData.FaceType.NUMBER:
+			continue
+		var max_depth: int = die_data.max_cluster_depth + GameManager.cluster_bonus_depth
+		if die_data.cluster_generation >= max_depth:
+			continue
+		var child_die: DiceData = ClusterDieHelperScript.build_child_die(die_data, face.value)
+		var child_face: DiceFaceData = child_die.roll()
+		var child_index: int = GameManager.dice_pool.size()
+		GameManager.add_dice(child_die)
+		current_results.append(child_face)
+		dice_stopped.append(false)
+		dice_keep.append(true)
+		dice_keep_locked.append(true)
+		_die_reroll_counts.append(0)
+		_was_displaced.append(false)
+		_cluster_child_flags.append(false)
+		var source_position: Vector2 = dice_arena.get_die_position(index)
+		var offset: Vector2 = Vector2(CLUSTER_CHILD_OFFSET, 0.0).rotated(GameManager.rng_randf("roll") * TAU)
+		dice_arena.spawn_settled_die(child_index, child_die, child_face, source_position + offset, true)
+		_cluster_child_flags[index] = true
+		pending.append(child_index)
+
+
+func _recompute_free_effect_totals() -> void:
+	accumulated_shield_count = 0
+	var shield_multiplier: int = 2 if GameManager.has_modifier(RunModifier.ModifierType.SHIELD_WALL) else 1
+	for i: int in GameManager.dice_pool.size():
+		var face: DiceFaceData = current_results[i]
+		if face != null and face.type == DiceFaceData.FaceType.SHIELD and not dice_stopped[i]:
+			accumulated_shield_count += face.value * shield_multiplier
+	accumulated_stop_count = _count_stops_in(_all_dice_indices())
+
+
+func _resolve_bust_after_free_effects() -> bool:
+	var shield_count: int = _count_shields()
+	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
+	var threshold: int = _get_bust_threshold()
+	var is_immune: bool = _bust_resolver.is_immune_turn(turn_number, GameManager.current_stage, int(GameManager.chosen_archetype))
+	var insurance_index: int = _find_insurance_face_index()
+	var bust_outcome: int = _get_roll_resolution_service().resolve_bust_outcome(
+		effective_stops,
+		threshold,
+		is_immune,
+		insurance_index,
+		GameManager.event_free_bust
+	)
+	match bust_outcome:
+		RollBustOutcome.SAFE, RollBustOutcome.IMMUNE_SAVE:
+			turn_state = TurnState.ACTIVE
+			return false
+		RollBustOutcome.INSURANCE_SAVE:
+			_consume_insurance_face(insurance_index)
+			_sync_arena_die_state(insurance_index)
+			turn_state = TurnState.BANKED
+			bank_streak = 0
+			_update_streak_display()
+			_push_feed_status("INSURANCE TRIGGERED! Bust canceled; turn score forfeited.", Color(0.4, 0.8, 1.0))
+			SFXManager.play_close_call()
+			_sync_buttons()
+			_schedule_auto_advance()
+			return true
+		RollBustOutcome.EVENT_SAVE:
+			if GameManager.consume_event_free_bust():
+				turn_state = TurnState.BANKED
+				bank_streak = 0
+				_update_streak_display()
+				_push_feed_status("GUARDIAN ANGEL! Bust absorbed — turn score forfeited.", Color(0.4, 0.8, 1.0))
+				SFXManager.play_close_call()
+				_sync_buttons()
+				_schedule_auto_advance()
+				return true
+			_apply_bust_outcome(effective_stops)
+			return true
+		RollBustOutcome.BUST:
+			_apply_bust_outcome(effective_stops)
+			return true
+	return false
 
 
 func _register_rolled_shields(indices: Array[int], play_feedback: bool = true) -> int:
@@ -936,49 +1111,23 @@ func _get_turn_multiplier() -> int:
 func _process_explode_chains(exploding_indices: Array[int]) -> void:
 	var chain_depth: int = 0
 	var to_reroll: Array[int] = exploding_indices.duplicate()
+	var touched_indices: Array[int] = exploding_indices.duplicate()
 	while not to_reroll.is_empty() and chain_depth < DiceData.MAX_CHAIN_ROLLS:
 		chain_depth += 1
 		var next_chain: Array[int] = []
 		for i: int in to_reroll:
-			# Unlock the die for chain reroll
+			var die: PhysicsDie = dice_arena.get_die(i)
 			dice_keep[i] = false
 			dice_keep_locked[i] = false
-			current_results[i] = GameManager.dice_pool[i].roll()
-			var face: DiceFaceData = current_results[i]
-			var die: PhysicsDie = dice_arena.get_die(i)
-			if face.type == DiceFaceData.FaceType.EXPLODE:
-				# Chain continues! Score and reroll again.
-				dice_keep[i] = true
-				dice_keep_locked[i] = true
-				if die:
-					_shake_screen(CHAIN_SHAKE_BASE + float(chain_depth) * CHAIN_SHAKE_STEP, CHAIN_SHAKE_DURATION)
-					die.play_explode_charge()
-					die.tumble(face)
-					die.pop()
-					die.show_chain_label(chain_depth)
-				next_chain.append(i)
-			elif face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
-				dice_stopped[i] = true
-				dice_keep[i] = false
-				accumulated_stop_count += _get_roll_resolution_service().stop_weight(face)
-				if die:
-					die.play_stop_impact(face.type == DiceFaceData.FaceType.CURSED_STOP)
-					die.tumble(face)
-					_sync_arena_die_state(i)
-			elif face.type == DiceFaceData.FaceType.AUTO_KEEP or face.type == DiceFaceData.FaceType.SHIELD or face.type == DiceFaceData.FaceType.MULTIPLY or face.type == DiceFaceData.FaceType.MULTIPLY_LEFT or face.type == DiceFaceData.FaceType.INSURANCE or face.type == DiceFaceData.FaceType.LUCK:
-				dice_keep[i] = true
-				dice_keep_locked[i] = true
-				if face.type == DiceFaceData.FaceType.SHIELD:
-					_register_rolled_shields([i], die != null)
-				if die:
-					die.tumble(face)
-					die.pop()
-			else:
-				if not dice_keep_locked[i]:
-					dice_keep[i] = false
-				if die:
-					die.tumble(face)
-					_sync_arena_die_state(i)
+			dice_stopped[i] = false
+			var face: DiceFaceData = GameManager.dice_pool[i].roll()
+			if die:
+				_shake_screen(CHAIN_SHAKE_BASE + float(chain_depth) * CHAIN_SHAKE_STEP, CHAIN_SHAKE_DURATION)
+				die.show_chain_label(chain_depth)
+			_resolve_face_outcome(i, face, next_chain, true)
+			_apply_explode_displacement(i, next_chain, touched_indices)
+			if GameManager.has_modifier(RunModifier.ModifierType.AFTERSHOCK):
+				_apply_explode_displacement(i, next_chain, touched_indices, AFTERSHOCK_RADIUS_BONUS)
 		to_reroll = next_chain
 
 	# Explosophile: after chains end, reroll 1 extra un-resolved die for free.
@@ -992,25 +1141,21 @@ func _process_explode_chains(exploding_indices: Array[int]) -> void:
 			if extra_index < 0:
 				extra_index = 0
 			var extra_i: int = candidates[extra_index]
-			current_results[extra_i] = GameManager.dice_pool[extra_i].roll()
-			var extra_face: DiceFaceData = current_results[extra_i]
-			var extra_die: PhysicsDie = dice_arena.get_die(extra_i)
-			if extra_face.type == DiceFaceData.FaceType.STOP or extra_face.type == DiceFaceData.FaceType.CURSED_STOP:
-				dice_stopped[extra_i] = true
-				accumulated_stop_count += _get_roll_resolution_service().stop_weight(extra_face)
-				if extra_die:
-					extra_die.play_stop_impact(extra_face.type == DiceFaceData.FaceType.CURSED_STOP)
-			elif extra_face.type in [DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE]:
-				dice_keep[extra_i] = true
-				dice_keep_locked[extra_i] = true
-				if extra_face.type == DiceFaceData.FaceType.SHIELD:
-					_register_rolled_shields([extra_i], extra_die != null)
-			if extra_die:
-				extra_die.tumble(extra_face)
-				_sync_arena_die_state(extra_i)
+			var extra_face: DiceFaceData = GameManager.dice_pool[extra_i].roll()
+			var extra_chain: Array[int] = []
+			_resolve_face_outcome(extra_i, extra_face, extra_chain, true)
+			_apply_explode_displacement(extra_i, extra_chain, touched_indices)
+			if not touched_indices.has(extra_i):
+				touched_indices.append(extra_i)
+
+	_maybe_spawn_cluster_children(touched_indices)
+	_recompute_free_effect_totals()
 
 	_sync_all_dice()
 	_sync_ui()
+	if _resolve_bust_after_free_effects():
+		_release_roll_animation_lock(POST_ROLL_EFFECT_LOCK_DURATION)
+		return
 
 	if chain_depth > 0:
 		SFXManager.play_explode(chain_depth)
@@ -1099,7 +1244,7 @@ func _estimate_next_reroll_bust_chance(effective_stops: int, threshold: int) -> 
 	return _risk_estimator.estimate_next_reroll_bust_chance(
 		effective_stops,
 		threshold,
-		GameManager.dice_pool,
+		_typed_dice_pool(),
 		dice_keep,
 		dice_keep_locked
 	)
@@ -1112,10 +1257,16 @@ func _estimate_bust_odds(effective_stops: int, threshold: int) -> float:
 		effective_stops,
 		threshold,
 		_reroll_count,
-		GameManager.dice_pool,
+		_typed_dice_pool(),
 		dice_keep,
 		dice_keep_locked
 	)
+
+
+func _typed_dice_pool() -> Array[DiceData]:
+	var pool: Array[DiceData] = []
+	pool.assign(GameManager.dice_pool)
+	return pool
 
 
 func _build_risk_details(
@@ -1173,7 +1324,7 @@ func _estimate_die_expected_value(die_data: DiceData) -> float:
 		match face.type:
 			DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.EXPLODE:
 				total_value += float(face.value)
-			DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+			DiceFaceData.FaceType.MULTIPLY:
 				total_value += float(maxi(1, face.value))
 			DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.LUCK, DiceFaceData.FaceType.HEART:
 				total_value += float(maxi(1, face.value)) * 0.6
@@ -1740,13 +1891,7 @@ func _play_score_count_animation(old_total: int, new_total: int) -> float:
 	for i: int in pool_size:
 		if per_die[i] > 0:
 			scoring_indices.append(i)
-	scoring_indices.sort_custom(func(a: int, b: int) -> bool:
-		var die_a: PhysicsDie = dice_arena.get_die(a)
-		var die_b: PhysicsDie = dice_arena.get_die(b)
-		var a_x: float = die_a.global_position.x if die_a else float(a)
-		var b_x: float = die_b.global_position.x if die_b else float(b)
-		return a_x < b_x
-	)
+	scoring_indices = _sort_indices_by_category_and_position(scoring_indices)
 
 	if scoring_indices.is_empty():
 		hud.animate_score_count(old_total, new_total)
@@ -1899,10 +2044,8 @@ func _play_multiply_face_vfx() -> void:
 		if face == null:
 			continue
 		if face.type == DiceFaceData.FaceType.MULTIPLY:
-			_spawn_multiplier_burst(anchor + Vector2(0.0, _burst_vertical_offset(effect_index)), face.value, false)
-			effect_index += 1
-		elif face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
-			_spawn_multiplier_burst(anchor + Vector2(0.0, _burst_vertical_offset(effect_index)), face.value, true)
+			var stop_amplifier: bool = i < GameManager.dice_pool.size() and GameManager.dice_pool[i] != null and GameManager.dice_pool[i].multiplies_stops
+			_spawn_multiplier_burst(anchor + Vector2(0.0, _burst_vertical_offset(effect_index)), face.value, stop_amplifier)
 			effect_index += 1
 
 
@@ -1921,7 +2064,7 @@ func _get_multiplier_vfx_anchor_global_position() -> Vector2:
 	return arena_origin + Vector2(MULTIPLIER_BURST_BAR_OFFSET, arena_size.y * 0.5)
 
 
-func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_multiplier: bool) -> void:
+func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_stop_multiplier: bool) -> void:
 	var fx_root := Node2D.new()
 	fx_root.name = "MultiplierBurstFx"
 	fx_root.top_level = true
@@ -1933,7 +2076,7 @@ func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_m
 	flame.amount = 36
 	flame.lifetime = MULTIPLIER_BURST_DURATION
 	flame.explosiveness = 0.82
-	flame.direction = Vector2.RIGHT if not is_left_multiplier else Vector2(0.9, -0.1)
+	flame.direction = Vector2.RIGHT if not is_stop_multiplier else Vector2(0.9, -0.1)
 	flame.spread = 34.0
 	flame.gravity = Vector2(0.0, -18.0)
 	flame.initial_velocity_min = 90.0
@@ -1941,7 +2084,7 @@ func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_m
 	flame.scale_amount_min = 1.4
 	flame.scale_amount_max = 2.6
 	var flame_gradient := Gradient.new()
-	var flame_color: Color = _UITheme.ROSE_ACCENT if is_left_multiplier else _UITheme.SCORE_GOLD
+	var flame_color: Color = _UITheme.ROSE_ACCENT if is_stop_multiplier else _UITheme.SCORE_GOLD
 	flame_gradient.set_color(0, Color(1.0, 0.98, 0.72, 0.95))
 	flame_gradient.add_point(0.45, flame_color)
 	flame_gradient.set_color(1, Color(flame_color.r, flame_color.g, flame_color.b, 0.0))
@@ -1949,7 +2092,7 @@ func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_m
 	fx_root.add_child(flame)
 
 	var tag := Label.new()
-	tag.text = "<x%d" % multiplier if is_left_multiplier else "x%d" % multiplier
+	tag.text = "x%d+STOP" % multiplier if is_stop_multiplier else "x%d" % multiplier
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	tag.position = Vector2(-28.0, -18.0)
@@ -1971,15 +2114,55 @@ func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_left_m
 	tween.tween_callback(fx_root.queue_free)
 
 
-## Compute effective per-die score contributions (after MULTIPLY_LEFT, with global multiplier).
+## Compute effective per-die score contributions after proximity multipliers.
 func _get_per_die_scores() -> Array[int]:
 	return _turn_score_service.calculate_per_die_scores(
 		current_results,
 		dice_stopped,
+		_get_die_positions(),
+		_get_multiplies_stops_flags(),
+		_was_displaced,
+		GameManager.has_modifier(RunModifier.ModifierType.SHRAPNEL),
 		GameManager.has_modifier(RunModifier.ModifierType.GLASS_CANNON),
 		GameManager.has_modifier(RunModifier.ModifierType.HIGH_ROLLER),
 		GameManager.has_modifier(RunModifier.ModifierType.OVERCHARGE)
 	)
+
+
+func _get_die_positions() -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	positions.resize(GameManager.dice_pool.size())
+	for i: int in GameManager.dice_pool.size():
+		var die: PhysicsDie = dice_arena.get_die(i)
+		positions[i] = die.global_position if die != null else Vector2(float(i) * PhysicsDie.DIE_SIZE, 0.0)
+	return positions
+
+
+func _get_multiplies_stops_flags() -> Array[bool]:
+	var flags: Array[bool] = []
+	flags.resize(GameManager.dice_pool.size())
+	for i: int in GameManager.dice_pool.size():
+		var die_data: DiceData = GameManager.dice_pool[i]
+		flags[i] = die_data != null and die_data.multiplies_stops
+	return flags
+
+
+func _sort_indices_by_category_and_position(indices: Array[int]) -> Array[int]:
+	var sorted_indices: Array[int] = indices.duplicate()
+	sorted_indices.sort_custom(func(a: int, b: int) -> bool:
+		var die_a_data: DiceData = GameManager.dice_pool[a] if a >= 0 and a < GameManager.dice_pool.size() else null
+		var die_b_data: DiceData = GameManager.dice_pool[b] if b >= 0 and b < GameManager.dice_pool.size() else null
+		var a_category: int = int(die_a_data.category) if die_a_data != null else int(DiceData.DieCategory.NORMAL)
+		var b_category: int = int(die_b_data.category) if die_b_data != null else int(DiceData.DieCategory.NORMAL)
+		if a_category != b_category:
+			return a_category < b_category
+		var die_a: PhysicsDie = dice_arena.get_die(a)
+		var die_b: PhysicsDie = dice_arena.get_die(b)
+		var a_x: float = die_a.global_position.x if die_a != null else float(a)
+		var b_x: float = die_b.global_position.x if die_b != null else float(b)
+		return a_x < b_x
+	)
+	return sorted_indices
 
 # ---------------------------------------------------------------------------
 # Juice overlays
@@ -2512,6 +2695,8 @@ func _build_roll_phase_state() -> Dictionary:
 		"dice_keep": dice_keep.duplicate(),
 		"dice_keep_locked": dice_keep_locked.duplicate(),
 		"die_reroll_counts": _die_reroll_counts.duplicate(),
+		"was_displaced": _was_displaced.duplicate(),
+		"cluster_child_flags": _cluster_child_flags.duplicate(),
 	}
 
 
@@ -2522,12 +2707,16 @@ func _build_turn_checkpoint_roll_phase_state() -> Dictionary:
 	var keep: Array = []
 	var keep_locked: Array = []
 	var reroll_counts: Array = []
+	var displaced: Array = []
+	var cluster_children: Array = []
 	for _i: int in dice_count:
 		empty_results.append({})
 		stopped.append(false)
 		keep.append(false)
 		keep_locked.append(false)
 		reroll_counts.append(0)
+		displaced.append(false)
+		cluster_children.append(false)
 	return {
 		"turn_state": int(TurnState.IDLE),
 		"turn_number": turn_number,
@@ -2546,6 +2735,8 @@ func _build_turn_checkpoint_roll_phase_state() -> Dictionary:
 		"dice_keep": keep,
 		"dice_keep_locked": keep_locked,
 		"die_reroll_counts": reroll_counts,
+		"was_displaced": displaced,
+		"cluster_child_flags": cluster_children,
 	}
 
 
@@ -2575,6 +2766,12 @@ func _restore_roll_phase_state(data: Dictionary) -> void:
 	_die_reroll_counts.clear()
 	for value: Variant in data.get("die_reroll_counts", []) as Array:
 		_die_reroll_counts.append(int(value))
+	_was_displaced.clear()
+	for value: Variant in data.get("was_displaced", []) as Array:
+		_was_displaced.append(bool(value))
+	_cluster_child_flags.clear()
+	for value: Variant in data.get("cluster_child_flags", []) as Array:
+		_cluster_child_flags.append(bool(value))
 
 	var expected_count: int = GameManager.dice_pool.size()
 	if current_results.size() != expected_count:
@@ -2587,6 +2784,10 @@ func _restore_roll_phase_state(data: Dictionary) -> void:
 		dice_keep_locked.resize(expected_count)
 	if _die_reroll_counts.size() != expected_count:
 		_die_reroll_counts.resize(expected_count)
+	if _was_displaced.size() != expected_count:
+		_was_displaced.resize(expected_count)
+	if _cluster_child_flags.size() != expected_count:
+		_cluster_child_flags.resize(expected_count)
 
 	_is_roll_animating = false
 	_roll_anim_nonce += 1
@@ -2676,6 +2877,10 @@ func _apply_turn_checkpoint_after_resume() -> void:
 	dice_keep_locked.fill(false)
 	_die_reroll_counts.resize(dice_count)
 	_die_reroll_counts.fill(0)
+	_was_displaced.resize(dice_count)
+	_was_displaced.fill(false)
+	_cluster_child_flags.resize(dice_count)
+	_cluster_child_flags.fill(false)
 	GameManager.set_held_stop_count(0)
 
 

@@ -1651,7 +1651,8 @@ func _spawn_overflow_droplets() -> void:
 
 
 func _refresh_modifier_display() -> void:
-	var active: Array[RunModifier] = GameManager.active_modifiers
+	var active: Array[RunModifier] = []
+	active.assign(GameManager.active_modifiers)
 	var current_types: Array[int] = []
 	for mod: RunModifier in active:
 		current_types.append(int(mod.modifier_type))

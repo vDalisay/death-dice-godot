@@ -24,6 +24,7 @@ enum ItemType {
 	HEAT_BET,
 	EVEN_ODD_BET,
 	BUY_SPARK_CHASER_DIE,
+	BUY_CLUSTER_DIE,
 }
 
 @export var item_name: String = ""
@@ -151,10 +152,19 @@ static func make_buy_spark_chaser_die() -> ShopItemData:
 	return item
 
 
+static func make_buy_cluster_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Cluster Die"
+	item.description = "Fractures into child dice on settle. (2, 2, 2, 4, 4, 6)"
+	item.cost = 60
+	item.item_type = ItemType.BUY_CLUSTER_DIE
+	return item
+
+
 static func make_upgrade_die() -> ShopItemData:
 	var item := ShopItemData.new()
 	item.item_name = "Empower Die"
-	item.description = "Upgrade the weakest face on a random die."
+	item.description = "Pick one die. All of its faces gain +1 up to their type caps."
 	item.cost = 30
 	item.item_type = ItemType.UPGRADE_DIE
 	return item

@@ -234,8 +234,6 @@ func _face_glyph(face_type: DiceFaceData.FaceType) -> String:
 			return "x"
 		DiceFaceData.FaceType.EXPLODE:
 			return _UITheme.GLYPH_EXPLODE
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return "<x"
 		DiceFaceData.FaceType.CURSED_STOP:
 			return _UITheme.GLYPH_CURSED
 		DiceFaceData.FaceType.INSURANCE:
@@ -263,8 +261,6 @@ func _face_accent(face_type: DiceFaceData.FaceType) -> Color:
 			return _UITheme.NEON_PURPLE
 		DiceFaceData.FaceType.EXPLODE:
 			return _UITheme.EXPLOSION_ORANGE
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return _UITheme.NEON_PURPLE
 		DiceFaceData.FaceType.CURSED_STOP:
 			return _UITheme.ROSE_ACCENT
 		DiceFaceData.FaceType.INSURANCE:

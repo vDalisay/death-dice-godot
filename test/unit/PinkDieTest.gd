@@ -9,14 +9,15 @@ func test_multiply_left_face_display() -> void:
 	var face := DiceFaceData.new()
 	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
 	face.value = 2
-	assert_str(face.get_display_text()).is_equal("←×2")
+	## MULTIPLY_LEFT normalizes to MULTIPLY on assignment; display text is now the same as MULTIPLY.
+	assert_str(face.get_display_text()).is_equal("x2")
 
 
 func test_multiply_left_face_display_value_3() -> void:
 	var face := DiceFaceData.new()
 	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
 	face.value = 3
-	assert_str(face.get_display_text()).is_equal("←×3")
+	assert_str(face.get_display_text()).is_equal("x3")
 
 
 # ---------------------------------------------------------------------------
@@ -46,11 +47,12 @@ func test_pink_d6_has_three_stops() -> void:
 	assert_int(die._count_stop_faces()).is_equal(3)
 
 
-func test_pink_d6_has_two_multiply_left_faces() -> void:
+func test_pink_d6_has_two_multiply_faces() -> void:
+	## Phase 3 replaced MULTIPLY_LEFT faces with MULTIPLY on the Pink D6.
 	var die: DiceData = DiceData.make_pink_d6()
 	var count: int = 0
 	for face: DiceFaceData in die.faces:
-		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
+		if face.type == DiceFaceData.FaceType.MULTIPLY:
 			count += 1
 	assert_int(count).is_equal(2)
 
@@ -109,10 +111,10 @@ func test_upgrade_pink_d6_targets_stop_not_multiply_left() -> void:
 	var die: DiceData = DiceData.make_pink_d6()
 	var result: bool = die.upgrade_weakest_face()
 	assert_bool(result).is_true()
-	# Should still have 2 MULTIPLY_LEFT faces (untouched — they're high power)
+	# Should still have 2 MULTIPLY faces (formerly MULTIPLY_LEFT — Phase 3 migration)
 	var ml_count: int = 0
 	for face: DiceFaceData in die.faces:
-		if face.type == DiceFaceData.FaceType.MULTIPLY_LEFT:
+		if face.type == DiceFaceData.FaceType.MULTIPLY:
 			ml_count += 1
 	assert_int(ml_count).is_equal(2)
 	# Should have lost one STOP (upgraded to BLANK)

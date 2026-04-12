@@ -3,8 +3,24 @@ extends Resource
 
 enum FaceType { NUMBER, BLANK, STOP, AUTO_KEEP, SHIELD, MULTIPLY, EXPLODE, MULTIPLY_LEFT, CURSED_STOP, INSURANCE, LUCK, HEART }
 
-@export var type: FaceType = FaceType.NUMBER
+var _type_value: FaceType = FaceType.NUMBER
+
+@export var type: FaceType:
+	get:
+		return _type_value
+	set(value):
+		_type_value = _normalize_type(value)
 @export var value: int = 0
+
+
+func _init() -> void:
+	_type_value = FaceType.NUMBER
+
+
+static func _normalize_type(value: FaceType) -> FaceType:
+	if value == FaceType.MULTIPLY_LEFT:
+		return FaceType.MULTIPLY
+	return value
 
 func get_display_text() -> String:
 	match type:
@@ -22,8 +38,6 @@ func get_display_text() -> String:
 			return "x%d" % value
 		FaceType.EXPLODE:
 			return "✦%d" % value
-		FaceType.MULTIPLY_LEFT:
-			return "←×%d" % value
 		FaceType.CURSED_STOP:
 			return "☠STOP"
 		FaceType.INSURANCE:

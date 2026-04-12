@@ -27,7 +27,9 @@ const CHASER_MIN_LOOP: int = 2
 const CHASER_MIN_LUCK: int = 2
 
 var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
+var _DiePickerOverlayScene: PackedScene = preload("res://Scenes/DiePickerOverlay.tscn")
 var _ShopItemCardScene: PackedScene = preload("res://Scenes/ShopItemCard.tscn")
+const DiceUpgradeServiceScript: GDScript = preload("res://Scripts/DiceUpgradeService.gd")
 const INSURANCE_BET_MIN_GOLD: int = 10
 const HEAT_BET_MIN_GOLD: int = 15
 const EVEN_ODD_BET_MIN_GOLD: int = 5
@@ -76,6 +78,7 @@ var _dd_used_this_shop: bool = false
 var _insurance_overlay: Node = null
 var _heat_overlay: Node = null
 var _even_odd_overlay: Node = null
+var _die_picker_overlay: Node = null
 var _ib_used_this_shop: bool = false
 var _hb_used_this_shop: bool = false
 var _eo_used_this_shop: bool = false
@@ -328,6 +331,7 @@ func _build_dice_offer_pool() -> Array[ShopItemData]:
 		ShopItemData.make_buy_heart_die(),
 		ShopItemData.make_buy_pink_die(),
 		ShopItemData.make_buy_fortune_die(),
+		ShopItemData.make_buy_cluster_die(),
 	]
 	if GameManager.current_loop >= CHASER_MIN_LOOP or GameManager.prestige_shop_tier_active:
 		dice_pool.append(ShopItemData.make_buy_runner_die())
@@ -589,8 +593,11 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 			GameManager.add_dice(DiceData.make_heart_d6())
 		ShopItemData.ItemType.BUY_SPARK_CHASER_DIE:
 			GameManager.add_dice(DiceData.make_reroll_chaser_d6())
+		ShopItemData.ItemType.BUY_CLUSTER_DIE:
+			GameManager.add_dice(DiceData.make_cluster_d6())
 		ShopItemData.ItemType.UPGRADE_DIE:
-			_upgrade_random_die()
+			_open_die_picker(item.cost)
+			return
 		ShopItemData.ItemType.BUY_MODIFIER:
 			if item.modifier != null:
 				GameManager.add_modifier(item.modifier)
@@ -612,14 +619,32 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 	_refresh_display()
 
 
-func _upgrade_random_die() -> void:
+func _open_die_picker(refund_cost: int) -> void:
 	if GameManager.dice_pool.is_empty():
+		GameManager.add_gold(refund_cost)
 		return
-	var die_index: int = GameManager.rng_pick_index("shop", GameManager.dice_pool.size())
-	if die_index < 0:
+	if _die_picker_overlay != null and is_instance_valid(_die_picker_overlay):
+		_die_picker_overlay.queue_free()
+	_die_picker_overlay = _DiePickerOverlayScene.instantiate()
+	add_child(_die_picker_overlay)
+	_die_picker_overlay.die_selected.connect(_on_die_picker_selected)
+	_die_picker_overlay.canceled.connect(_on_die_picker_canceled.bind(refund_cost))
+	var dice_pool: Array[DiceData] = []
+	dice_pool.assign(GameManager.dice_pool)
+	_die_picker_overlay.open(dice_pool)
+
+
+func _on_die_picker_selected(die_index: int) -> void:
+	if die_index < 0 or die_index >= GameManager.dice_pool.size():
 		return
-	var die: DiceData = GameManager.dice_pool[die_index]
-	die.upgrade_weakest_face()
+	var upgrade_service: RefCounted = DiceUpgradeServiceScript.new()
+	upgrade_service.upgrade_all_faces(GameManager.dice_pool[die_index], 1)
+	_refresh_display()
+
+
+func _on_die_picker_canceled(refund_cost: int) -> void:
+	GameManager.add_gold(refund_cost)
+	_refresh_display()
 
 
 # ---------------------------------------------------------------------------
@@ -694,20 +719,12 @@ func _get_upgrade_preview() -> String:
 		return tr("SHOP_NO_DICE_TO_UPGRADE")
 	var previews: Array[String] = []
 	for die: DiceData in GameManager.dice_pool:
-		var worst_index: int = -1
-		var worst_power: int = 999
-		for i: int in die.faces.size():
-			var power: int = die._face_power(die.faces[i])
-			if power < worst_power:
-				if die.faces[i].type == DiceFaceData.FaceType.STOP and die._count_stop_faces() <= 1:
-					continue
-				worst_power = power
-				worst_index = i
-		if worst_index >= 0:
-			var face_text: String = die.faces[worst_index].get_display_text()
-			var preview: String = "%s [%s]" % [die.dice_name, face_text]
-			if preview not in previews:
-				previews.append(preview)
+		var face_texts: Array[String] = []
+		for face: DiceFaceData in die.faces:
+			face_texts.append(face.get_display_text())
+		var preview: String = "%s [%s]" % [die.dice_name, ", ".join(face_texts)]
+		if preview not in previews:
+			previews.append(preview)
 	if previews.is_empty():
 		return tr("SHOP_NO_UPGRADEABLE_FACES")
 	return tr("SHOP_UPGRADE_PREVIEW_FMT").format({"candidates": ", ".join(previews)})

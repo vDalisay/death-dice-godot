@@ -9,7 +9,6 @@ const MAX_FACE_VALUE: int = 5
 const MAX_SHIELD_VALUE: int = 3
 const MAX_MULTIPLY_VALUE: int = 4
 const MAX_EXPLODE_VALUE: int = 5
-const MAX_MULTIPLY_LEFT_VALUE: int = 4
 const MAX_LUCK_VALUE: int = 3
 const MAX_HEART_VALUE: int = 3
 const MAX_CHAIN_ROLLS: int = 10
@@ -18,6 +17,7 @@ const DiceUpgradeServiceScript: GDScript = preload("res://Scripts/DiceUpgradeSer
 var _upgrade_service: RefCounted = DiceUpgradeServiceScript.new()
 
 enum Rarity { GREY, GREEN, BLUE, PURPLE }
+enum DieCategory { DISPLACEMENT, AMPLIFIER, DEFENSE, HEAL, SECURE, NORMAL }
 
 const RARITY_GREY_COLOR: Color = Color("#888888")
 const RARITY_GREEN_COLOR: Color = Color("#00E676")
@@ -28,6 +28,11 @@ const RARITY_PURPLE_COLOR: Color = Color("#7C3AED")
 @export var faces: Array[DiceFaceData] = []
 @export var custom_color: Color = Color.TRANSPARENT
 @export var rarity: Rarity = Rarity.GREY
+@export var category: DieCategory = DieCategory.NORMAL
+@export var multiplies_stops: bool = false
+@export var is_cluster: bool = false
+@export var cluster_generation: int = 0
+@export var max_cluster_depth: int = 0
 @export var reroll_family_id: String = ""
 @export var reroll_tier: int = 0
 @export var reroll_upgrade_thresholds: Array[int] = []
@@ -121,6 +126,11 @@ func _copy_from(source_die: DiceData) -> void:
 	dice_name = source_die.dice_name
 	custom_color = source_die.custom_color
 	rarity = source_die.rarity
+	category = source_die.category
+	multiplies_stops = source_die.multiplies_stops
+	is_cluster = source_die.is_cluster
+	cluster_generation = source_die.cluster_generation
+	max_cluster_depth = source_die.max_cluster_depth
 	reroll_family_id = source_die.reroll_family_id
 	reroll_tier = source_die.reroll_tier
 	reroll_upgrade_thresholds = source_die.reroll_upgrade_thresholds.duplicate()
@@ -140,6 +150,14 @@ func _count_stop_faces() -> int:
 	return _upgrade_service.count_stop_faces(faces)
 
 
+static func _append_faces(die: DiceData, configs: Array) -> void:
+	for config: Array in configs:
+		var face := DiceFaceData.new()
+		face.type = config[0]
+		face.value = config[1]
+		die.faces.append(face)
+
+
 # ---------------------------------------------------------------------------
 # Factory methods
 # ---------------------------------------------------------------------------
@@ -156,11 +174,7 @@ static func make_standard_d6() -> DiceData:
 		[DiceFaceData.FaceType.BLANK,     0],
 		[DiceFaceData.FaceType.STOP,      0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -168,6 +182,7 @@ static func make_lucky_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Lucky D6"
 	die.rarity = Rarity.GREEN
+	die.category = DieCategory.SECURE
 	var configs: Array = [
 		[DiceFaceData.FaceType.NUMBER,    2],
 		[DiceFaceData.FaceType.NUMBER,    2],
@@ -176,11 +191,7 @@ static func make_lucky_d6() -> DiceData:
 		[DiceFaceData.FaceType.NUMBER,    1],
 		[DiceFaceData.FaceType.STOP,      0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -188,6 +199,7 @@ static func make_shield_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Shield D6"
 	die.rarity = Rarity.GREY
+	die.category = DieCategory.DEFENSE
 	var configs: Array = [
 		[DiceFaceData.FaceType.SHIELD, 1],
 		[DiceFaceData.FaceType.SHIELD, 1],
@@ -196,11 +208,7 @@ static func make_shield_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,   0],
 		[DiceFaceData.FaceType.BLANK,  0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -208,6 +216,7 @@ static func make_heart_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Heart D6"
 	die.rarity = Rarity.GREEN
+	die.category = DieCategory.HEAL
 	var configs: Array = [
 		[DiceFaceData.FaceType.HEART,  1],
 		[DiceFaceData.FaceType.HEART,  1],
@@ -216,11 +225,7 @@ static func make_heart_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,   0],
 		[DiceFaceData.FaceType.BLANK,  0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -237,11 +242,7 @@ static func make_gambler_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,   0],
 		[DiceFaceData.FaceType.STOP,   0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -250,6 +251,7 @@ static func make_golden_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Golden D6"
 	die.rarity = Rarity.BLUE
+	die.category = DieCategory.AMPLIFIER
 	var configs: Array = [
 		[DiceFaceData.FaceType.AUTO_KEEP, 2],
 		[DiceFaceData.FaceType.AUTO_KEEP, 2],
@@ -258,11 +260,7 @@ static func make_golden_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,      0],
 		[DiceFaceData.FaceType.STOP,      0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -279,11 +277,7 @@ static func make_heavy_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,   0],
 		[DiceFaceData.FaceType.STOP,   0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -292,6 +286,7 @@ static func make_explosive_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Explosive D6"
 	die.rarity = Rarity.PURPLE
+	die.category = DieCategory.DISPLACEMENT
 	var configs: Array = [
 		[DiceFaceData.FaceType.EXPLODE, 2],
 		[DiceFaceData.FaceType.EXPLODE, 2],
@@ -300,11 +295,27 @@ static func make_explosive_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,    0],
 		[DiceFaceData.FaceType.STOP,    0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
+	return die
+
+
+static func make_cluster_d6() -> DiceData:
+	var die := DiceData.new()
+	die.dice_name = "Cluster D6"
+	die.rarity = Rarity.PURPLE
+	die.category = DieCategory.DISPLACEMENT
+	die.is_cluster = true
+	die.cluster_generation = 0
+	die.max_cluster_depth = 1
+	var configs: Array = [
+		[DiceFaceData.FaceType.NUMBER, 2],
+		[DiceFaceData.FaceType.NUMBER, 2],
+		[DiceFaceData.FaceType.NUMBER, 2],
+		[DiceFaceData.FaceType.NUMBER, 4],
+		[DiceFaceData.FaceType.NUMBER, 4],
+		[DiceFaceData.FaceType.NUMBER, 6],
+	]
+	_append_faces(die, configs)
 	return die
 
 
@@ -314,19 +325,17 @@ static func make_pink_d6() -> DiceData:
 	die.dice_name = "Pink D6"
 	die.custom_color = Color(1.0, 0.4, 0.7)
 	die.rarity = Rarity.PURPLE
+	die.category = DieCategory.AMPLIFIER
+	die.multiplies_stops = true
 	var configs: Array = [
-		[DiceFaceData.FaceType.MULTIPLY_LEFT, 2],
-		[DiceFaceData.FaceType.MULTIPLY_LEFT, 2],
+		[DiceFaceData.FaceType.MULTIPLY,      2],
+		[DiceFaceData.FaceType.MULTIPLY,      2],
 		[DiceFaceData.FaceType.STOP,          0],
 		[DiceFaceData.FaceType.STOP,          0],
 		[DiceFaceData.FaceType.STOP,          0],
 		[DiceFaceData.FaceType.BLANK,         0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -335,6 +344,7 @@ static func make_insurance_d6() -> DiceData:
 	var die := DiceData.new()
 	die.dice_name = "Insurance D6"
 	die.rarity = Rarity.BLUE
+	die.category = DieCategory.DEFENSE
 	var configs: Array = [
 		[DiceFaceData.FaceType.INSURANCE, 0],
 		[DiceFaceData.FaceType.NUMBER,    2],
@@ -343,11 +353,7 @@ static func make_insurance_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,      0],
 		[DiceFaceData.FaceType.STOP,      0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -364,11 +370,7 @@ static func make_fortune_d6() -> DiceData:
 		[DiceFaceData.FaceType.STOP,   0],
 		[DiceFaceData.FaceType.STOP,   0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -385,11 +387,7 @@ static func make_blank_canvas_d6() -> DiceData:
 		[DiceFaceData.FaceType.BLANK, 0],
 		[DiceFaceData.FaceType.STOP,  0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -410,6 +408,7 @@ static func get_all_known_dice() -> Array[DiceData]:
 		make_golden_d6(),
 		make_insurance_d6(),
 		make_explosive_d6(),
+		make_cluster_d6(),
 		make_pink_d6(),
 		make_fortune_d6(),
 	]
@@ -429,11 +428,7 @@ static func make_simple_d6() -> DiceData:
 		[DiceFaceData.FaceType.BLANK,  0],
 		[DiceFaceData.FaceType.BLANK,  0],
 	]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type  = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die
 
 
@@ -460,6 +455,7 @@ static func make_reroll_chaser_d6(tier: int = 0) -> DiceData:
 			die.dice_name = "Surge Chaser D6"
 			die.rarity = Rarity.GREEN
 			die.custom_color = Color("#2ED0C2")
+			die.category = DieCategory.NORMAL
 			die.reroll_tier = 1
 			configs = [
 				[DiceFaceData.FaceType.NUMBER, 2],
@@ -473,6 +469,7 @@ static func make_reroll_chaser_d6(tier: int = 0) -> DiceData:
 			die.dice_name = "Tempest Chaser D6"
 			die.rarity = Rarity.BLUE
 			die.custom_color = Color("#FF8A3D")
+			die.category = DieCategory.NORMAL
 			die.reroll_tier = 2
 			configs = [
 				[DiceFaceData.FaceType.NUMBER, 3],
@@ -482,9 +479,5 @@ static func make_reroll_chaser_d6(tier: int = 0) -> DiceData:
 				[DiceFaceData.FaceType.EXPLODE, 2],
 				[DiceFaceData.FaceType.STOP, 0],
 			]
-	for config: Array in configs:
-		var face := DiceFaceData.new()
-		face.type = config[0]
-		face.value = config[1]
-		die.faces.append(face)
+	_append_faces(die, configs)
 	return die

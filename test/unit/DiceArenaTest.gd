@@ -167,3 +167,41 @@ func test_large_pool_spawn_positions_stay_centered_and_in_bounds() -> void:
 
 	average_x /= float(positions.size())
 	assert_float(average_x).is_equal_approx(DiceArena.ARENA_WIDTH * 0.5, 0.1)
+
+
+func test_detonate_around_returns_hits_within_radius() -> void:
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 2
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(200.0, 200.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(240.0, 200.0))
+	_arena.spawn_settled_die(2, DiceData.make_standard_d6(), face, Vector2(420.0, 200.0))
+
+	var hit_indices: Array[int] = _arena.detonate_around(0, 70.0)
+
+	assert_bool(hit_indices.has(1)).is_true()
+	assert_bool(hit_indices.has(0)).is_false()
+	assert_bool(hit_indices.has(2)).is_false()
+
+
+func test_detonate_around_is_seed_reproducible_for_overlapping_dice() -> void:
+	GameManager.restore_run_identity("detonate-seed", true, 1)
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 2
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+
+	_arena.detonate_around(0, 80.0)
+	var first_position: Vector2 = _arena.get_die(1).position
+
+	_arena.reset()
+	GameManager.restore_run_identity("detonate-seed", true, 1)
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+
+	_arena.detonate_around(0, 80.0)
+	var second_position: Vector2 = _arena.get_die(1).position
+
+	assert_float(first_position.x).is_equal_approx(second_position.x, 0.001)
+	assert_float(first_position.y).is_equal_approx(second_position.y, 0.001)

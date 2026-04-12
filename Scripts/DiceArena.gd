@@ -54,6 +54,8 @@ const CONTAINMENT_INWARD_NUDGE: float = 54.0
 const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
+const GRAVITY_WELL_RADIUS: float = 90.0   ## matches TurnScoreService.MULTIPLY_RADIUS
+const GRAVITY_WELL_FORCE: float = 30.0    ## constant inward force per physics step (N)
 const PREVIEW_BOUNDS_PADDING: float = 10.0
 const MIN_ARENA_FIT_SCALE: float = 0.45
 
@@ -149,6 +151,8 @@ func _physics_process(_delta: float) -> void:
 	_apply_boundary_glow()
 	_enforce_arena_containment()
 	_apply_soft_separation()
+	if GameManager != null and GameManager.has_modifier(RunModifier.ModifierType.GRAVITY_WELL):
+		_apply_gravity_well_forces()
 	if not _settle_check_active:
 		return
 	# Check if all dice have settled
@@ -158,6 +162,29 @@ func _physics_process(_delta: float) -> void:
 	# All settled
 	_settle_check_active = false
 	all_dice_settled.emit()
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: GRAVITY_WELL — MULTIPLY-settled dice pull nearby FLYING dice inward
+# ---------------------------------------------------------------------------
+func _apply_gravity_well_forces() -> void:
+	for source: PhysicsDie in _dice:
+		if source.physics_state != PhysicsDie.DiePhysicsState.SETTLED:
+			continue
+		if source.current_face == null:
+			continue
+		if source.current_face.type != DiceFaceData.FaceType.MULTIPLY:
+			continue
+		var source_pos: Vector2 = source.global_position
+		for target: PhysicsDie in _dice:
+			if target == source:
+				continue
+			if target.physics_state != PhysicsDie.DiePhysicsState.FLYING:
+				continue
+			var diff: Vector2 = source_pos - target.global_position
+			if diff.length_squared() > GRAVITY_WELL_RADIUS * GRAVITY_WELL_RADIUS:
+				continue
+			target.apply_central_force(diff.normalized() * GRAVITY_WELL_FORCE)
 
 
 # ---------------------------------------------------------------------------
@@ -295,10 +322,18 @@ func get_die_position(index: int) -> Vector2:
 	return Vector2.ZERO
 
 
-func get_dice_in_radius(center: Vector2, radius: float) -> Array[int]:
+func _rng_randf(stream_name: String) -> float:
+	if GameManager != null and GameManager.has_method("rng_randf"):
+		return GameManager.rng_randf(stream_name)
+	return randf()
+
+
+func get_dice_in_radius(center: Vector2, radius: float, exclude_indices: Array[int] = []) -> Array[int]:
 	var result: Array[int] = []
 	var radius_sq: float = radius * radius
 	for die: PhysicsDie in _dice:
+		if die == null or exclude_indices.has(die.die_index):
+			continue
 		if die.global_position.distance_squared_to(center) <= radius_sq:
 			result.append(die.die_index)
 	return result
@@ -318,8 +353,59 @@ func get_die(index: int) -> PhysicsDie:
 	return null
 
 
+func detonate_around(center_index: int, radius: float, exclude_indices: Array[int] = []) -> Array[int]:
+	var source_die: PhysicsDie = get_die(center_index)
+	if source_die == null:
+		return []
+	var effective_excludes: Array[int] = exclude_indices.duplicate()
+	if not effective_excludes.has(center_index):
+		effective_excludes.append(center_index)
+	var hit_indices: Array[int] = get_dice_in_radius(source_die.global_position, radius, effective_excludes)
+	for hit_index: int in hit_indices:
+		var hit_die: PhysicsDie = get_die(hit_index)
+		if hit_die == null:
+			continue
+		var direction: Vector2 = (hit_die.global_position - source_die.global_position).normalized()
+		if direction == Vector2.ZERO:
+			direction = Vector2.RIGHT.rotated(_rng_randf("roll") * TAU)
+		var target_position: Vector2 = _clamp_to_arena(hit_die.position + direction * minf(radius * 0.55, 90.0))
+		hit_die.position = target_position
+		hit_die.play_displacement_hit(direction)
+	source_die.play_detonation(radius)
+	return hit_indices
+
+
+func spawn_settled_die(index: int, data: DiceData, face: DiceFaceData, position: Vector2, kept_locked: bool = true) -> void:
+	var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
+	add_child(die)
+	die.setup(index, data)
+	_apply_popup_bounds_to_die(die)
+	if index >= _dice.size():
+		_dice.resize(index + 1)
+	_dice[index] = die
+	die.toggled_keep.connect(_on_die_toggled)
+	die.shift_toggled_keep.connect(_on_die_shift_toggled)
+	die.collision_rerolled.connect(_on_die_collision_rerolled)
+	die.position = _clamp_to_arena(position)
+	die.current_face = face
+	die.show_face(face)
+	die.is_kept = kept_locked
+	die.is_keep_locked = kept_locked
+	die.freeze = true
+	die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+	die.pop()
+
+
 func get_die_count() -> int:
 	return _dice.size()
+
+
+func _clamp_to_arena(position: Vector2) -> Vector2:
+	var rect: Rect2 = get_arena_rect()
+	return Vector2(
+		clampf(position.x, rect.position.x + PhysicsDie.COLLISION_RADIUS, rect.end.x - PhysicsDie.COLLISION_RADIUS),
+		clampf(position.y, rect.position.y + PhysicsDie.COLLISION_RADIUS, rect.end.y - PhysicsDie.COLLISION_RADIUS)
+	)
 
 
 func reset() -> void:

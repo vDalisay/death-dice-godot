@@ -5,6 +5,10 @@ const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageCatalog.gd")
 const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 const RunSeedServiceScript: GDScript = preload("res://Scripts/RunSeedService.gd")
+const SpecialStageCatalog = SpecialStageCatalogScript
+const DiceData = preload("res://Scripts/DiceData.gd")
+const DiceFaceData = preload("res://Scripts/DiceFaceData.gd")
+const RunModifier = preload("res://Scripts/RunModifier.gd")
 
 const BASE_STAGE_HANDS: int = 5
 const MAX_LIVES: int = BASE_STAGE_HANDS
@@ -96,7 +100,7 @@ var stage_map: Resource = null
 var gold: int = 0
 var stage_target_score: int = INITIAL_CLASSIC_STAGE_TARGET
 var current_stage_variant: int = SpecialStageCatalogScript.Variant.NONE
-var dice_pool: Array[DiceData] = []
+var dice_pool: Array = []
 var total_stages_cleared: int = 0
 var best_turn_score: int = 0
 var run_busts: int = 0
@@ -104,12 +108,13 @@ var is_seeded_run: bool = false
 var run_seed_text: String = ""
 var run_seed_version: int = 1
 var has_resumable_run: bool = false
-var active_modifiers: Array[RunModifier] = []
+var active_modifiers: Array = []
 var chosen_archetype: Archetype = Archetype.CAUTION
 var run_mode: RunMode = RunMode.CLASSIC
 var luck: int = 0
 var current_run_exp: int = 0
 var current_run_stop_shards: int = 0
+var cluster_bonus_depth: int = 0
 var held_stop_count: int = 0
 var active_loop_contract_id: String = ""
 var active_loop_contract_progress: Dictionary = {}
@@ -462,7 +467,7 @@ func get_current_stage_variant_hover_text() -> String:
 	return SpecialStageCatalogScript.get_hover_text(current_stage_variant)
 
 
-func begin_stage_from_map(stage_node: MapNodeData = null) -> void:
+func begin_stage_from_map(stage_node = null) -> void:
 	var stage_variant: int = SpecialStageCatalogScript.Variant.NONE
 	if stage_node != null:
 		stage_variant = stage_node.stage_variant
@@ -533,7 +538,7 @@ func _build_starting_pool() -> void:
 			dice_pool.append(DiceData.make_shield_d6())
 
 
-func add_dice(die: DiceData) -> void:
+func add_dice(die) -> void:
 	dice_pool.append(die)
 
 
@@ -713,6 +718,7 @@ func reset_run() -> void:
 	luck = 0
 	current_run_exp = 0
 	current_run_stop_shards = 0
+	cluster_bonus_depth = 0
 	held_stop_count = 0
 	near_death_banks_this_stage = 0
 	near_death_banks_this_run = 0
@@ -865,17 +871,19 @@ func get_special_stage_clear_rewards(effective_stops: int, will_clear_stage: boo
 # Modifier helpers
 # ---------------------------------------------------------------------------
 
-func has_modifier(mod_type: RunModifier.ModifierType) -> bool:
-	for m: RunModifier in active_modifiers:
+func has_modifier(mod_type: int) -> bool:
+	for m in active_modifiers:
 		if m.modifier_type == mod_type:
 			return true
 	return false
 
 
-func add_modifier(modifier: RunModifier) -> bool:
+func add_modifier(modifier) -> bool:
 	if active_modifiers.size() >= MAX_MODIFIERS:
 		return false
 	active_modifiers.append(modifier)
+	if modifier.modifier_type == RunModifier.ModifierType.CLUSTER_RECURSION:
+		cluster_bonus_depth += 1
 	return true
 
 
@@ -1032,6 +1040,7 @@ func build_active_run_state() -> Dictionary:
 		"luck": luck,
 		"current_run_exp": current_run_exp,
 		"current_run_stop_shards": current_run_stop_shards,
+		"cluster_bonus_depth": cluster_bonus_depth,
 		"held_stop_count": held_stop_count,
 		"active_loop_contract_id": active_loop_contract_id,
 		"active_loop_contract_progress": active_loop_contract_progress.duplicate(true),
@@ -1088,6 +1097,7 @@ func apply_active_run_state(data: Dictionary) -> void:
 	luck = int(data.get("luck", 0))
 	current_run_exp = int(data.get("current_run_exp", 0))
 	current_run_stop_shards = int(data.get("current_run_stop_shards", 0))
+	cluster_bonus_depth = int(data.get("cluster_bonus_depth", 0))
 	held_stop_count = int(data.get("held_stop_count", 0))
 	active_loop_contract_id = str(data.get("active_loop_contract_id", ""))
 	active_loop_contract_progress = data.get("active_loop_contract_progress", {}) as Dictionary
@@ -1177,22 +1187,22 @@ func _ensure_seed_service_initialized() -> void:
 
 func _serialize_dice_pool() -> Array[Dictionary]:
 	var serialized: Array[Dictionary] = []
-	for die: DiceData in dice_pool:
+	for die in dice_pool:
 		serialized.append(_serialize_die(die))
 	return serialized
 
 
-func _deserialize_dice_pool(raw_data: Array) -> Array[DiceData]:
-	var deserialized: Array[DiceData] = []
+func _deserialize_dice_pool(raw_data: Array) -> Array:
+	var deserialized: Array = []
 	for die_data: Variant in raw_data:
 		if die_data is Dictionary:
 			deserialized.append(_deserialize_die(die_data as Dictionary))
 	return deserialized
 
 
-func _serialize_die(die: DiceData) -> Dictionary:
+func _serialize_die(die) -> Dictionary:
 	var faces_data: Array[Dictionary] = []
-	for face: DiceFaceData in die.faces:
+	for face in die.faces:
 		faces_data.append({
 			"type": int(face.type),
 			"value": face.value,
@@ -1202,6 +1212,11 @@ func _serialize_die(die: DiceData) -> Dictionary:
 		"faces": faces_data,
 		"custom_color": die.custom_color.to_html(true),
 		"rarity": int(die.rarity),
+		"category": int(die.category),
+		"multiplies_stops": die.multiplies_stops,
+		"is_cluster": die.is_cluster,
+		"cluster_generation": die.cluster_generation,
+		"max_cluster_depth": die.max_cluster_depth,
 		"reroll_family_id": die.reroll_family_id,
 		"reroll_tier": die.reroll_tier,
 		"reroll_upgrade_thresholds": die.reroll_upgrade_thresholds.duplicate(),
@@ -1209,11 +1224,16 @@ func _serialize_die(die: DiceData) -> Dictionary:
 	}
 
 
-func _deserialize_die(data: Dictionary) -> DiceData:
+func _deserialize_die(data: Dictionary):
 	var die := DiceData.new()
 	die.dice_name = str(data.get("dice_name", "Standard D6"))
 	die.custom_color = Color(str(data.get("custom_color", Color.TRANSPARENT.to_html(true))))
 	die.rarity = int(data.get("rarity", int(DiceData.Rarity.GREY))) as DiceData.Rarity
+	die.category = int(data.get("category", int(DiceData.DieCategory.NORMAL))) as DiceData.DieCategory
+	die.multiplies_stops = bool(data.get("multiplies_stops", false))
+	die.is_cluster = bool(data.get("is_cluster", false))
+	die.cluster_generation = int(data.get("cluster_generation", 0))
+	die.max_cluster_depth = int(data.get("max_cluster_depth", 0))
 	die.reroll_family_id = str(data.get("reroll_family_id", ""))
 	die.reroll_tier = int(data.get("reroll_tier", 0))
 	die.reroll_upgrade_thresholds.clear()
@@ -1235,26 +1255,26 @@ func _deserialize_die(data: Dictionary) -> DiceData:
 
 func _serialize_modifiers() -> Array[Dictionary]:
 	var serialized: Array[Dictionary] = []
-	for modifier: RunModifier in active_modifiers:
+	for modifier in active_modifiers:
 		serialized.append({
 			"type": int(modifier.modifier_type),
 		})
 	return serialized
 
 
-func _deserialize_modifiers(raw_data: Array) -> Array[RunModifier]:
-	var deserialized: Array[RunModifier] = []
+func _deserialize_modifiers(raw_data: Array) -> Array:
+	var deserialized: Array = []
 	for modifier_data: Variant in raw_data:
 		if not (modifier_data is Dictionary):
 			continue
 		var modifier_type: int = int((modifier_data as Dictionary).get("type", -1))
-		var modifier: RunModifier = _make_modifier_from_type(modifier_type)
+		var modifier = _make_modifier_from_type(modifier_type)
 		if modifier != null:
 			deserialized.append(modifier)
 	return deserialized
 
 
-func _make_modifier_from_type(modifier_type: int) -> RunModifier:
+func _make_modifier_from_type(modifier_type: int):
 	match modifier_type:
 		int(RunModifier.ModifierType.GAMBLERS_RUSH):
 			return RunModifier.make_gamblers_rush()
@@ -1282,4 +1302,26 @@ func _make_modifier_from_type(modifier_type: int) -> RunModifier:
 			return RunModifier.make_high_roller()
 		int(RunModifier.ModifierType.OVERCHARGE):
 			return RunModifier.make_overcharge()
+		int(RunModifier.ModifierType.BLAST_SHIELD):
+			return RunModifier.make_blast_shield()
+		int(RunModifier.ModifierType.ANCHORED_HEARTS):
+			return RunModifier.make_anchored_hearts()
+		int(RunModifier.ModifierType.HEAVY_DICE):
+			return RunModifier.make_heavy_dice()
+		int(RunModifier.ModifierType.AFTERSHOCK):
+			return RunModifier.make_aftershock()
+		int(RunModifier.ModifierType.SYMPATHETIC_DETONATION):
+			return RunModifier.make_sympathetic_detonation()
+		int(RunModifier.ModifierType.SHRAPNEL):
+			return RunModifier.make_shrapnel()
+		int(RunModifier.ModifierType.GRAVITY_WELL):
+			return RunModifier.make_gravity_well()
+		int(RunModifier.ModifierType.RUBBER_DICE):
+			return RunModifier.make_rubber_dice()
+		int(RunModifier.ModifierType.SPARK_SCATTER):
+			return RunModifier.make_spark_scatter()
+		int(RunModifier.ModifierType.CLUSTER_RECURSION):
+			return RunModifier.make_cluster_recursion()
+		int(RunModifier.ModifierType.EMPOWER_DIE):
+			return RunModifier.make_empower_die()
 	return null

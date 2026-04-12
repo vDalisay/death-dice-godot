@@ -20,6 +20,17 @@ enum ModifierType {
 	CHAIN_LIGHTNING,  ## 3+ kept dice with same value: each scores +3
 	HIGH_ROLLER,      ## NUMBER faces with value >= 4 score +3
 	OVERCHARGE,       ## EXPLODE faces score 2x their value
+	BLAST_SHIELD,     ## SHIELD faces immune to displacement
+	ANCHORED_HEARTS,  ## HEART faces immune to displacement
+	HEAVY_DICE,       ## Kept/locked dice resist displacement
+	AFTERSHOCK,       ## EXPLODE detonates itself a second time
+	SYMPATHETIC_DETONATION,
+	SHRAPNEL,
+	GRAVITY_WELL,
+	RUBBER_DICE,
+	SPARK_SCATTER,
+	CLUSTER_RECURSION,
+	EMPOWER_DIE,
 }
 
 @export var modifier_type: ModifierType = ModifierType.GAMBLERS_RUSH
@@ -64,6 +75,28 @@ static func badge_glyph_for_type(mod_type: ModifierType) -> String:
 			return "♦"
 		ModifierType.OVERCHARGE:
 			return "☢"
+		ModifierType.BLAST_SHIELD:
+			return "⛨"
+		ModifierType.ANCHORED_HEARTS:
+			return "♥"
+		ModifierType.HEAVY_DICE:
+			return "⬣"
+		ModifierType.AFTERSHOCK:
+			return "✹"
+		ModifierType.SYMPATHETIC_DETONATION:
+			return "✦"
+		ModifierType.SHRAPNEL:
+			return "✚"
+		ModifierType.GRAVITY_WELL:
+			return "◎"
+		ModifierType.RUBBER_DICE:
+			return "↺"
+		ModifierType.SPARK_SCATTER:
+			return "⚑"
+		ModifierType.CLUSTER_RECURSION:
+			return "◉"
+		ModifierType.EMPOWER_DIE:
+			return "+1"
 	return "?"
 
 
@@ -95,6 +128,28 @@ static func badge_color_for_type(mod_type: ModifierType) -> Color:
 			return _UITheme.NEON_PURPLE
 		ModifierType.OVERCHARGE:
 			return _UITheme.EXPLOSION_ORANGE
+		ModifierType.BLAST_SHIELD:
+			return _UITheme.ACTION_CYAN
+		ModifierType.ANCHORED_HEARTS:
+			return _UITheme.ROSE_ACCENT
+		ModifierType.HEAVY_DICE:
+			return _UITheme.BRIGHT_TEXT
+		ModifierType.AFTERSHOCK:
+			return _UITheme.EXPLOSION_ORANGE
+		ModifierType.SYMPATHETIC_DETONATION:
+			return _UITheme.EXPLOSION_ORANGE
+		ModifierType.SHRAPNEL:
+			return _UITheme.SCORE_GOLD
+		ModifierType.GRAVITY_WELL:
+			return _UITheme.NEON_PURPLE
+		ModifierType.RUBBER_DICE:
+			return _UITheme.SUCCESS_GREEN
+		ModifierType.SPARK_SCATTER:
+			return _UITheme.ACTION_CYAN
+		ModifierType.CLUSTER_RECURSION:
+			return _UITheme.NEON_PURPLE
+		ModifierType.EMPOWER_DIE:
+			return _UITheme.ACTION_CYAN
 	return _UITheme.MUTED_TEXT
 
 
@@ -219,6 +274,105 @@ static func make_overcharge() -> RunModifier:
 	return m
 
 
+static func make_blast_shield() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.BLAST_SHIELD
+	m.modifier_name = "Blast Shield"
+	m.description = "SHIELD faces are immune to displacement."
+	m.cost = 30
+	return m
+
+
+static func make_anchored_hearts() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.ANCHORED_HEARTS
+	m.modifier_name = "Anchored Hearts"
+	m.description = "HEART faces are immune to displacement."
+	m.cost = 25
+	return m
+
+
+static func make_heavy_dice() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.HEAVY_DICE
+	m.modifier_name = "Heavy Dice"
+	m.description = "Kept and locked dice resist displacement."
+	m.cost = 20
+	return m
+
+
+static func make_aftershock() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.AFTERSHOCK
+	m.modifier_name = "Aftershock"
+	m.description = "EXPLODE detonates itself a second time after displacing."
+	m.cost = 40
+	return m
+
+
+static func make_sympathetic_detonation() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.SYMPATHETIC_DETONATION
+	m.modifier_name = "Sympathetic Detonation"
+	m.description = "Displaced EXPLODE dice can join the chain."
+	m.cost = 45
+	return m
+
+
+static func make_shrapnel() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.SHRAPNEL
+	m.modifier_name = "Shrapnel"
+	m.description = "Displaced NUMBER faces score +1."
+	m.cost = 35
+	return m
+
+
+static func make_gravity_well() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.GRAVITY_WELL
+	m.modifier_name = "Gravity Well"
+	m.description = "Settled MULTIPLY dice tug nearby flying dice inward."
+	m.cost = 35
+	return m
+
+
+static func make_rubber_dice() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.RUBBER_DICE
+	m.modifier_name = "Rubber Dice"
+	m.description = "Collision rerolls roll twice and keep the better face."
+	m.cost = 25
+	return m
+
+
+static func make_spark_scatter() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.SPARK_SCATTER
+	m.modifier_name = "Spark Scatter"
+	m.description = "Displaced evolving dice gain extra reroll progress."
+	m.cost = 30
+	return m
+
+
+static func make_cluster_recursion() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.CLUSTER_RECURSION
+	m.modifier_name = "Cluster Recursion"
+	m.description = "Cluster children can spawn one generation deeper."
+	m.cost = 35
+	return m
+
+
+static func make_empower_die() -> RunModifier:
+	var m := RunModifier.new()
+	m.modifier_type = ModifierType.EMPOWER_DIE
+	m.modifier_name = "Empower Die"
+	m.description = "Shop Empower upgrades all faces on a selected die."
+	m.cost = 30
+	return m
+
+
 ## Returns all modifier factory methods for building the shop pool.
 static func all_factories() -> Array[Callable]:
 	return [
@@ -234,4 +388,15 @@ static func all_factories() -> Array[Callable]:
 		RunModifier.make_chain_lightning,
 		RunModifier.make_high_roller,
 		RunModifier.make_overcharge,
+		RunModifier.make_blast_shield,
+		RunModifier.make_anchored_hearts,
+		RunModifier.make_heavy_dice,
+		RunModifier.make_aftershock,
+		RunModifier.make_sympathetic_detonation,
+		RunModifier.make_shrapnel,
+		RunModifier.make_gravity_well,
+		RunModifier.make_rubber_dice,
+		RunModifier.make_spark_scatter,
+		RunModifier.make_cluster_recursion,
+		RunModifier.make_empower_die,
 	]
