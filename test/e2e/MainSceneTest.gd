@@ -215,7 +215,10 @@ func test_rolling_transitions_to_active() -> void:
 	var root: RollPhase = _get_root(runner)
 	# Click the Roll button.
 	root.roll_button.pressed.emit()
-	await runner.simulate_frames(2)
+	# Phase tween delays sum to ~1.2 s (incl. shields). Use simulate_frames
+	# with an explicit 100 ms delta so game time advances along with real time,
+	# ensuring tween callbacks (CLASSIFY → SHIELDS → BUST CHECK) fire.
+	await runner.simulate_frames(15, 100)
 	# After rolling, state should be ACTIVE (unless auto-bank happened).
 	var state: int = root.turn_state
 	assert_bool(
