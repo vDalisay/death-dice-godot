@@ -98,6 +98,7 @@ var turn_number: int = 0
 
 # Per-die state arrays (same length as GameManager.dice_pool).
 var current_results: Array[DiceFaceData] = []
+var _active_rolled_indices: Array[int] = []
 var dice_stopped: Array[bool] = []
 var dice_keep: Array[bool] = []
 var dice_keep_locked: Array[bool] = []
@@ -633,6 +634,7 @@ func _on_die_collision_rerolled(die_index: int, new_face: DiceFaceData) -> void:
 func _process_roll_results(rolled_indices: Array[int]) -> void:
 	if not rolled_indices.is_empty():
 		_begin_roll_animation_lock()
+	_active_rolled_indices = rolled_indices.duplicate()
 
 	# === DATA PHASE (synchronous) ===
 	var chain_reroll: Array[int] = _classify_rolled_dice(rolled_indices)
@@ -838,7 +840,7 @@ func _phase_bust_check() -> void:
 
 	# Sync non-rolled dice visuals.
 	for i: int in GameManager.dice_pool.size():
-		if i not in rolled_indices:
+		if i not in _active_rolled_indices:
 			_sync_arena_die_state(i)
 	GameManager.set_held_stop_count(_count_intentionally_held_stops())
 	_sync_ui()
@@ -852,13 +854,13 @@ func _phase_bust_check() -> void:
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
 		_push_feed_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
 		SFXManager.play_close_call()
-	elif effective_stops == 0 and rolled_indices.size() > 0:
+	elif effective_stops == 0 and _active_rolled_indices.size() > 0:
 		_push_feed_status("CLEAN ROLL! No stops!", Color(0.3, 1.0, 0.3))
 		SFXManager.play_clean_roll()
 
-	var roll_stop_count: int = _count_stops_in(rolled_indices)
+	var roll_stop_count: int = _count_stops_in(_active_rolled_indices)
 	if roll_stop_count > 0:
-		var has_cursed: bool = _get_roll_resolution_service().has_cursed_stop_in(rolled_indices, current_results)
+		var has_cursed: bool = _get_roll_resolution_service().has_cursed_stop_in(_active_rolled_indices, current_results)
 		_shake_screen(SHAKE_CURSED_STOP if has_cursed else SHAKE_STOP, 0.12 if has_cursed else 0.1)
 	var shielded: int = _get_roll_resolution_service().absorbed_stop_count(roll_stop_count, shield_count)
 	if shielded > 0:

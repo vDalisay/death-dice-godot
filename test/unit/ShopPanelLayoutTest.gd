@@ -130,6 +130,19 @@ func test_refresh_button_disables_at_zero_gold() -> void:
 	assert_bool(refresh_button.disabled).is_true()
 
 
+func test_continue_button_resets_enabled_on_reopen() -> void:
+	GameManager.reset_run()
+	GameManager.add_gold(30)
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+	panel.open(1, false)
+	var continue_button: Button = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/FooterRow/ContinueButton") as Button
+	continue_button.disabled = true
+	panel.open(2, false)
+	assert_bool(continue_button.disabled).is_false()
+
+
 func test_expensive_cards_dim_when_gold_is_zero() -> void:
 	GameManager.reset_run()
 	GameManager.gold = 0

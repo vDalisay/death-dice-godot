@@ -116,6 +116,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	GameManager.on_shop_entered()
 	_current_stage_cleared = stage_just_cleared
 	_current_is_loop_complete = is_loop_complete
+	_continue_button.disabled = false
 	_dd_used_this_shop = false
 	_ib_used_this_shop = false
 	_hb_used_this_shop = false
@@ -130,6 +131,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 
 
 func open_from_resume(snapshot: Dictionary) -> void:
+	_continue_button.disabled = false
 	_dd_used_this_shop = bool(snapshot.get("dd_used_this_shop", false))
 	_ib_used_this_shop = bool(snapshot.get("ib_used_this_shop", false))
 	_hb_used_this_shop = bool(snapshot.get("hb_used_this_shop", false))
