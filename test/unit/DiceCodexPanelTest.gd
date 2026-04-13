@@ -121,7 +121,7 @@ func test_face_tile_long_text_stays_contained() -> void:
 	add_child(panel)
 	await await_idle_frame()
 	var face: DiceFaceData = DiceFaceData.new()
-	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
+	face.type = DiceFaceData.FaceType.MULTIPLY
 	face.value = 999
 	var tile: PanelContainer = panel._build_face_tile(face, true)
 	auto_free(tile)

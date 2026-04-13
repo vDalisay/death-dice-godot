@@ -1,0 +1,370 @@
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:17)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:30)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:18)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:18)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:45)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:48)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:70)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:73)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:96)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:99)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:123)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:126)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:143)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:146)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:171)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:187)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:190)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:210)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:218)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:221)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:248)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:251)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:275)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:278)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:285)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:294)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:301)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:304)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:321)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:328)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:336)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:339)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not parse global class "RollPhase" from "res://Scripts/RollPhase.gd".
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:354)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:357)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:382)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+SCRIPT ERROR: Parse Error: Could not resolve class "RollPhase", because of a parser error.
+   at: GDScript::reload (res://test/e2e/Phase1JuiceTest.gd:391)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)
+ERROR: Failed to load script "res://test/e2e/Phase1JuiceTest.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript.cpp:2907)
+   GDScript backtrace (most recent call first):
+       [0] load_with_disabled_warnings (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:214)
+       [1] _load_is_test_suite (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:129)
+       [2] scan (res://addons/gdUnit4/src/core/GdUnitTestSuiteScanner.gd:50)
+       [3] discover_tests (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:401)
+       [4] init_gd_unit (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:386)
+       [5] init_runner (res://addons/gdUnit4/src/core/runners/GdUnitTestCIRunner.gd:121)
+       [6] _process (res://addons/gdUnit4/src/core/runners/GdUnitTestSessionRunner.gd:115)

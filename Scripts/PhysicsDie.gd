@@ -108,7 +108,6 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 	4: "◆",     # SHIELD
 	5: "×",     # MULTIPLY
 	6: "✦",     # EXPLODE
-	7: "←×",    # MULTIPLY_LEFT (kept for save-compat; normalizes to MULTIPLY)
 	8: "☠",     # CURSED_STOP
 	9: "!",     # INSURANCE
 	10: "🍀",   # LUCK
@@ -410,10 +409,6 @@ func play_multiply_vfx(multiplier: int) -> void:
 	_play_radial_effect(_UITheme.SCORE_GOLD, "x%d" % multiplier)
 
 
-func play_multiply_left_vfx(multiplier: int) -> void:
-	_play_radial_effect(_UITheme.ROSE_ACCENT, "STOP x%d" % multiplier)
-
-
 func play_displacement_hit(direction: Vector2) -> void:
 	var burst: CPUParticles2D = ParticlePool.acquire(self)
 	if burst != null:
@@ -437,6 +432,35 @@ func play_detonation(radius: float) -> void:
 	_spawn_explode_burst()
 	_spawn_explode_ring(radius)
 	_play_radial_effect(_UITheme.EXPLOSION_ORANGE, "%dpx" % int(radius))
+
+
+func detonate(radius: float, siblings: Array[PhysicsDie] = []) -> Array[int]:
+	var targets: Array[PhysicsDie] = siblings
+	if targets.is_empty() and get_parent() != null:
+		for child: Node in get_parent().get_children():
+			if child is PhysicsDie:
+				targets.append(child as PhysicsDie)
+	var affected: Array[int] = []
+	for die: PhysicsDie in targets:
+		if die == null or die == self or not is_instance_valid(die):
+			continue
+		var direction: Vector2 = die.global_position - global_position
+		var distance: float = direction.length()
+		if distance > radius:
+			continue
+		if direction == Vector2.ZERO:
+			direction = Vector2.RIGHT.rotated(randf() * TAU)
+		else:
+			direction = direction / distance
+		var falloff: float = lerpf(1.0, 0.35, clampf(distance / maxf(radius, 1.0), 0.0, 1.0))
+		die.set_physics_state(DiePhysicsState.FLYING)
+		die._settle_timer = 0.0
+		die.apply_central_impulse(direction * DETONATE_IMPULSE * falloff)
+		die.angular_velocity += randf_range(-4.0, 4.0)
+		die.play_displacement_hit(direction)
+		affected.append(die.die_index)
+	play_detonation(radius)
+	return affected
 
 
 func play_stop_impact(is_cursed: bool) -> void:

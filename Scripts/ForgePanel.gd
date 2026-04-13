@@ -95,7 +95,9 @@ func _on_forge_pressed() -> void:
 	await _play_sacrifice_animation()
 
 	# Sort descending so removal doesn't shift earlier indices.
-	var sorted: Array[int] = _selected_indices.duplicate()
+	var sorted: Array[int] = []
+	for index: int in _selected_indices:
+		sorted.append(index)
 	sorted.sort()
 	sorted.reverse()
 

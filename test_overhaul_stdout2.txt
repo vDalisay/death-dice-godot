@@ -1,0 +1,132 @@
+Godot Engine v4.6.1.stable.mono.official.14d19694e - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 3070
+
+[2J[H[38;2;233;150;122m
+--------------------------------------------------------------------------------------------------
+GdUnit4 Comandline Tool
+--------------------------------------------------------------------------------------------------[0m
+[38;2;100;149;237mInstalling GdUnit4 session system hooks.[0m
+[38;2;100;149;237mSession hook 'GdUnitHtmlTestReporter' installed.[0m
+[38;2;100;149;237mSession hook 'GdUnitXMLTestReporter' installed.[0m
+[38;2;0;206;209mRun Test Suite: [0m[38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_starts_empty[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_starts_empty[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 20ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_rect_dimensions[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_rect_dimensions[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 17ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_throw_dice_creates_correct_count[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_throw_dice_creates_correct_count[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 20ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_get_die_returns_correct_die[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_get_die_returns_correct_die[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 16ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_get_die_out_of_bounds_returns_null[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_get_die_out_of_bounds_returns_null[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 16ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_get_results_returns_faces[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_get_results_returns_faces[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 16ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_reset_clears_all_dice[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_reset_clears_all_dice[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 16ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_lock_die_freezes_physics[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_lock_die_freezes_physics[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 16ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_constants_are_sensible[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_constants_are_sensible[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 17ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_centers_in_viewport[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_centers_in_viewport[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 18ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_scales_down_to_fit_small_viewport[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_arena_scales_down_to_fit_small_viewport[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 30ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_throw_dice_spread_avoids_overlap[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_throw_dice_spread_avoids_overlap[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 46ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_large_pool_spawn_positions_stay_centered_and_in_bounds[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_large_pool_spawn_positions_stay_centered_and_in_bounds[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 12ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_detonate_around_returns_hits_within_radius[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_detonate_around_returns_hits_within_radius[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 18ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_detonate_around_is_seed_reproducible_for_overlapping_dice[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/DiceArenaTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_detonate_around_is_seed_reproducible_for_overlapping_dice[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 15ms[0m
+[38;2;250;235;215m[0m
+[38;2;30;144;255mStatistics:[0m[38;2;250;235;215m 15 test cases | 0 errors | 0 failures | 0 flaky | 0 skipped | 0 orphans |[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 382ms[0m
+[38;2;250;235;215m[0m
+[38;2;250;235;215m[0m
+[38;2;0;206;209mRun Test Suite: [0m[38;2;250;235;215mres://test/unit/ClusterDieHelperTest.gd[0m
+  [38;2;250;235;215mres://test/unit/ClusterDieHelperTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_build_child_faces_splits_parent_value_into_halves_and_quarters[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/ClusterDieHelperTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_build_child_faces_splits_parent_value_into_halves_and_quarters[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/ClusterDieHelperTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_build_child_die_inherits_cluster_metadata_and_increments_generation[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/ClusterDieHelperTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_build_child_die_inherits_cluster_metadata_and_increments_generation[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+[38;2;30;144;255mStatistics:[0m[38;2;250;235;215m 2 test cases | 0 errors | 0 failures | 0 flaky | 0 skipped | 0 orphans |[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 18ms[0m
+[38;2;250;235;215m[0m
+[38;2;250;235;215m[0m
+[38;2;0;206;209mRun Test Suite: [0m[38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_normalizes_display[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_normalizes_display[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_display_value_3[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_display_value_3[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_six_faces[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_six_faces[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_name[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_name[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_custom_color[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_custom_color[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_three_stops[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_three_stops[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_two_multiply_faces[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_two_multiply_faces[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_one_blank[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_one_blank[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_stop_face[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_d6_has_stop_face[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_standard_d6_has_no_custom_color[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_standard_d6_has_no_custom_color[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 4ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_power_equals_multiply_tier[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_power_equals_multiply_tier[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_power_higher_than_auto_keep[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_deprecated_multiply_left_power_higher_than_auto_keep[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_upgrade_pink_d6_targets_stop_not_multiply[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_upgrade_pink_d6_targets_stop_not_multiply[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 4ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_upgrade_preserves_last_stop_on_pink_d6[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_upgrade_preserves_last_stop_on_pink_d6[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_die_shop_item[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_die_shop_item[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 5ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_die_shop_item_has_description[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_pink_die_shop_item_has_description[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_all_dice_including_pink_have_at_least_one_stop[0m[38;2;34;139;34m STARTED[0m[38;2;250;235;215m[0m
+  [38;2;250;235;215mres://test/unit/PinkDieTest.gd[0m[38;2;250;235;215m > [0m[38;2;250;235;215mtest_all_dice_including_pink_have_at_least_one_stop[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 3ms[0m
+[38;2;250;235;215m[0m
+[38;2;30;144;255mStatistics:[0m[38;2;250;235;215m 17 test cases | 0 errors | 0 failures | 0 flaky | 0 skipped | 0 orphans |[0m[38;2;34;139;34m PASSED[0m[38;2;100;149;237m 134ms[0m
+[38;2;250;235;215m[0m
+[38;2;250;235;215m[0m
+[38;2;30;144;255mOverall Summary:[0m[38;2;255;255;255m 34 test cases | 0 errors | 0 failures | 0 flaky | 0 skipped | 0 orphans |[0m
+[38;2;233;150;122mExecuted test suites: (3/3)[0m
+[38;2;233;150;122mExecuted test cases : (34/34)[0m
+[38;2;233;150;122mTotal execution time: 534ms[0m
+[38;2;255;255;255m [0m[38;2;100;149;237mOpen XML Report at: file://C:/Users/Home/Documents/death-dice.worktrees/dice-mechanics-overhaul/reports/report_15/results.xml[0m
+[38;2;100;149;237mOpen HTML Report at: file://C:/Users/Home/Documents/death-dice.worktrees/dice-mechanics-overhaul/reports/report_15/index.html[0m
+[38;2;233;150;122mExit code: 0[0m
+Finallize .. done

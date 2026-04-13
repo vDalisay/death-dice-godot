@@ -181,6 +181,50 @@ static func make_buy_modifier(mod: RunModifier) -> ShopItemData:
 	return item
 
 
+static func make_blast_shield_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_blast_shield())
+
+
+static func make_anchored_hearts_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_anchored_hearts())
+
+
+static func make_heavy_dice_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_heavy_dice())
+
+
+static func make_aftershock_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_aftershock())
+
+
+static func make_sympathetic_detonation_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_sympathetic_detonation())
+
+
+static func make_shrapnel_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_shrapnel())
+
+
+static func make_gravity_well_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_gravity_well())
+
+
+static func make_rubber_dice_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_rubber_dice())
+
+
+static func make_spark_scatter_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_spark_scatter())
+
+
+static func make_cluster_recursion_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_cluster_recursion())
+
+
+static func make_empower_die_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_empower_die())
+
+
 static func make_cleanse_curse() -> ShopItemData:
 	var item := ShopItemData.new()
 	item.item_name = "Cleanse Curse"

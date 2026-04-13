@@ -333,6 +333,7 @@ func _build_dice_offer_pool() -> Array[ShopItemData]:
 		ShopItemData.make_buy_heart_die(),
 		ShopItemData.make_buy_pink_die(),
 		ShopItemData.make_buy_fortune_die(),
+		ShopItemData.make_buy_explosive_die(),
 		ShopItemData.make_buy_cluster_die(),
 	]
 	if GameManager.current_loop >= CHASER_MIN_LOOP or GameManager.prestige_shop_tier_active:
@@ -340,7 +341,6 @@ func _build_dice_offer_pool() -> Array[ShopItemData]:
 		dice_pool.append(ShopItemData.make_buy_golden_die())
 		dice_pool.append(ShopItemData.make_buy_insurance_die())
 		dice_pool.append(ShopItemData.make_buy_heavy_die())
-		dice_pool.append(ShopItemData.make_buy_explosive_die())
 	if _can_offer_spark_chaser_die():
 		dice_pool.append(ShopItemData.make_buy_spark_chaser_die())
 	return dice_pool

@@ -1,19 +1,19 @@
 extends GdUnitTestSuite
-## Unit tests for the Pink Die and MULTIPLY_LEFT face type.
+## Unit tests for the Pink Die and multiply face migration behavior.
 
 # ---------------------------------------------------------------------------
-# DiceFaceData — MULTIPLY_LEFT display
+# DiceFaceData — deprecated type normalization
 # ---------------------------------------------------------------------------
 
-func test_multiply_left_face_display() -> void:
+func test_deprecated_multiply_left_normalizes_display() -> void:
 	var face := DiceFaceData.new()
 	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
 	face.value = 2
-	## MULTIPLY_LEFT normalizes to MULTIPLY on assignment; display text is now the same as MULTIPLY.
+	## Deprecated MULTIPLY_LEFT normalizes to MULTIPLY on assignment.
 	assert_str(face.get_display_text()).is_equal("x2")
 
 
-func test_multiply_left_face_display_value_3() -> void:
+func test_deprecated_multiply_left_display_value_3() -> void:
 	var face := DiceFaceData.new()
 	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
 	face.value = 3
@@ -77,10 +77,10 @@ func test_standard_d6_has_no_custom_color() -> void:
 
 
 # ---------------------------------------------------------------------------
-# DiceData — face power ordering for MULTIPLY_LEFT
+# DiceData — face power ordering for multiply tier
 # ---------------------------------------------------------------------------
 
-func test_multiply_left_power_equals_multiply_tier() -> void:
+func test_deprecated_multiply_left_power_equals_multiply_tier() -> void:
 	var die := DiceData.new()
 	var ml := DiceFaceData.new()
 	ml.type = DiceFaceData.FaceType.MULTIPLY_LEFT
@@ -92,7 +92,7 @@ func test_multiply_left_power_equals_multiply_tier() -> void:
 	assert_int(die._face_power(ml)).is_equal(die._face_power(mult))
 
 
-func test_multiply_left_power_higher_than_auto_keep() -> void:
+func test_deprecated_multiply_left_power_higher_than_auto_keep() -> void:
 	var die := DiceData.new()
 	var ml := DiceFaceData.new()
 	ml.type = DiceFaceData.FaceType.MULTIPLY_LEFT
@@ -104,10 +104,10 @@ func test_multiply_left_power_higher_than_auto_keep() -> void:
 
 
 # ---------------------------------------------------------------------------
-# DiceData — upgrade system with MULTIPLY_LEFT
+# DiceData — upgrade system with multiply faces
 # ---------------------------------------------------------------------------
 
-func test_upgrade_pink_d6_targets_stop_not_multiply_left() -> void:
+func test_upgrade_pink_d6_targets_stop_not_multiply() -> void:
 	var die: DiceData = DiceData.make_pink_d6()
 	var result: bool = die.upgrade_weakest_face()
 	assert_bool(result).is_true()
