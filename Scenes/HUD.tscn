@@ -86,7 +86,18 @@ size_flags_horizontal = 3
 
 [node name="TurnScorePanel" type="PanelContainer" parent="ScoreRow/ScoreObjectiveCenter"]
 layout_mode = 2
-custom_minimum_size = Vector2(520, 0)
+custom_minimum_size = Vector2(1040, 0)
+
+[node name="CounterStreakSlot" type="Control" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel"]
+layout_mode = 1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -90.0
+offset_top = -6.0
+offset_right = 90.0
+offset_bottom = 54.0
+grow_horizontal = 2
+mouse_filter = 2
 
 [node name="TurnScoreMargin" type="MarginContainer" parent="ScoreRow/ScoreObjectiveCenter/TurnScorePanel"]
 layout_mode = 2

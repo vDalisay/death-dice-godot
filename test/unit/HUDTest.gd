@@ -410,6 +410,7 @@ func test_progress_bar_snaps_when_score_decreases() -> void:
 	hud._refresh_progress_display()
 	assert_object(hud._progress_tween).is_null()
 	assert_float(hud.progress_bar.value).is_equal(20.0)
+	assert_float(hud._score_fill_rect.size.x).is_equal(hud.get_progress_visual_rect().size.x * 0.2)
 
 
 func test_score_feedback_defers_score_signal_until_finished() -> void:
@@ -470,11 +471,10 @@ func test_recent_bank_chunk_matches_progress_bar_height_and_centering() -> void:
 	hud._recent_bank_amount = 40
 	hud._show_recent_bank_chunk(0, 40, HUD.OverflowState.NONE)
 	await get_tree().process_frame
-	assert_float(hud._recent_bank_chunk.size.y).is_equal(hud.progress_bar.size.y)
-	assert_float(absf(hud._recent_bank_chunk.position.y - hud.progress_bar.position.y)).is_less(0.1)
-	var top_padding: float = hud._recent_bank_chunk.position.y
-	var bottom_padding: float = hud.progress_track.size.y - (hud._recent_bank_chunk.position.y + hud._recent_bank_chunk.size.y)
-	assert_float(absf(top_padding - bottom_padding)).is_less(0.1)
+	var progress_rect: Rect2 = hud.get_progress_visual_rect()
+	assert_float(hud._recent_bank_chunk.size.y).is_equal(progress_rect.size.y)
+	assert_float(hud._recent_bank_chunk.position.y).is_equal(0.0)
+	assert_float(hud._recent_bank_chunk.size.x).is_greater(0.0)
 
 
 func test_overflow_crack_state_activates_when_bank_exceeds_target() -> void:
@@ -559,6 +559,26 @@ func test_turn_score_panel_has_gold_border() -> void:
 	assert_int(sb.border_width_left).is_greater(0)
 
 
+func test_score_panel_fill_width_matches_progress_ratio() -> void:
+	GameManager.total_score = 0
+	GameManager.stage_target_score = 100
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	hud._set_progress_bar_value(35.0)
+	await get_tree().process_frame
+	var progress_rect: Rect2 = hud.get_progress_visual_rect()
+	assert_float(hud._score_fill_rect.size.x).is_equal(progress_rect.size.x * 0.35)
+	assert_float(hud._score_fill_rect.size.y).is_equal(progress_rect.size.y)
+
+
+func test_progress_panel_hidden_after_counter_merge() -> void:
+	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
+	add_child(hud)
+	await await_idle_frame()
+	assert_bool(hud._progress_panel.visible).is_false()
+
+
 func test_stage_label_uses_display_font() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
@@ -614,11 +634,11 @@ func test_set_active_combos_renders_combo_badges() -> void:
 	assert_int(combo_container.get_child_count()).is_equal(2)
 
 
-func test_hud_has_streak_slot_in_progress_tile() -> void:
+func test_hud_has_streak_slot_on_score_counter() -> void:
 	var hud: HUD = auto_free(HUDScene.instantiate()) as HUD
 	add_child(hud)
 	await await_idle_frame()
-	var slot: Control = hud.get_node("ScoreRow/ProgressPanel/ProgressMargin/ProgressVBox/ProgressContentRow/StreakSlot") as Control
+	var slot: Control = hud.get_node("ScoreRow/ScoreObjectiveCenter/TurnScorePanel/CounterStreakSlot") as Control
 	assert_object(slot).is_not_null()
 
 
