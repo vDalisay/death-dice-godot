@@ -438,14 +438,6 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	var chain_reroll: Array[int] = _classify_rolled_dice(rolled_indices)
 	accumulated_stop_count += _count_stops_in(rolled_indices)
 	_register_rolled_shields(rolled_indices, false)
-	var shield_count: int = _count_shields()
-	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
-	var threshold: int = _get_bust_threshold()
-	var is_immune: bool = _bust_resolver.is_immune_turn(turn_number, GameManager.current_stage, int(GameManager.chosen_archetype))
-	var insurance_index: int = _find_insurance_face_index()
-	var bust_outcome: int = _get_roll_resolution_service().resolve_bust_outcome(
-		effective_stops, threshold, is_immune, insurance_index, GameManager.event_free_bust
-	)
 	# Sync non-rolled dice and UI state upfront.
 	for i: int in GameManager.dice_pool.size():
 		if i not in rolled_indices:
@@ -455,6 +447,7 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 	# Pre-compute roll-level data for visual phases.
 	var roll_stop_count: int = _count_stops_in(rolled_indices)
 	var has_cursed: bool = _get_roll_resolution_service().has_cursed_stop_in(rolled_indices, current_results)
+	var shield_count: int = _count_shields()
 	var shielded: int = _get_roll_resolution_service().absorbed_stop_count(roll_stop_count, shield_count)
 
 	# === VISUAL PHASE (tween-based, left-to-right) ===
@@ -491,13 +484,11 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		)
 		_phase_tween.tween_callback(SFXManager.play_shield_absorb)
 
-	# Phase 4: BUST STATUS — apply outcome + status messages, start chains or complete.
-	_phase_tween.tween_callback(
-		_apply_phased_bust_result.bind(
-			bust_outcome, effective_stops, threshold, is_immune,
-			insurance_index, rolled_indices, chain_reroll
-		)
-	).set_delay(PHASE_BUST_DELAY)
+	# Phase 4: EXPLODES then BUST CHECK — chains fire before verdict.
+	if not chain_reroll.is_empty():
+		_phase_tween.tween_callback(_process_explode_chains.bind(chain_reroll)).set_delay(PHASE_BUST_DELAY)
+	else:
+		_phase_tween.tween_callback(_phase_bust_check).set_delay(PHASE_BUST_DELAY)
 
 
 ## Classify each rolled die into stopped/kept/explode. Returns indices needing chain rerolls.
@@ -608,16 +599,16 @@ func _play_shield_activation(shield_index: int) -> void:
 		die.play_shield_absorb()
 
 
-## Apply bust outcome, show status messages, then start chains or complete the phase.
-func _apply_phased_bust_result(
-	bust_outcome: int,
-	effective_stops: int,
-	threshold: int,
-	is_immune: bool,
-	insurance_index: int,
-	rolled_indices: Array[int],
-	chain_reroll: Array[int],
-) -> void:
+## Phase 5 — evaluate accumulated stops after ALL effects and apply bust verdict.
+func _phase_bust_check() -> void:
+	var shield_count: int = _count_shields()
+	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
+	var threshold: int = _get_bust_threshold()
+	var is_immune: bool = _bust_resolver.is_immune_turn(turn_number, GameManager.current_stage, int(GameManager.chosen_archetype))
+	var insurance_index: int = _find_insurance_face_index()
+	var bust_outcome: int = _get_roll_resolution_service().resolve_bust_outcome(
+		effective_stops, threshold, is_immune, insurance_index, GameManager.event_free_bust
+	)
 	match bust_outcome:
 		RollBustOutcome.SAFE, RollBustOutcome.IMMUNE_SAVE:
 			turn_state = TurnState.ACTIVE
@@ -653,13 +644,9 @@ func _apply_phased_bust_result(
 	elif effective_stops == threshold - 1 and threshold > 1 and turn_number > 1:
 		hud.show_status("CLOSE CALL! One more stop and you bust!", Color(1.0, 0.6, 0.0))
 		SFXManager.play_close_call()
-	elif effective_stops == 0 and rolled_indices.size() > 0:
+	elif effective_stops == 0:
 		hud.show_status("CLEAN ROLL! No stops!", Color(0.3, 1.0, 0.3))
 		SFXManager.play_clean_roll()
-
-	if turn_state == TurnState.ACTIVE and not chain_reroll.is_empty():
-		_process_explode_chains(chain_reroll)
-		return
 
 	_phase_complete()
 
@@ -940,7 +927,7 @@ func _finish_explode_chains(chain_depth: int) -> void:
 	_sync_ui()
 	if chain_depth > 0:
 		SFXManager.play_explode(chain_depth)
-	_phase_complete()
+	_phase_bust_check()
 func _check_roll_combos() -> void:
 	if turn_state != TurnState.ACTIVE:
 		return

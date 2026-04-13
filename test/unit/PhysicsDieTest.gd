@@ -250,10 +250,12 @@ func test_tumble_sets_pending_face_and_clears_on_settle() -> void:
 	_die.linear_velocity = Vector2(5.0, 0.0)  # Below settle threshold
 	_die._settle_timer = PhysicsDie.SETTLE_TIME_REQUIRED - 0.01
 	_die._physics_process(0.02)
-	# Die should have settled and resolved pending face.
+	# Die should have settled and pending face cleared.
+	# current_face is NOT set here — the phase tween calls _reveal_die_face()
+	# asynchronously after all dice settle, which then calls show_face().
+	# In real use, DiceArena always sets die.current_face before tumble().
 	assert_int(_die.physics_state).is_equal(PhysicsDie.DiePhysicsState.SETTLED)
 	assert_object(_die._pending_face).is_null()
-	assert_object(_die.current_face).is_same(face)
 
 
 func test_setup_resets_pending_face() -> void:

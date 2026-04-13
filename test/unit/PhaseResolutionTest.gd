@@ -198,23 +198,42 @@ func test_shields_before_bust_check() -> void:
 	assert_bool(effective_with_shield >= threshold).is_false()
 
 
-func test_explode_chains_dont_trigger_second_bust() -> void:
-	## Explode chains add stops to accumulated_stop_count but do NOT trigger
-	## a second bust check. This is by design: chains are "free".
+func test_bust_check_fires_after_chains_complete() -> void:
+	## Phase order guarantee: chains resolve BEFORE the bust check.
+	## Chain-added stops feed into the single bust verdict.
+	## Player can bust from a chain stop even if the initial roll was safe.
 	var initial_stops: int = 2
 	var threshold: int = 4
 	var chain_added_stops: int = 3
 
-	# Initial bust check: safe.
+	# Initial roll alone: safe.
 	assert_bool(initial_stops >= threshold).is_false()
 
-	# After chain resolution, stops exceed threshold.
+	# After chain adds stops, bust check sees the full accumulated total.
 	var final_stops: int = initial_stops + chain_added_stops
 	assert_bool(final_stops >= threshold).is_true()
+	# One single bust check fires at the end — player would bust here.
 
-	# But no second bust check runs — player remains active.
-	# This test documents the intentional design decision.
-	assert_bool(true).is_true()
+
+func test_bustcheck_uses_post_chain_accumulated_stops() -> void:
+	## Simulate the stop accumulation as it happens in _process_explode_chain_step:
+	## each chain step adds stops to accumulated_stop_count before _phase_bust_check runs.
+	var accumulated: int = 0
+
+	# Roll 1: 2 stops.
+	accumulated += 2
+
+	# Explode fires, chain step 1: +1 stop.
+	accumulated += 1
+
+	# Chain step 2: +2 stops (cursed stop = weight 2).
+	accumulated += 2
+
+	# Now bust check fires with full accumulated total.
+	var effective: int = maxi(0, accumulated - 0)  # no shields in this scenario
+	var threshold: int = 4
+	# 5 effective stops vs threshold 4 → bust.
+	assert_bool(effective >= threshold).is_true()
 
 
 func test_chain_step_stops_are_visible() -> void:

@@ -886,8 +886,8 @@ func _set_random_glyph() -> void:
 
 func _resolve_pending_face() -> void:
 	if _pending_face:
-		show_face(_pending_face)
-		pop()
+		# Face display and VFX handled by RollPhase's phase tween (_reveal_die_face).
+		# Only clear the pending state so the die stops cycling random glyphs.
 		_pending_face = null
 
 
