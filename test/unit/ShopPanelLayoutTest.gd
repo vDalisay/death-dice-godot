@@ -211,6 +211,19 @@ func test_dice_offer_pool_surfaces_spark_chaser_only_when_gate_passes() -> void:
 			assert_str(item.item_name).is_equal("Spark Chaser Die")
 
 
+func test_dice_offer_pool_includes_explosive_die_in_loop_1_without_gate() -> void:
+	GameManager.reset_run()
+	var panel: ShopPanel = auto_free(ShopPanelScene.instantiate()) as ShopPanel
+	add_child(panel)
+	await await_idle_frame()
+
+	GameManager.current_loop = 1
+	GameManager.prestige_shop_tier_active = false
+	GameManager.luck = 0
+	var offer_pool: Array[ShopItemData] = panel._build_dice_offer_pool()
+	assert_bool(_pool_has_item_type(offer_pool, ShopItemData.ItemType.BUY_EXPLOSIVE_DIE)).is_true()
+
+
 func test_buying_spark_chaser_adds_base_tier_and_preserves_evolution_identity() -> void:
 	GameManager.reset_run()
 	GameManager.add_gold(200)

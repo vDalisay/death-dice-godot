@@ -63,8 +63,8 @@ func test_per_die_scores_simple_numbers() -> void:
 	assert_int(scores[4]).is_equal(4)
 
 
-func test_per_die_scores_with_multiply_left() -> void:
-	## MULTIPLY_LEFT should multiply the left neighbor's score.
+func test_per_die_scores_with_multiply() -> void:
+	## MULTIPLY should multiply nearby dice scores.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
@@ -75,22 +75,22 @@ func test_per_die_scores_with_multiply_left() -> void:
 
 	_force_clean_state(root)
 	root.current_results[0] = _make_face(DiceFaceData.FaceType.NUMBER, 5)
-	root.current_results[1] = _make_face(DiceFaceData.FaceType.MULTIPLY_LEFT, 2)
+	root.current_results[1] = _make_face(DiceFaceData.FaceType.MULTIPLY, 2)
 	root.current_results[2] = _make_face(DiceFaceData.FaceType.NUMBER, 3)
 	root.current_results[3] = _make_face(DiceFaceData.FaceType.NUMBER, 1)
 	root.current_results[4] = _make_face(DiceFaceData.FaceType.NUMBER, 1)
 	root.dice_keep_locked[1] = true
 
 	var scores: Array[int] = root._get_per_die_scores()
-	# Die 0 = 5 × 2 (MULTIPLY_LEFT from die 1) = 10
+	# Die 0 = 5 × 2 (MULTIPLY from die 1) = 10
 	assert_int(scores[0]).is_equal(10)
-	# Die 1 = 0 (MULTIPLY_LEFT contributes no base score itself)
+	# Die 1 = 0 (MULTIPLY contributes no base score itself)
 	assert_int(scores[1]).is_equal(0)
 	assert_int(scores[2]).is_equal(3)
 
 
-func test_per_die_scores_with_global_multiply() -> void:
-	## MULTIPLY face should multiply ALL per-die scores.
+func test_per_die_scores_with_stacked_multiply() -> void:
+	## MULTIPLY face should multiply nearby per-die scores.
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
 	await runner.simulate_frames(2)
 	var root: RollPhase = _setup_scene(runner)
@@ -108,7 +108,7 @@ func test_per_die_scores_with_global_multiply() -> void:
 	root.dice_keep_locked[1] = true
 
 	var scores: Array[int] = root._get_per_die_scores()
-	# All scores doubled by x2 multiplier.
+	# Nearby scores doubled by x2 multiplier.
 	assert_int(scores[0]).is_equal(6)   # 3 × 2
 	assert_int(scores[1]).is_equal(0)   # MULTIPLY itself = 0
 	assert_int(scores[2]).is_equal(8)   # 4 × 2
@@ -148,7 +148,7 @@ func test_per_die_scores_sum_equals_turn_score() -> void:
 
 	_force_clean_state(root)
 	root.current_results[0] = _make_face(DiceFaceData.FaceType.NUMBER, 3)
-	root.current_results[1] = _make_face(DiceFaceData.FaceType.MULTIPLY_LEFT, 2)
+	root.current_results[1] = _make_face(DiceFaceData.FaceType.MULTIPLY, 2)
 	root.current_results[2] = _make_face(DiceFaceData.FaceType.MULTIPLY, 3)
 	root.current_results[3] = _make_face(DiceFaceData.FaceType.AUTO_KEEP, 4)
 	root.current_results[4] = _make_face(DiceFaceData.FaceType.STOP, 0)

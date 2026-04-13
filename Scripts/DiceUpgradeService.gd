@@ -3,6 +3,15 @@ extends RefCounted
 ## Encapsulates die face upgrade logic so DiceData remains data-centric.
 
 
+func upgrade_all_faces(die: DiceData, amount: int) -> void:
+	if die == null or amount == 0:
+		return
+	for face: DiceFaceData in die.faces:
+		if face == null:
+			continue
+		face.value = mini(face.value + amount, _max_value_for_type(face.type))
+
+
 func upgrade_weakest_face(die: DiceData) -> bool:
 	var worst_index: int = -1
 	var worst_power: int = 999
@@ -59,10 +68,6 @@ func upgrade_weakest_face(die: DiceData) -> bool:
 			if face.value >= DiceData.MAX_HEART_VALUE:
 				return false
 			face.value += 1
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			if face.value >= DiceData.MAX_MULTIPLY_LEFT_VALUE:
-				return false
-			face.value += 1
 	return true
 
 
@@ -90,8 +95,6 @@ func face_power(face: DiceFaceData) -> int:
 			return 18 + face.value
 		DiceFaceData.FaceType.EXPLODE:
 			return 22 + face.value
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return 18 + face.value
 	return 0
 
 
@@ -101,3 +104,21 @@ func count_stop_faces(faces: Array[DiceFaceData]) -> int:
 		if face.type == DiceFaceData.FaceType.STOP or face.type == DiceFaceData.FaceType.CURSED_STOP:
 			count += 1
 	return count
+
+
+func _max_value_for_type(face_type: DiceFaceData.FaceType) -> int:
+	match face_type:
+		DiceFaceData.FaceType.NUMBER, DiceFaceData.FaceType.AUTO_KEEP:
+			return DiceData.MAX_FACE_VALUE
+		DiceFaceData.FaceType.SHIELD:
+			return DiceData.MAX_SHIELD_VALUE
+		DiceFaceData.FaceType.MULTIPLY:
+			return DiceData.MAX_MULTIPLY_VALUE
+		DiceFaceData.FaceType.EXPLODE:
+			return DiceData.MAX_EXPLODE_VALUE
+		DiceFaceData.FaceType.LUCK:
+			return DiceData.MAX_LUCK_VALUE
+		DiceFaceData.FaceType.HEART:
+			return DiceData.MAX_HEART_VALUE
+		_:
+			return maxi(0, 999)

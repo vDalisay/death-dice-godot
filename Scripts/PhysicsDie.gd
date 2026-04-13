@@ -66,6 +66,22 @@ const LANDING_DUST_AMOUNT_MIN: int = 10
 const LANDING_DUST_AMOUNT_MAX: int = 22
 const FACE_FLASH_DURATION: float = 0.1
 
+## Phase 2 — Displacement physics (used by DiceArena.detonate_around)
+const DETONATE_IMPULSE: float = 1000.0
+const DETONATE_RADIUS: float = 135.0
+const DETONATE_STAGGER_DELAY: float = 0.05
+const DETONATE_RING_DURATION: float = 0.3
+
+## Phase 3 — MULTIPLY AOE indicator
+const MULTIPLY_AOE_RADIUS: float = 90.0
+const MULTIPLY_AOE_FADE_IN: float = 0.2
+const MULTIPLY_AOE_ALPHA: float = 0.12
+const MULTIPLY_AOE_FADE_OUT: float = 0.15
+
+## Phase 5 — Per-face settle VFX
+const FACE_SETTLE_SCALE_PULSE: float = 1.06
+const FACE_SETTLE_SCALE_DURATION: float = 0.12
+
 const TUMBLE_DURATION: float = 0.35
 const TUMBLE_TICKS: int = 6
 const TUMBLE_MIN_INTERVAL: float = 0.04
@@ -92,7 +108,6 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 	4: "◆",     # SHIELD
 	5: "×",     # MULTIPLY
 	6: "✦",     # EXPLODE
-	7: "←×",    # MULTIPLY_LEFT
 	8: "☠",     # CURSED_STOP
 	9: "!",     # INSURANCE
 	10: "🍀",   # LUCK
@@ -123,6 +138,8 @@ var is_kept: bool = false
 var is_keep_locked: bool = false
 var is_stopped: bool = false
 var rarity_color: Color = Color.TRANSPARENT
+## Scale factor for cluster child dice. Apply before adding to scene.
+var die_scale: float = 1.0
 
 var _settle_timer: float = 0.0
 var _jitter_timer: float = 0.0
@@ -136,6 +153,7 @@ var _scale_tween: Tween = null
 var _glow_tween: Tween = null
 var _opacity_tween: Tween = null
 var _popup_tween: Tween = null
+var _aoe_tween: Tween = null
 var _is_hovered: bool = false
 var _peak_speed_since_launch: float = 0.0
 var _last_motion_velocity: Vector2 = Vector2.ZERO
@@ -153,6 +171,7 @@ var _tier_label: Label = null
 var _name_popup: Panel = null
 var _name_popup_faces: HBoxContainer = null
 var _collision_shape: CollisionShape2D = null
+var _aoe_indicator: Node2D = null
 
 
 func _ready() -> void:
@@ -250,6 +269,12 @@ func _ready() -> void:
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 
+	# Phase 3: MULTIPLY AOE indicator (hidden until MULTIPLY face settles)
+	_aoe_indicator = _MultiplyAoeIndicator.new()
+	_aoe_indicator.modulate.a = 0.0
+	_aoe_indicator.z_index = -1
+	add_child(_aoe_indicator)
+
 	_apply_visual()
 
 
@@ -280,6 +305,11 @@ func setup(index: int, data: DiceData) -> void:
 		_glyph_label.text = ""
 	if _tier_label:
 		_tier_label.text = data.get_reroll_tier_label() if data and data.is_reroll_evolving() else ""
+	# Phase 4: apply die_scale for cluster child dice
+	if die_scale != 1.0:
+		scale = Vector2(die_scale, die_scale)
+		if _collision_shape != null and _collision_shape.shape is CircleShape2D:
+			(_collision_shape.shape as CircleShape2D).radius = COLLISION_RADIUS * die_scale
 	_apply_visual()
 
 
@@ -379,8 +409,58 @@ func play_multiply_vfx(multiplier: int) -> void:
 	_play_radial_effect(_UITheme.SCORE_GOLD, "x%d" % multiplier)
 
 
-func play_multiply_left_vfx(multiplier: int) -> void:
-	_play_directional_left_effect(_UITheme.ROSE_ACCENT, "<x%d" % multiplier)
+func play_displacement_hit(direction: Vector2) -> void:
+	var burst: CPUParticles2D = ParticlePool.acquire(self)
+	if burst != null:
+		ParticlePool.configure_burst(burst, {
+			"amount": 18,
+			"lifetime": 0.22,
+			"explosiveness": 0.82,
+			"direction": direction,
+			"spread": 34.0,
+			"initial_velocity_min": 70.0,
+			"initial_velocity_max": 140.0,
+			"gravity": Vector2.ZERO,
+			"color": _UITheme.EXPLOSION_ORANGE,
+		})
+		burst.emitting = true
+		ParticlePool.release_after(burst, 0.4)
+	_play_impact_accent()
+
+
+func play_detonation(radius: float) -> void:
+	_spawn_explode_burst()
+	_spawn_explode_ring(radius)
+	_play_radial_effect(_UITheme.EXPLOSION_ORANGE, "%dpx" % int(radius))
+
+
+func detonate(radius: float, siblings: Array[PhysicsDie] = []) -> Array[int]:
+	var targets: Array[PhysicsDie] = siblings
+	if targets.is_empty() and get_parent() != null:
+		for child: Node in get_parent().get_children():
+			if child is PhysicsDie:
+				targets.append(child as PhysicsDie)
+	var affected: Array[int] = []
+	for die: PhysicsDie in targets:
+		if die == null or die == self or not is_instance_valid(die):
+			continue
+		var direction: Vector2 = die.global_position - global_position
+		var distance: float = direction.length()
+		if distance > radius:
+			continue
+		if direction == Vector2.ZERO:
+			direction = Vector2.RIGHT.rotated(randf() * TAU)
+		else:
+			direction = direction / distance
+		var falloff: float = lerpf(1.0, 0.35, clampf(distance / maxf(radius, 1.0), 0.0, 1.0))
+		die.set_physics_state(DiePhysicsState.FLYING)
+		die._settle_timer = 0.0
+		die.apply_central_impulse(direction * DETONATE_IMPULSE * falloff)
+		die.angular_velocity += randf_range(-4.0, 4.0)
+		die.play_displacement_hit(direction)
+		affected.append(die.die_index)
+	play_detonation(radius)
+	return affected
 
 
 func play_stop_impact(is_cursed: bool) -> void:
@@ -477,6 +557,8 @@ func play_reroll_lift() -> void:
 		var mod_tween: Tween = create_tween()
 		mod_tween.tween_property(_bg_panel, "modulate", Color(1.15, 1.15, 1.15, 1.0), REROLL_LIFT_DURATION * 0.5)
 		mod_tween.tween_property(_bg_panel, "modulate", Color.WHITE, REROLL_LIFT_DURATION * 0.5)
+	# Fade out MULTIPLY AOE indicator when this die is rerolled
+	_update_aoe_indicator(null)
 
 
 func play_launch_burst() -> void:
@@ -639,7 +721,14 @@ func _on_body_entered(other: Node) -> void:
 
 	# Reroll this die's face (cosmetic)
 	if die_data and not is_keep_locked:
-		var new_face: DiceFaceData = die_data.roll()
+		var new_face: DiceFaceData
+		# Phase 6: RUBBER_DICE — roll twice, keep the face with the higher value
+		if GameManager != null and GameManager.has_modifier(RunModifier.ModifierType.RUBBER_DICE):
+			var face_a: DiceFaceData = die_data.roll()
+			var face_b: DiceFaceData = die_data.roll()
+			new_face = face_a if face_a.value >= face_b.value else face_b
+		else:
+			new_face = die_data.roll()
 		tumble(new_face)
 		current_face = new_face
 		collision_rerolled.emit(die_index, new_face)
@@ -765,8 +854,6 @@ static func face_type_color(ft: DiceFaceData.FaceType) -> Color:
 			return _UITheme.SUCCESS_GREEN
 		DiceFaceData.FaceType.EXPLODE:
 			return _UITheme.EXPLOSION_ORANGE
-		DiceFaceData.FaceType.MULTIPLY_LEFT:
-			return _UITheme.SUCCESS_GREEN
 		DiceFaceData.FaceType.CURSED_STOP:
 			return _UITheme.NEON_PURPLE
 		DiceFaceData.FaceType.INSURANCE:
@@ -851,7 +938,7 @@ func _apply_visual() -> void:
 	elif is_keep_locked:
 		if current_face and current_face.type in [
 			DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD,
-			DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT,
+			DiceFaceData.FaceType.MULTIPLY,
 			DiceFaceData.FaceType.EXPLODE,
 		]:
 			fill = FILL_AUTO_KEPT
@@ -934,9 +1021,151 @@ func _set_random_glyph() -> void:
 
 func _resolve_pending_face() -> void:
 	if _pending_face:
-		# Face display and VFX handled by RollPhase's phase tween (_reveal_die_face).
-		# Only clear the pending state so the die stops cycling random glyphs.
+		show_face(_pending_face)
+		pop()
+		_play_face_settle_vfx(_pending_face)
+		_update_aoe_indicator(_pending_face)
 		_pending_face = null
+
+
+## Phase 5 — Dispatch face-specific settle VFX + SFX.
+func _play_face_settle_vfx(face: DiceFaceData) -> void:
+	if face == null:
+		return
+	match face.type:
+		DiceFaceData.FaceType.NUMBER:
+			if face.value <= 0:
+				return
+			# Gold label scale pulse
+			if _face_label:
+				var lbl_tween: Tween = create_tween()
+				lbl_tween.tween_property(_face_label, "scale",
+					Vector2(FACE_SETTLE_SCALE_PULSE, FACE_SETTLE_SCALE_PULSE),
+					FACE_SETTLE_SCALE_DURATION * 0.45)
+				lbl_tween.tween_property(_face_label, "scale",
+					Vector2.ONE, FACE_SETTLE_SCALE_DURATION * 0.55)
+			# Gold sparkle burst (amount scales with value)
+			var spark: CPUParticles2D = ParticlePool.acquire(self)
+			if spark != null:
+				ParticlePool.configure_burst(spark, {
+					"amount": clampi(face.value + 3, 4, 8),
+					"lifetime": 0.15,
+					"explosiveness": 0.85,
+					"direction": Vector2.ZERO,
+					"spread": 180.0,
+					"initial_velocity_min": 30.0,
+					"initial_velocity_max": 80.0,
+					"gravity": Vector2.ZERO,
+					"color": _UITheme.SCORE_GOLD,
+				})
+				spark.emitting = true
+				ParticlePool.release_after(spark, 0.3)
+			SFXManager.play_number_clink(face.value)
+		DiceFaceData.FaceType.BLANK:
+			# Desaturate pulse
+			if _bg_panel:
+				var mod_tween: Tween = create_tween()
+				mod_tween.tween_property(_bg_panel, "modulate",
+					Color(0.6, 0.6, 0.6, 0.8), 0.1)
+				mod_tween.tween_property(_bg_panel, "modulate", Color.WHITE, 0.1)
+			SFXManager.play_blank_thunk()
+		DiceFaceData.FaceType.AUTO_KEEP:
+			# Gold ring burst
+			var ring: CPUParticles2D = ParticlePool.acquire(self)
+			if ring != null:
+				ParticlePool.configure_burst(ring, {
+					"amount": 12,
+					"lifetime": 0.2,
+					"explosiveness": 0.85,
+					"direction": Vector2.ZERO,
+					"spread": 180.0,
+					"initial_velocity_min": 50.0,
+					"initial_velocity_max": 110.0,
+					"gravity": Vector2.ZERO,
+					"color": _UITheme.SCORE_GOLD,
+				})
+				ring.emitting = true
+				ParticlePool.release_after(ring, 0.4)
+			SFXManager.play_autokeep_lock()
+		DiceFaceData.FaceType.MULTIPLY:
+			# Wobble + golden aura (full bank VFX handled by play_multiply_vfx)
+			_play_visual_offset_pulse_xy(2.0, 0.0, 0.15)
+			if _bg_panel:
+				var aura_tween: Tween = create_tween()
+				aura_tween.tween_property(_bg_panel, "modulate",
+					Color(1.15, 1.1, 0.85, 1.0), 0.2)
+				aura_tween.tween_property(_bg_panel, "modulate", Color.WHITE, 0.2)
+			SFXManager.play_multiply_power()
+		DiceFaceData.FaceType.SHIELD:
+			# Cyan border flash
+			if _bg_panel:
+				var shield_tween: Tween = create_tween()
+				shield_tween.tween_property(_bg_panel, "modulate",
+					Color(_UITheme.ACTION_CYAN, 1.0), 0.1)
+				shield_tween.tween_property(_bg_panel, "modulate", Color.WHITE, 0.1)
+			SFXManager.play_shield_clang()
+		DiceFaceData.FaceType.LUCK:
+			# Green sparkle puff rising upward
+			var luck_burst: CPUParticles2D = ParticlePool.acquire(self)
+			if luck_burst != null:
+				ParticlePool.configure_burst(luck_burst, {
+					"amount": 8,
+					"lifetime": 0.22,
+					"explosiveness": 0.7,
+					"direction": Vector2.UP,
+					"spread": 60.0,
+					"initial_velocity_min": 40.0,
+					"initial_velocity_max": 80.0,
+					"gravity": Vector2(0.0, -30.0),
+					"color": _UITheme.SUCCESS_GREEN,
+				})
+				luck_burst.emitting = true
+				ParticlePool.release_after(luck_burst, 0.45)
+			SFXManager.play_luck_chime()
+		DiceFaceData.FaceType.HEART:
+			# Rose tint pulse + rising heart particles
+			if _bg_panel:
+				var heart_tween: Tween = create_tween()
+				heart_tween.tween_property(_bg_panel, "modulate",
+					Color(_UITheme.ROSE_ACCENT, 1.0), 0.1)
+				heart_tween.tween_property(_bg_panel, "modulate", Color.WHITE, 0.1)
+			var heart_burst: CPUParticles2D = ParticlePool.acquire(self)
+			if heart_burst != null:
+				ParticlePool.configure_burst(heart_burst, {
+					"amount": 7,
+					"lifetime": 0.25,
+					"explosiveness": 0.65,
+					"direction": Vector2.UP,
+					"spread": 50.0,
+					"initial_velocity_min": 30.0,
+					"initial_velocity_max": 70.0,
+					"gravity": Vector2(0.0, -20.0),
+					"color": _UITheme.ROSE_ACCENT,
+				})
+				heart_burst.emitting = true
+				ParticlePool.release_after(heart_burst, 0.45)
+			SFXManager.play_heart_heal()
+
+
+## Phase 3 — Show/hide the MULTIPLY proximity AOE indicator ring.
+func _update_aoe_indicator(face: DiceFaceData) -> void:
+	if _aoe_indicator == null:
+		return
+	var should_show: bool = face != null and face.type == DiceFaceData.FaceType.MULTIPLY
+	if _aoe_tween and _aoe_tween.is_valid():
+		_aoe_tween.kill()
+	_aoe_tween = create_tween()
+	if should_show:
+		var ring_color: Color = _UITheme.ROSE_ACCENT \
+			if (die_data != null and die_data.multiplies_stops) \
+			else _UITheme.SCORE_GOLD
+		(_aoe_indicator as _MultiplyAoeIndicator).ring_color = ring_color
+		_aoe_indicator.queue_redraw()
+		_aoe_tween.tween_property(_aoe_indicator, "modulate:a",
+			MULTIPLY_AOE_ALPHA, MULTIPLY_AOE_FADE_IN)
+	else:
+		_aoe_tween.tween_property(_aoe_indicator, "modulate:a",
+			0.0, MULTIPLY_AOE_FADE_OUT)
 
 
 func _play_settle_accent(peak_speed: float) -> void:
@@ -1076,11 +1305,11 @@ func _spawn_explode_burst() -> void:
 	ParticlePool.release_after(burst, 0.5)
 
 
-func _spawn_explode_ring() -> void:
+func _spawn_explode_ring(radius: float = DIE_SIZE * 0.55) -> void:
 	var ring: _ExplodeRing = _ExplodeRing.new()
 	ring.position = Vector2.ZERO
 	add_child(ring)
-	ring.play(DIE_SIZE * 0.55)
+	ring.play(radius)
 
 
 func _spawn_stop_smoke(color: Color) -> void:
@@ -1210,6 +1439,20 @@ func _play_visual_offset_pulse_xy(offset_x: float, offset_y: float, duration: fl
 	tween.parallel().tween_property(_bg_panel, "position:y", base_bg.y, duration * 0.55).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_face_label, "position:y", base_face.y, duration * 0.55).set_ease(Tween.EASE_IN)
 	tween.parallel().tween_property(_glyph_label, "position:y", base_glyph.y, duration * 0.55).set_ease(Tween.EASE_IN)
+
+
+# ---------------------------------------------------------------------------
+# Inner class: MULTIPLY proximity AOE indicator (Phase 3)
+# ---------------------------------------------------------------------------
+class _MultiplyAoeIndicator extends Node2D:
+	const RING_SEGMENTS: int = 48
+	const RING_WIDTH: float = 1.5
+	var ring_color: Color = Color("#FFD700")  # overwritten per die
+
+	func _draw() -> void:
+		var col: Color = Color(ring_color, 1.0)
+		var r: float = PhysicsDie.MULTIPLY_AOE_RADIUS
+		draw_arc(Vector2.ZERO, r, 0.0, TAU, RING_SEGMENTS, col, RING_WIDTH, true)
 
 
 # ---------------------------------------------------------------------------

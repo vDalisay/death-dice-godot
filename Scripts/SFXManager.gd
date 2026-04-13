@@ -136,6 +136,49 @@ func play_ui_slot(is_heavy: bool = false) -> void:
 	_play_tone_delayed(accent, 0.04, 0.18, 0.02)
 
 
+## Phase 5 — Per-face settle SFX
+
+func play_number_clink(value: int) -> void:
+	var hz: float = 800.0 + float(clampi(value, 0, 20)) * 40.0
+	_play_tone(hz, 0.07, 0.35)
+
+
+func play_blank_thunk() -> void:
+	_play_tone(140.0, 0.08, 0.28)
+
+
+func play_autokeep_lock() -> void:
+	_play_tone(600.0, 0.05, 0.45)
+	_play_tone_delayed(900.0, 0.05, 0.45, 0.05)
+
+
+func play_multiply_power() -> void:
+	_play_tone(120.0, 0.12, 0.55)
+	_play_tone_delayed(400.0, 0.1, 0.45, 0.06)
+	_play_tone_delayed(800.0, 0.1, 0.40, 0.14)
+
+
+func play_shield_clang() -> void:
+	_play_tone(300.0, 0.06, 0.48)
+	_play_tone_delayed(600.0, 0.06, 0.38, 0.03)
+
+
+func play_insurance_shatter() -> void:
+	_play_tone(800.0, 0.05, 0.50)
+	_play_tone_delayed(500.0, 0.08, 0.40, 0.06)
+	_play_tone_delayed(200.0, 0.12, 0.35, 0.14)
+
+
+func play_luck_chime() -> void:
+	_play_tone(1200.0, 0.06, 0.40)
+	_play_tone_delayed(1500.0, 0.06, 0.35, 0.04)
+
+
+func play_heart_heal() -> void:
+	_play_tone(400.0, 0.10, 0.38)
+	_play_tone_delayed(500.0, 0.10, 0.38, 0.08)
+
+
 # ---------------------------------------------------------------------------
 # Internal
 # ---------------------------------------------------------------------------

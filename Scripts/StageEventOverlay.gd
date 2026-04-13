@@ -1173,7 +1173,7 @@ static func _face_color(face: DiceFaceData) -> Color:
 			return _UITheme.MUTED_TEXT
 		DiceFaceData.FaceType.SHIELD:
 			return _UITheme.ACTION_CYAN
-		DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+		DiceFaceData.FaceType.MULTIPLY:
 			return _UITheme.SCORE_GOLD
 		DiceFaceData.FaceType.EXPLODE:
 			return _UITheme.EXPLOSION_ORANGE

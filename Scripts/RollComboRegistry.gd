@@ -49,7 +49,7 @@ func _ensure_default_combos() -> void:
 		RollCombo.make(
 			"power_pair",
 			"Power Pair",
-			{DiceFaceData.FaceType.MULTIPLY: 1, DiceFaceData.FaceType.MULTIPLY_LEFT: 1},
+			{DiceFaceData.FaceType.MULTIPLY: 2},
 			Color(0.95, 0.5, 0.8),
 			6
 		),

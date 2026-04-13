@@ -54,6 +54,8 @@ const CONTAINMENT_INWARD_NUDGE: float = 54.0
 const SOFT_SEPARATION_RADIUS_MULT: float = 1.82
 const SOFT_SEPARATION_MAX_SPEED: float = 150.0
 const SOFT_SEPARATION_PUSH: float = 38.0
+const GRAVITY_WELL_RADIUS: float = 90.0   ## matches TurnScoreService.MULTIPLY_RADIUS
+const GRAVITY_WELL_FORCE: float = 30.0    ## constant inward force per physics step (N)
 const PREVIEW_BOUNDS_PADDING: float = 10.0
 const MIN_ARENA_FIT_SCALE: float = 0.45
 
@@ -149,6 +151,8 @@ func _physics_process(_delta: float) -> void:
 	_apply_boundary_glow()
 	_enforce_arena_containment()
 	_apply_soft_separation()
+	if GameManager != null and GameManager.has_modifier(RunModifier.ModifierType.GRAVITY_WELL):
+		_apply_gravity_well_forces()
 	if not _settle_check_active:
 		return
 	# Check if all dice have settled
@@ -158,6 +162,29 @@ func _physics_process(_delta: float) -> void:
 	# All settled
 	_settle_check_active = false
 	all_dice_settled.emit()
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: GRAVITY_WELL — MULTIPLY-settled dice pull nearby FLYING dice inward
+# ---------------------------------------------------------------------------
+func _apply_gravity_well_forces() -> void:
+	for source: PhysicsDie in _dice:
+		if source.physics_state != PhysicsDie.DiePhysicsState.SETTLED:
+			continue
+		if source.current_face == null:
+			continue
+		if source.current_face.type != DiceFaceData.FaceType.MULTIPLY:
+			continue
+		var source_pos: Vector2 = source.global_position
+		for target: PhysicsDie in _dice:
+			if target == source:
+				continue
+			if target.physics_state != PhysicsDie.DiePhysicsState.FLYING:
+				continue
+			var diff: Vector2 = source_pos - target.global_position
+			if diff.length_squared() > GRAVITY_WELL_RADIUS * GRAVITY_WELL_RADIUS:
+				continue
+			target.apply_central_force(diff.normalized() * GRAVITY_WELL_FORCE)
 
 
 # ---------------------------------------------------------------------------
@@ -215,8 +242,12 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 		_execute_reroll(indices, pool)
 	else:
 		# Wait for the exit and bag animations to finish, then reroll.
-		var captured_indices: Array[int] = indices.duplicate()
-		var captured_pool: Array[DiceData] = pool.duplicate()
+		var captured_indices: Array[int] = []
+		for index: int in indices:
+			captured_indices.append(index)
+		var captured_pool: Array[DiceData] = []
+		for die_data: DiceData in pool:
+			captured_pool.append(die_data)
 		get_tree().create_timer(launch_prep_delay).timeout.connect(
 			_execute_reroll.bind(captured_indices, captured_pool)
 		)
@@ -295,10 +326,18 @@ func get_die_position(index: int) -> Vector2:
 	return Vector2.ZERO
 
 
-func get_dice_in_radius(center: Vector2, radius: float) -> Array[int]:
+func _rng_randf(stream_name: String) -> float:
+	if GameManager != null and GameManager.has_method("rng_randf"):
+		return GameManager.rng_randf(stream_name)
+	return randf()
+
+
+func get_dice_in_radius(center: Vector2, radius: float, exclude_indices: Array[int] = []) -> Array[int]:
 	var result: Array[int] = []
 	var radius_sq: float = radius * radius
 	for die: PhysicsDie in _dice:
+		if die == null or exclude_indices.has(die.die_index):
+			continue
 		if die.global_position.distance_squared_to(center) <= radius_sq:
 			result.append(die.die_index)
 	return result
@@ -318,8 +357,120 @@ func get_die(index: int) -> PhysicsDie:
 	return null
 
 
+func detonate_around(
+	center_index: int,
+	radius: float,
+	exclude_indices: Array[int] = [],
+	immune_indices: Array[int] = [],
+	dampened_indices: Array[int] = []
+) -> Array[int]:
+	var source_die: PhysicsDie = get_die(center_index)
+	if source_die == null:
+		return []
+	var effective_excludes: Array[int] = []
+	for index: int in exclude_indices:
+		effective_excludes.append(index)
+	if not effective_excludes.has(center_index):
+		effective_excludes.append(center_index)
+	var nearby_indices: Array[int] = get_dice_in_radius(source_die.global_position, radius, effective_excludes)
+	var hit_indices: Array[int] = []
+	for hit_index: int in nearby_indices:
+		if immune_indices.has(hit_index):
+			continue
+		var hit_die: PhysicsDie = get_die(hit_index)
+		if hit_die == null:
+			continue
+		hit_indices.append(hit_index)
+		var direction: Vector2 = (hit_die.global_position - source_die.global_position).normalized()
+		if direction == Vector2.ZERO:
+			direction = Vector2.RIGHT.rotated(_rng_randf("roll") * TAU)
+		var distance_ratio: float = clampf(hit_die.global_position.distance_to(source_die.global_position) / maxf(radius, 1.0), 0.0, 1.0)
+		var falloff: float = lerpf(1.0, 0.35, distance_ratio)
+		var impulse_scale: float = 0.35 if dampened_indices.has(hit_index) else 1.0
+		var impulse_magnitude: float = PhysicsDie.DETONATE_IMPULSE * falloff * impulse_scale
+		hit_die.set_physics_state(PhysicsDie.DiePhysicsState.FLYING)
+		hit_die._settle_timer = 0.0
+		hit_die.linear_velocity = direction * (impulse_magnitude * 0.72)
+		hit_die.apply_central_impulse(direction * impulse_magnitude)
+		hit_die.angular_velocity += randf_range(-4.0, 4.0)
+		hit_die.play_displacement_hit(direction)
+	_settle_check_active = true
+	source_die.play_detonation(radius)
+	return hit_indices
+
+
+func spawn_settled_die(index: int, data: DiceData, face: DiceFaceData, position: Vector2, kept_locked: bool = true) -> void:
+	var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
+	add_child(die)
+	die.setup(index, data)
+	_apply_popup_bounds_to_die(die)
+	if index >= _dice.size():
+		_dice.resize(index + 1)
+	_dice[index] = die
+	die.toggled_keep.connect(_on_die_toggled)
+	die.shift_toggled_keep.connect(_on_die_shift_toggled)
+	die.collision_rerolled.connect(_on_die_collision_rerolled)
+	die.position = _clamp_to_arena(position)
+	die.current_face = face
+	die.show_face(face)
+	die.is_kept = kept_locked
+	die.is_keep_locked = kept_locked
+	die.freeze = true
+	die.physics_state = PhysicsDie.DiePhysicsState.SETTLED
+	die.pop()
+
+
+func spawn_cluster_children(parent_index: int, child_count: int, child_dice: Array[DiceData]) -> Array[int]:
+	var spawned_indices: Array[int] = []
+	if child_count <= 0 or child_dice.is_empty():
+		return spawned_indices
+	var parent_die: PhysicsDie = get_die(parent_index)
+	if parent_die == null:
+		return spawned_indices
+	var spawn_total: int = mini(child_count, child_dice.size())
+	for slot: int in spawn_total:
+		var data: DiceData = child_dice[slot]
+		if data == null:
+			continue
+		var child_index: int = _dice.size()
+		var angle: float = (TAU * float(slot) / float(maxi(spawn_total, 1))) + randf_range(-0.25, 0.25)
+		var radius: float = randf_range(26.0, 44.0)
+		var child_position: Vector2 = _clamp_to_arena(parent_die.position + Vector2(cos(angle), sin(angle)) * radius)
+		var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
+		die.die_scale = 0.55
+		add_child(die)
+		die.setup(child_index, data)
+		_apply_popup_bounds_to_die(die)
+		if child_index >= _dice.size():
+			_dice.resize(child_index + 1)
+		_dice[child_index] = die
+		die.toggled_keep.connect(_on_die_toggled)
+		die.shift_toggled_keep.connect(_on_die_shift_toggled)
+		die.collision_rerolled.connect(_on_die_collision_rerolled)
+		die.position = child_position
+		var child_face: DiceFaceData = data.roll()
+		die.current_face = child_face
+		die.tumble(child_face)
+		die.play_launch_burst()
+		die.set_physics_state(PhysicsDie.DiePhysicsState.FLYING)
+		die._settle_timer = 0.0
+		die.linear_velocity = Vector2(cos(angle), sin(angle)) * randf_range(600.0, 900.0)
+		die.angular_velocity = randf_range(THROW_ANGULAR_MIN * 0.6, THROW_ANGULAR_MAX * 0.6)
+		spawned_indices.append(child_index)
+	_settle_check_active = true
+	return spawned_indices
+
+
 func get_die_count() -> int:
 	return _dice.size()
+
+
+func _clamp_to_arena(position: Vector2) -> Vector2:
+	var rect: Rect2 = get_arena_rect()
+	return Vector2(
+		clampf(position.x, rect.position.x + PhysicsDie.COLLISION_RADIUS, rect.end.x - PhysicsDie.COLLISION_RADIUS),
+		clampf(position.y, rect.position.y + PhysicsDie.COLLISION_RADIUS, rect.end.y - PhysicsDie.COLLISION_RADIUS)
+	)
 
 
 func reset() -> void:

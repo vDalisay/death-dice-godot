@@ -56,7 +56,7 @@ func test_power_pair_combo_triggers() -> void:
 	var registry = auto_free(preload("res://Scripts/RollComboRegistry.gd").new())
 	var results: Array[DiceFaceData] = [
 		_make_face(DiceFaceData.FaceType.MULTIPLY, 2),
-		_make_face(DiceFaceData.FaceType.MULTIPLY_LEFT, 2),
+		_make_face(DiceFaceData.FaceType.MULTIPLY, 2),
 		_make_face(DiceFaceData.FaceType.NUMBER, 4),
 	]
 	var stopped: Array[bool] = [false, false, false]

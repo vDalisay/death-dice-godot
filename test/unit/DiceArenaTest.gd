@@ -167,3 +167,92 @@ func test_large_pool_spawn_positions_stay_centered_and_in_bounds() -> void:
 
 	average_x /= float(positions.size())
 	assert_float(average_x).is_equal_approx(DiceArena.ARENA_WIDTH * 0.5, 0.1)
+
+
+func test_detonate_around_returns_hits_within_radius() -> void:
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 2
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(200.0, 200.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(240.0, 200.0))
+	_arena.spawn_settled_die(2, DiceData.make_standard_d6(), face, Vector2(420.0, 200.0))
+
+	var hit_indices: Array[int] = _arena.detonate_around(0, 70.0)
+
+	assert_bool(hit_indices.has(1)).is_true()
+	assert_bool(hit_indices.has(0)).is_false()
+	assert_bool(hit_indices.has(2)).is_false()
+
+
+func test_detonate_around_is_seed_reproducible_for_overlapping_dice() -> void:
+	GameManager.restore_run_identity("detonate-seed", true, 1)
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 2
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+
+	_arena.detonate_around(0, 80.0)
+	var first_position: Vector2 = _arena.get_die(1).position
+
+	_arena.reset()
+	GameManager.restore_run_identity("detonate-seed", true, 1)
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(260.0, 260.0))
+
+	_arena.detonate_around(0, 80.0)
+	var second_position: Vector2 = _arena.get_die(1).position
+
+	assert_float(first_position.x).is_equal_approx(second_position.x, 0.001)
+	assert_float(first_position.y).is_equal_approx(second_position.y, 0.001)
+
+
+func test_detonate_around_skips_immune_indices() -> void:
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 2
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(200.0, 200.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(240.0, 200.0))
+
+	var hit_indices: Array[int] = _arena.detonate_around(0, 80.0, [], [1], [])
+
+	assert_bool(hit_indices.has(1)).is_false()
+	assert_int(_arena.get_die(1).physics_state).is_equal(PhysicsDie.DiePhysicsState.SETTLED)
+
+
+func test_detonate_around_dampened_indices_get_lower_impulse() -> void:
+	var face: DiceFaceData = DiceFaceData.new()
+	face.type = DiceFaceData.FaceType.NUMBER
+	face.value = 2
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), face, Vector2(200.0, 200.0))
+	_arena.spawn_settled_die(1, DiceData.make_standard_d6(), face, Vector2(240.0, 200.0))
+	_arena.spawn_settled_die(2, DiceData.make_standard_d6(), face, Vector2(200.0, 240.0))
+
+	var hit_indices: Array[int] = _arena.detonate_around(0, 90.0, [], [], [2])
+
+	assert_bool(hit_indices.has(1)).is_true()
+	assert_bool(hit_indices.has(2)).is_true()
+	var normal_speed: float = _arena.get_die(1).linear_velocity.length()
+	var dampened_speed: float = _arena.get_die(2).linear_velocity.length()
+	assert_float(normal_speed).is_greater(0.0)
+	assert_float(dampened_speed).is_greater(0.0)
+	assert_float(dampened_speed).is_less(normal_speed)
+
+
+func test_spawn_cluster_children_launches_flying_scaled_dice() -> void:
+	var parent_face: DiceFaceData = DiceFaceData.new()
+	parent_face.type = DiceFaceData.FaceType.NUMBER
+	parent_face.value = 3
+	_arena.spawn_settled_die(0, DiceData.make_standard_d6(), parent_face, Vector2(280.0, 220.0))
+
+	var children: Array[DiceData] = [DiceData.make_standard_d6(), DiceData.make_standard_d6()]
+	var spawned_indices: Array[int] = _arena.spawn_cluster_children(0, 2, children)
+
+	assert_int(spawned_indices.size()).is_equal(2)
+	for idx: int in spawned_indices:
+		var die: PhysicsDie = _arena.get_die(idx)
+		assert_object(die).is_not_null()
+		assert_int(die.physics_state).is_equal(PhysicsDie.DiePhysicsState.FLYING)
+		assert_float(die.scale.x).is_equal_approx(0.55, 0.001)
+		assert_float(die.scale.y).is_equal_approx(0.55, 0.001)
+		assert_float(die.linear_velocity.length()).is_greater(0.0)

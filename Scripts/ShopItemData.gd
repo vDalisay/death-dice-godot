@@ -24,6 +24,7 @@ enum ItemType {
 	HEAT_BET,
 	EVEN_ODD_BET,
 	BUY_SPARK_CHASER_DIE,
+	BUY_CLUSTER_DIE,
 }
 
 @export var item_name: String = ""
@@ -151,10 +152,19 @@ static func make_buy_spark_chaser_die() -> ShopItemData:
 	return item
 
 
+static func make_buy_cluster_die() -> ShopItemData:
+	var item := ShopItemData.new()
+	item.item_name = "Cluster Die"
+	item.description = "Fractures into child dice on settle. (2, 2, 2, 4, 4, 6)"
+	item.cost = 60
+	item.item_type = ItemType.BUY_CLUSTER_DIE
+	return item
+
+
 static func make_upgrade_die() -> ShopItemData:
 	var item := ShopItemData.new()
 	item.item_name = "Empower Die"
-	item.description = "Upgrade the weakest face on a random die."
+	item.description = "Pick one die. All of its faces gain +1 up to their type caps."
 	item.cost = 30
 	item.item_type = ItemType.UPGRADE_DIE
 	return item
@@ -169,6 +179,50 @@ static func make_buy_modifier(mod: RunModifier) -> ShopItemData:
 	item.item_type = ItemType.BUY_MODIFIER
 	item.modifier = mod
 	return item
+
+
+static func make_blast_shield_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_blast_shield())
+
+
+static func make_anchored_hearts_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_anchored_hearts())
+
+
+static func make_heavy_dice_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_heavy_dice())
+
+
+static func make_aftershock_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_aftershock())
+
+
+static func make_sympathetic_detonation_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_sympathetic_detonation())
+
+
+static func make_shrapnel_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_shrapnel())
+
+
+static func make_gravity_well_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_gravity_well())
+
+
+static func make_rubber_dice_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_rubber_dice())
+
+
+static func make_spark_scatter_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_spark_scatter())
+
+
+static func make_cluster_recursion_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_cluster_recursion())
+
+
+static func make_empower_die_mod() -> ShopItemData:
+	return make_buy_modifier(RunModifier.make_empower_die())
 
 
 static func make_cleanse_curse() -> ShopItemData:

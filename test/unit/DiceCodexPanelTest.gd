@@ -69,7 +69,7 @@ func test_completion_label_reflects_discovery_progress() -> void:
 	panel.open_panel()
 	await await_idle_frame()
 	var completion_label: Label = panel.get_node("CenterContainer/Modal/MarginContainer/VBoxContainer/HeaderRow/CompletionBadge/CompletionMargin/CompletionLabel") as Label
-	assert_str(completion_label.text).contains("2 / 16")
+	assert_str(completion_label.text).contains("2 / 17")
 
 
 func test_face_tile_label_stays_centered_inside_padded_tile_bounds() -> void:
@@ -121,7 +121,7 @@ func test_face_tile_long_text_stays_contained() -> void:
 	add_child(panel)
 	await await_idle_frame()
 	var face: DiceFaceData = DiceFaceData.new()
-	face.type = DiceFaceData.FaceType.MULTIPLY_LEFT
+	face.type = DiceFaceData.FaceType.MULTIPLY
 	face.value = 999
 	var tile: PanelContainer = panel._build_face_tile(face, true)
 	auto_free(tile)

@@ -31,7 +31,7 @@ const MIN_GREY_WEIGHT: float = 0.10
 const GREY_POOL: Array[String] = ["make_simple_d6", "make_standard_d6", "make_blank_canvas_d6"]
 const GREEN_POOL: Array[String] = ["make_lucky_d6", "make_heavy_d6", "make_fortune_d6"]
 const BLUE_POOL: Array[String] = ["make_gambler_d6", "make_golden_d6", "make_insurance_d6"]
-const PURPLE_POOL: Array[String] = ["make_explosive_d6", "make_pink_d6"]
+const PURPLE_POOL: Array[String] = ["make_explosive_d6", "make_pink_d6", "make_cluster_d6"]
 
 @onready var _title_label: Label = $CenterContainer/Card/MarginContainer/Content/TitleLabel
 @onready var _hint_label: Label = $CenterContainer/Card/MarginContainer/Content/HintLabel
@@ -379,7 +379,7 @@ static func _face_color(face: DiceFaceData) -> Color:
 			return _UITheme.MUTED_TEXT
 		DiceFaceData.FaceType.SHIELD:
 			return _UITheme.ACTION_CYAN
-		DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.MULTIPLY_LEFT:
+		DiceFaceData.FaceType.MULTIPLY:
 			return _UITheme.SCORE_GOLD
 		DiceFaceData.FaceType.EXPLODE:
 			return _UITheme.EXPLOSION_ORANGE
