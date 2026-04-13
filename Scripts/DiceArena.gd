@@ -191,22 +191,23 @@ func _apply_gravity_well_forces() -> void:
 # Public API
 # ---------------------------------------------------------------------------
 
-func throw_dice(pool: Array[DiceData]) -> void:
+func throw_dice(pool: Array) -> void:
+	var typed_pool: Array[DiceData] = _coerce_dice_pool(pool)
 	_clear_dice()
 	if instant_mode:
 		# Instant mode: spawn all dice at once in grid and settle (used by tests).
-		var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, pool.size())
-		for i: int in pool.size():
+		var spawn_positions: Array[Vector2] = _build_spawn_positions(default_spawn_origin, typed_pool.size())
+		for i: int in typed_pool.size():
 			var die: PhysicsDie = PhysicsDieScene.instantiate() as PhysicsDie
 			add_child(die)
-			die.setup(i, pool[i])
+			die.setup(i, typed_pool[i])
 			_apply_popup_bounds_to_die(die)
 			_dice.append(die)
 			die.toggled_keep.connect(_on_die_toggled)
 			die.shift_toggled_keep.connect(_on_die_shift_toggled)
 			die.collision_rerolled.connect(_on_die_collision_rerolled)
 			die.position = spawn_positions[i]
-			var face: DiceFaceData = pool[i].roll()
+			var face: DiceFaceData = typed_pool[i].roll()
 			die.current_face = face
 			die.show_face(face)
 			die.freeze = true
@@ -214,13 +215,14 @@ func throw_dice(pool: Array[DiceData]) -> void:
 		all_dice_settled.emit()
 	else:
 		# Dealer's sweep: store pool and launch dice one at a time.
-		_pending_pool = pool.duplicate()
+		_pending_pool = typed_pool
 		_start_volley()
 
 
-func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
+func reroll_dice(indices: Array[int], pool: Array) -> void:
+	var typed_pool: Array[DiceData] = _coerce_dice_pool(pool)
 	if instant_mode:
-		_execute_reroll(indices, pool)
+		_execute_reroll(indices, typed_pool)
 		return
 	# Move all kept (non-rerolled) dice to the dice bag.
 	var reroll_set: Dictionary = {}
@@ -239,18 +241,26 @@ func reroll_dice(indices: Array[int], pool: Array[DiceData]) -> void:
 			launch_prep_delay = maxf(launch_prep_delay, BAG_MOVE_DURATION)
 
 	if instant_mode or launch_prep_delay <= 0.0:
-		_execute_reroll(indices, pool)
+		_execute_reroll(indices, typed_pool)
 	else:
 		# Wait for the exit and bag animations to finish, then reroll.
 		var captured_indices: Array[int] = []
 		for index: int in indices:
 			captured_indices.append(index)
 		var captured_pool: Array[DiceData] = []
-		for die_data: DiceData in pool:
+		for die_data: DiceData in typed_pool:
 			captured_pool.append(die_data)
 		get_tree().create_timer(launch_prep_delay).timeout.connect(
 			_execute_reroll.bind(captured_indices, captured_pool)
 		)
+
+
+func _coerce_dice_pool(pool: Array) -> Array[DiceData]:
+	var typed_pool: Array[DiceData] = []
+	for entry: Variant in pool:
+		if entry is DiceData:
+			typed_pool.append(entry as DiceData)
+	return typed_pool
 
 
 func _execute_reroll(indices: Array[int], pool: Array[DiceData]) -> void:

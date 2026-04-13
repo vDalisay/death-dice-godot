@@ -91,7 +91,11 @@ func test_restore_turn_surface_resets_to_fresh_idle_turn() -> void:
 
 	if root.dice_arena.all_dice_settled.is_connected(root._on_all_dice_settled):
 		root.dice_arena.all_dice_settled.disconnect(root._on_all_dice_settled)
-	root.dice_arena.throw_dice(GameManager.dice_pool)
+	var typed_pool: Array[DiceData] = []
+	for die_entry: Variant in GameManager.dice_pool:
+		if die_entry is DiceData:
+			typed_pool.append(die_entry as DiceData)
+	root.dice_arena.throw_dice(typed_pool)
 	assert_int(root.dice_arena.get_die_count()).is_greater(0)
 
 	root._restore_turn_surface()
