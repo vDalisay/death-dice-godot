@@ -108,6 +108,7 @@ const FACE_TYPE_GLYPHS: Dictionary = {
 	4: "◆",     # SHIELD
 	5: "×",     # MULTIPLY
 	6: "✦",     # EXPLODE
+	7: "×",     # MULTIPLY_LEFT
 	8: "☠",     # CURSED_STOP
 	9: "!",     # INSURANCE
 	10: "🍀",   # LUCK

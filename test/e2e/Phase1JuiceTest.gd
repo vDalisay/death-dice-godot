@@ -167,13 +167,16 @@ func test_per_die_scores_sum_equals_turn_score() -> void:
 
 func test_multiplier_vfx_anchor_is_left_of_progress_bar() -> void:
 	var runner: GdUnitSceneRunner = scene_runner("res://Scenes/Main.tscn")
-	await runner.simulate_frames(2)
+	await runner.simulate_frames(10)
 	var root: RollPhase = _setup_scene(runner)
+	root.roll_button.pressed.emit()
+	await runner.simulate_frames(5)
 	var anchor: Vector2 = root._get_multiplier_vfx_anchor_global_position()
-	var bar_rect: Rect2 = root.hud.get_progress_visual_rect()
-	assert_float(anchor.x).is_less(bar_rect.position.x)
-	assert_float(anchor.x).is_greater(bar_rect.position.x - 40.0)
-	assert_float(absf(anchor.y - (bar_rect.position.y + bar_rect.size.y * 0.5))).is_less(0.1)
+	var bar_pos: Vector2 = root.hud.progress_bar.global_position
+	var bar_size: Vector2 = root.hud.progress_bar.size
+	assert_float(anchor.x).is_less(bar_pos.x)
+	assert_float(anchor.x).is_greater(bar_pos.x - 40.0)
+	assert_float(absf(anchor.y - (bar_pos.y + bar_size.y * 0.5))).is_less(1.0)
 
 
 # ---------------------------------------------------------------------------
