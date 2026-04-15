@@ -328,6 +328,7 @@ func _apply_theme_styling() -> void:
 		if crack_line != null:
 			crack_line.color = _UITheme.SCORE_GOLD
 
+	# Top bar lives (hearts)
 	# Info row
 	lives_label.add_theme_font_size_override("font_size", 20)
 	lives_label.add_theme_color_override("font_color", _UITheme.DANGER_RED)

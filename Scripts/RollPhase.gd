@@ -35,10 +35,7 @@ const NEAR_DEATH_GOLD_BONUS: int = 8
 const META_LEDGER_EXP_REWARD: int = 2
 const META_HIGH_RISK_EXP_REWARD: int = 1
 const META_NEAR_DEATH_SHARD_REWARD: int = 1
-const RISK_TOWER_LIGHT_COUNT: int = 10
-const RISK_TOWER_STOP_DOT_COUNT: int = 4
-const CONTRACT_OVERLAY_WIDTH: float = 420.0
-const RISK_TOWER_OVERLAY_WIDTH: float = 128.0
+## Surface transition durations kept for backward compatibility with tests.
 const SURFACE_ENTER_DURATION: float = 0.14
 const SURFACE_EXIT_DURATION: float = 0.12
 const STAGE_VARIANT_STATUS_COLOR: Color = Color(0.55, 0.9, 1.0)
@@ -47,9 +44,6 @@ const RUN_OVER_STATUS_COLOR: Color = Color(0.9, 0.2, 0.2)
 const BUTTON_HOVER_SCALE: float = 1.03
 const BUTTON_PRESS_SCALE: float = 0.96
 const BUTTON_TWEEN_DURATION: float = 0.08
-const MULTIPLIER_BURST_DURATION: float = 0.42
-const MULTIPLIER_BURST_BAR_OFFSET: float = 26.0
-const MULTIPLIER_BURST_Y_JITTER: float = 18.0
 const INTRO_CARD_SLOT_SHAKE_DURATION: float = 0.09
 const INTRO_CARD_RULE_SLOT_SHAKE: float = 1.1
 const INTRO_CARD_TARGET_SLOT_SHAKE: float = 1.6
@@ -81,7 +75,7 @@ enum ContractContinuation { START_TURN, OPEN_STAGE_MAP }
 @onready var stage_map_panel: StageMapPanel = $StageMapPanel
 @onready var settings_panel: PanelContainer = $SettingsPanel
 @onready var pause_menu: Control = $PauseMenu
-@onready var _contract_overlay: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay
+@onready var _contract_overlay_panel: PanelContainer = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay
 @onready var _contract_overlay_title_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractTitleLabel
 @onready var _contract_overlay_check_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/CheckLabel
 @onready var _contract_overlay_text_label: Label = $MarginContainer/VBoxContainer/ArenaRow/ContractOverlay/MarginContainer/VBoxContainer/ContractRow/ContractTextLabel
@@ -135,14 +129,14 @@ var _resume_surface: String = RESUME_SURFACE_TURN
 var _resume_payload: Dictionary = {}
 var _active_event_overlay: ColorRect = null
 var _active_rest_overlay: ColorRect = null
-var _risk_tower_lights: Array[ColorRect] = []
-var _risk_tower_stop_dots: Array[Label] = []
-var _risk_tower_tooltip_text: String = ""
-var _risk_tower_hovered: bool = false
-var _surface_transition_tweens: Dictionary = {}
+var _risk_tower: RiskTowerRenderer = null
+var _contract_overlay_ctrl: ContractOverlayController = null
+var _vfx: RollPhaseVFX = null
+var _surface_ctrl: SurfaceTransitionController = null
 var _pending_run_end_snapshot: RunSaveData = null
 var _pending_run_end_prior_bests: Dictionary = {}
 var _settings_opened_from_pause: bool = false
+var _snapshot_service: RefCounted = null
 
 const StreakDisplayScript: GDScript = preload("res://Scripts/StreakDisplay.gd")
 const BustOverlayScene: PackedScene = preload("res://Scenes/BustOverlay.tscn")
@@ -167,6 +161,8 @@ const _UITheme := preload("res://Scripts/UITheme.gd")
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
+const RollPhaseSnapshotScript: GDScript = preload("res://Scripts/RollPhaseSnapshot.gd")
+const RollPhaseSnapshotScript: GDScript = preload("res://Scripts/RollPhaseSnapshot.gd")
 const MAIN_MENU_SCENE_PATH: String = "res://Scenes/MainMenu.tscn"
 
 func _ready() -> void:
@@ -176,6 +172,7 @@ func _ready() -> void:
 	_roll_resolution_service = RollResolutionServiceScript.new()
 	_contract_progress_service = ContractProgressServiceScript.new()
 	_stage_flow = StageFlowCoordinatorScript.new()
+	_snapshot_service = RollPhaseSnapshotScript.new()
 	theme = _UITheme.build_theme()
 	roll_button.pressed.connect(_on_roll_pressed)
 	bank_button.pressed.connect(_on_bank_pressed)
@@ -211,12 +208,26 @@ func _ready() -> void:
 	_screen_shake.setup(_roll_content)
 	_screen_overlay = ScreenOverlayScript.new()
 	add_child(_screen_overlay)
-	_build_risk_tower_lights()
-	_build_risk_tower_stop_dots()
-	_apply_risk_tower_theme()
-	_risk_tower_overlay.mouse_entered.connect(_on_risk_tower_mouse_entered)
-	_risk_tower_overlay.mouse_exited.connect(_on_risk_tower_mouse_exited)
-	_apply_contract_overlay_theme()
+	_risk_tower = RiskTowerRenderer.new()
+	add_child(_risk_tower)
+	_risk_tower.setup(
+		_risk_tower_overlay, _risk_tower_title_label,
+		_risk_tower_lights_column, _risk_tower_stop_dots_column,
+		_risk_tower_percent_label, hud, _roll_content,
+	)
+	_contract_overlay_ctrl = ContractOverlayController.new()
+	add_child(_contract_overlay_ctrl)
+	_contract_overlay_ctrl.setup(
+		_contract_overlay_panel, _contract_overlay_title_label,
+		_contract_overlay_check_label, _contract_overlay_text_label,
+		_contract_progress_service, _roll_content,
+	)
+	_vfx = RollPhaseVFX.new()
+	add_child(_vfx)
+	_vfx.setup(self, _screen_shake, _screen_overlay)
+	_surface_ctrl = SurfaceTransitionController.new()
+	add_child(_surface_ctrl)
+	_surface_ctrl.setup(self, _roll_content, shop_panel, forge_panel, stage_map_panel, _screen_shake)
 	_add_button_micro_tween(roll_button)
 	_add_button_micro_tween(bank_button)
 	_add_button_micro_tween(new_run_button)
@@ -275,6 +286,7 @@ func _start_new_turn() -> void:
 	_reroll_count = 0
 	_triggered_combo_ids.clear()
 	hud.set_active_combos([])
+	GameManager.consume_cluster_children_for_new_hand()
 	var count: int = GameManager.dice_pool.size()
 	current_results.resize(count)
 	current_results.fill(null)
@@ -702,10 +714,11 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			await get_tree().create_timer(CATEGORY_TIER_STEP_DELAY).timeout
 
 	rolled_indices = ordered_indices
+	var roll_stop_count: int = _count_stops_in(rolled_indices)
 
 	# Recompute effective stops using proximity multipliers rather than a flat STOP count.
 	_maybe_spawn_cluster_children(rolled_indices)
-	accumulated_stop_count = _count_stops_in(_all_dice_indices())
+	accumulated_stop_count += roll_stop_count
 	_register_rolled_shields(rolled_indices)
 	var shield_count: int = _count_shields()
 	var effective_stops: int = _bust_resolver.effective_stops(accumulated_stop_count, shield_count)
@@ -724,7 +737,6 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 			turn_state = TurnState.ACTIVE
 		RollBustOutcome.INSURANCE_SAVE:
 			_consume_insurance_face(insurance_index)
-			accumulated_stop_count = _count_stops_in(_all_dice_indices())
 			turn_state = TurnState.BANKED
 			bank_streak = 0
 			_update_streak_display()
@@ -765,10 +777,9 @@ func _process_roll_results(rolled_indices: Array[int]) -> void:
 		_push_feed_status("CLEAN ROLL! No stops!", Color(0.3, 1.0, 0.3))
 		SFXManager.play_clean_roll()
 
-	var roll_stop_count: int = _count_stops_in(rolled_indices)
 	if roll_stop_count > 0:
-		var has_cursed: bool = _get_roll_resolution_service().has_cursed_stop_in(rolled_indices, current_results)
-		_shake_screen(SHAKE_CURSED_STOP if has_cursed else SHAKE_STOP, 0.12 if has_cursed else 0.1)
+		# Keep STOP feedback die-local (impact pop/sfx) to avoid perturbing HUD/layout.
+		pass
 	var shielded: int = _get_roll_resolution_service().absorbed_stop_count(roll_stop_count, shield_count)
 	if shielded > 0:
 		_push_feed_status("Shields absorbed %d stop(s)!" % shielded, Color(0.3, 0.7, 1.0))
@@ -860,6 +871,16 @@ func _count_stops() -> int:
 	return count
 
 
+func _stop_value_for_face(face: DiceFaceData) -> int:
+	if face == null:
+		return 0
+	if face.type == DiceFaceData.FaceType.CURSED_STOP:
+		return 2
+	if face.type == DiceFaceData.FaceType.STOP:
+		return 1
+	return 0
+
+
 func _all_dice_indices() -> Array[int]:
 	var indices: Array[int] = []
 	for i: int in GameManager.dice_pool.size():
@@ -896,6 +917,7 @@ func _resolve_face_outcome(index: int, face: DiceFaceData, chain_targets: Array[
 	match face.type:
 		DiceFaceData.FaceType.STOP, DiceFaceData.FaceType.CURSED_STOP:
 			dice_stopped[index] = true
+			accumulated_stop_count += _stop_value_for_face(face)
 		DiceFaceData.FaceType.AUTO_KEEP, DiceFaceData.FaceType.SHIELD, DiceFaceData.FaceType.MULTIPLY, DiceFaceData.FaceType.INSURANCE, DiceFaceData.FaceType.EXPLODE, DiceFaceData.FaceType.LUCK:
 			dice_keep[index] = true
 			dice_keep_locked[index] = true
@@ -1038,7 +1060,6 @@ func _recompute_free_effect_totals() -> void:
 		var face: DiceFaceData = current_results[i]
 		if face != null and face.type == DiceFaceData.FaceType.SHIELD and not dice_stopped[i]:
 			accumulated_shield_count += face.value * shield_multiplier
-	accumulated_stop_count = _count_stops_in(_all_dice_indices())
 
 
 func _resolve_bust_after_free_effects() -> bool:
@@ -1494,144 +1515,37 @@ func _get_idle_status_context() -> Dictionary:
 
 
 func _apply_contract_overlay_theme() -> void:
-	if _contract_overlay == null:
-		return
-	_contract_overlay.custom_minimum_size = Vector2(CONTRACT_OVERLAY_WIDTH, 0.0)
-	_contract_overlay.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	_contract_overlay.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_contract_overlay.add_theme_stylebox_override(
-		"panel",
-		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
-	)
-	_contract_overlay_title_label.add_theme_font_override("font", _UITheme.font_display())
-	_contract_overlay_title_label.add_theme_font_size_override("font_size", 32)
-	_contract_overlay_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_ACCENT_TEXT)
-	_contract_overlay_check_label.add_theme_font_override("font", _UITheme.font_display())
-	_contract_overlay_check_label.add_theme_font_size_override("font_size", 28)
-	_contract_overlay_check_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	_contract_overlay_text_label.add_theme_font_override("font", _UITheme.font_mono())
-	_contract_overlay_text_label.add_theme_font_size_override("font_size", 28)
-	_contract_overlay_text_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_BODY_TEXT)
-	_contract_overlay_text_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_contract_overlay_text_label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	_contract_overlay_text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_contract_overlay_text_label.clip_text = false
+	pass  # Handled by ContractOverlayController.setup()
 
 
 func _build_risk_tower_lights() -> void:
-	if _risk_tower_lights_column == null:
-		return
-	for child: Node in _risk_tower_lights_column.get_children():
-		child.queue_free()
-	_risk_tower_lights.clear()
-	for _i: int in RISK_TOWER_LIGHT_COUNT:
-		var light := ColorRect.new()
-		light.custom_minimum_size = Vector2(16, 12)
-		light.color = Color("#1A2229")
-		_risk_tower_lights_column.add_child(light)
-		_risk_tower_lights.append(light)
+	pass  # Handled by RiskTowerRenderer.setup()
 
 
 func _build_risk_tower_stop_dots() -> void:
-	if _risk_tower_stop_dots_column == null:
-		return
-	for child: Node in _risk_tower_stop_dots_column.get_children():
-		child.queue_free()
-	_risk_tower_stop_dots.clear()
-	for _i: int in RISK_TOWER_STOP_DOT_COUNT:
-		var dot := Label.new()
-		dot.text = "●"
-		dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		dot.add_theme_font_override("font", _UITheme.font_display())
-		dot.add_theme_font_size_override("font_size", 18)
-		dot.modulate = Color("#40252A")
-		_risk_tower_stop_dots_column.add_child(dot)
-		_risk_tower_stop_dots.append(dot)
+	pass  # Handled by RiskTowerRenderer.setup()
 
 
 func _apply_risk_tower_theme() -> void:
-	if _risk_tower_overlay == null:
-		return
-	_risk_tower_overlay.custom_minimum_size = Vector2(RISK_TOWER_OVERLAY_WIDTH, 0.0)
-	_risk_tower_overlay.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_risk_tower_overlay.add_theme_stylebox_override(
-		"panel",
-		_UITheme.make_stage_family_panel_style("inspector", _UITheme.CORNER_RADIUS_CARD, 1)
-	)
-	_risk_tower_title_label.add_theme_font_override("font", _UITheme.font_display())
-	_risk_tower_title_label.add_theme_font_size_override("font_size", 13)
-	_risk_tower_title_label.add_theme_color_override("font_color", _UITheme.STAGE_FAMILY_MUTED_TEXT)
-	_risk_tower_percent_label.add_theme_font_override("font", _UITheme.font_mono())
-	_risk_tower_percent_label.add_theme_font_size_override("font_size", 30)
-	_risk_tower_percent_label.add_theme_color_override("font_color", _UITheme.SUCCESS_GREEN)
-	_refresh_risk_tower(0.0, 0, "")
+	pass  # Handled by RiskTowerRenderer.setup()
 
 
 func _refresh_risk_tower(bust_odds: float, effective_stops: int, risk_details: String) -> void:
-	if _risk_tower_overlay == null:
-		return
-	_risk_tower_overlay.visible = _roll_content.visible
-	if not _risk_tower_overlay.visible:
-		_risk_tower_hovered = false
-		hud.hide_risk_tooltip()
-		return
-	_risk_tower_tooltip_text = risk_details
-	var ratio: float = clampf(bust_odds, 0.0, 1.0)
-	var filled: int = ceili(ratio * float(RISK_TOWER_LIGHT_COUNT))
-	var percent: int = int(round(ratio * 100.0))
-	var light_color: Color = _UITheme.SUCCESS_GREEN
-	if ratio >= 0.66:
-		light_color = _UITheme.DANGER_RED
-	elif ratio >= 0.33:
-		light_color = _UITheme.SCORE_GOLD
-	_risk_tower_percent_label.text = "%03d%%" % percent
-	_risk_tower_percent_label.modulate = light_color
-	for i: int in RISK_TOWER_LIGHT_COUNT:
-		var is_lit: bool = i >= RISK_TOWER_LIGHT_COUNT - filled
-		_risk_tower_lights[i].color = light_color if is_lit else Color("#1A2229")
-	var lit_stop_dots: int = mini(maxi(effective_stops, 0), RISK_TOWER_STOP_DOT_COUNT)
-	for i: int in RISK_TOWER_STOP_DOT_COUNT:
-		var dot_lit: bool = i >= RISK_TOWER_STOP_DOT_COUNT - lit_stop_dots
-		_risk_tower_stop_dots[i].modulate = _UITheme.DANGER_RED if dot_lit else Color("#40252A")
-	if _risk_tower_hovered:
-		hud.show_risk_tooltip(_risk_tower_overlay.get_global_rect(), _risk_tower_tooltip_text)
+	if _risk_tower != null:
+		_risk_tower.refresh(bust_odds, effective_stops, risk_details)
 
 
 func _on_risk_tower_mouse_entered() -> void:
-	_risk_tower_hovered = true
-	hud.show_risk_tooltip(_risk_tower_overlay.get_global_rect(), _risk_tower_tooltip_text)
+	pass  # Handled by RiskTowerRenderer
 
 
 func _on_risk_tower_mouse_exited() -> void:
-	_risk_tower_hovered = false
-	hud.hide_risk_tooltip()
+	pass  # Handled by RiskTowerRenderer
 
 
 func _refresh_contract_overlay() -> void:
-	if _contract_overlay == null:
-		return
-	if GameManager.active_loop_contract_id.is_empty() or not _roll_content.visible:
-		_contract_overlay.visible = false
-		return
-	var contract: LoopContractDataType = LoopContractCatalogScript.get_by_id(GameManager.active_loop_contract_id)
-	if contract == null:
-		_contract_overlay.visible = false
-		return
-	_contract_overlay.visible = true
-	var completed: bool = bool(GameManager.active_loop_contract_progress.get("completed", false))
-	_contract_overlay_check_label.text = _UITheme.GLYPH_CHECK if completed else "[ ]"
-	_contract_overlay_check_label.modulate = _UITheme.SUCCESS_GREEN if completed else _UITheme.MUTED_TEXT
-	var progress_text: String = ""
-	if _contract_progress_service != null:
-		progress_text = _contract_progress_service.format_progress_text(
-			GameManager.active_loop_contract_id,
-			GameManager.active_loop_contract_progress
-		)
-	if progress_text.is_empty():
-		_contract_overlay_text_label.text = contract.description
-	else:
-		_contract_overlay_text_label.text = "%s\n%s" % [contract.description, progress_text]
-	_contract_overlay_text_label.reset_size()
+	if _contract_overlay_ctrl != null:
+		_contract_overlay_ctrl.refresh()
 
 
 func _on_loop_contract_overlay_changed(_active_contract_id: String) -> void:
@@ -1727,45 +1641,25 @@ func _set_post_run_buttons_visible(should_show: bool) -> void:
 
 
 func _set_roll_surface_visible(should_show: bool, show_streak: bool = false) -> void:
-	if should_show and _screen_shake != null:
-		_screen_shake.force_restore()
-	_transition_surface(_roll_content, should_show)
-	if _streak_display == null:
-		return
-	if should_show and show_streak:
-		_transition_surface(_streak_display, true)
+	if _surface_ctrl != null:
+		_surface_ctrl.set_roll_surface_visible(should_show, show_streak, _streak_display)
 	else:
-		_transition_surface(_streak_display, false)
+		if should_show and _screen_shake != null:
+			_screen_shake.force_restore()
+		_transition_surface(_roll_content, should_show)
 
 
 func _transition_surface(surface: CanvasItem, should_show: bool) -> void:
+	if _surface_ctrl != null:
+		_surface_ctrl.transition_surface(surface, should_show)
+		return
 	if surface == null:
 		return
-	var surface_key: int = surface.get_instance_id()
-	if _surface_transition_tweens.has(surface_key):
-		var prior_tween: Tween = _surface_transition_tweens.get(surface_key) as Tween
-		if prior_tween != null and prior_tween.is_valid():
-			prior_tween.kill()
-		_surface_transition_tweens.erase(surface_key)
-
-	var tween: Tween = null
 	if should_show:
-		if surface.visible and surface.modulate.a >= 0.999:
-			return
-		tween = FlowTransitionScript.play_fade_in(self, surface, SURFACE_ENTER_DURATION)
+		surface.visible = true
+		surface.modulate.a = 1.0
 	else:
-		if not surface.visible:
-			return
-		tween = FlowTransitionScript.play_fade_out(self, surface, SURFACE_EXIT_DURATION)
-
-	if tween == null:
-		return
-	_surface_transition_tweens[surface_key] = tween
-	tween.finished.connect(_on_surface_transition_finished.bind(surface_key), CONNECT_ONE_SHOT)
-
-
-func _on_surface_transition_finished(surface_key: int) -> void:
-	_surface_transition_tweens.erase(surface_key)
+		surface.visible = false
 
 func _on_stage_cleared() -> void:
 	if _defer_stage_clear_overlay:
@@ -1783,6 +1677,7 @@ func _perform_stage_clear() -> void:
 	var bonus: int = GameManager.consume_next_stage_clear_gold_bonus(GameManager.get_stage_clear_bonus())
 	var surplus: int = GameManager.total_score - GameManager.stage_target_score
 	GameManager.add_gold(bonus)
+	GameManager.purge_cluster_children_after_stage()
 	SFXManager.play_stage_clear()
 	var is_loop: bool = GameManager.is_final_stage()
 	GameManager.reset_stage_hands()
@@ -1802,6 +1697,10 @@ func _schedule_deferred_stage_clear(after_delay: float) -> void:
 
 func _trigger_pending_stage_clear() -> void:
 	if not _pending_stage_clear_overlay:
+		return
+	if hud != null and hud.is_score_presentation_busy():
+		# Keep stage clear in sync with the final score meter state.
+		get_tree().create_timer(0.05).timeout.connect(_trigger_pending_stage_clear, CONNECT_ONE_SHOT)
 		return
 	_pending_stage_clear_overlay = false
 	_perform_stage_clear()
@@ -2132,83 +2031,26 @@ func _publish_bank_score_feed(
 
 
 func _play_multiply_face_vfx() -> void:
-	var effect_index: int = 0
+	if _vfx == null:
+		return
 	var anchor: Vector2 = _get_multiplier_vfx_anchor_global_position()
-	for i: int in GameManager.dice_pool.size():
-		if dice_stopped[i]:
-			continue
-		var face: DiceFaceData = current_results[i]
-		if face == null:
-			continue
-		if face.type == DiceFaceData.FaceType.MULTIPLY:
-			var stop_amplifier: bool = i < GameManager.dice_pool.size() and GameManager.dice_pool[i] != null and GameManager.dice_pool[i].multiplies_stops
-			_spawn_multiplier_burst(anchor + Vector2(0.0, _burst_vertical_offset(effect_index)), face.value, stop_amplifier)
-			effect_index += 1
-
-
-func _burst_vertical_offset(effect_index: int) -> float:
-	if effect_index == 0:
-		return 0.0
-	var direction: float = -1.0 if effect_index % 2 == 0 else 1.0
-	return direction * ceilf(float(effect_index) * 0.5) * MULTIPLIER_BURST_Y_JITTER
+	_vfx.play_multiply_face_vfx(GameManager.dice_pool, current_results, dice_stopped, anchor)
 
 
 func _get_multiplier_vfx_anchor_global_position() -> Vector2:
+	if hud != null and hud.has_method("get_progress_visual_rect"):
+		var progress_rect: Rect2 = hud.get_progress_visual_rect()
+		return Vector2(progress_rect.position.x - RollPhaseVFX.MULTIPLIER_BURST_BAR_OFFSET, progress_rect.position.y + progress_rect.size.y * 0.5)
 	if hud != null and hud.progress_bar != null:
-		return hud.progress_bar.global_position + Vector2(-MULTIPLIER_BURST_BAR_OFFSET, hud.progress_bar.size.y * 0.5)
+		return hud.progress_bar.global_position + Vector2(-RollPhaseVFX.MULTIPLIER_BURST_BAR_OFFSET, hud.progress_bar.size.y * 0.5)
 	var arena_origin: Vector2 = _arena_viewport_container.global_position
 	var arena_size: Vector2 = _arena_viewport_container.size
-	return arena_origin + Vector2(MULTIPLIER_BURST_BAR_OFFSET, arena_size.y * 0.5)
+	return arena_origin + Vector2(RollPhaseVFX.MULTIPLIER_BURST_BAR_OFFSET, arena_size.y * 0.5)
 
 
 func _spawn_multiplier_burst(burst_position: Vector2, multiplier: int, is_stop_multiplier: bool) -> void:
-	var fx_root := Node2D.new()
-	fx_root.name = "MultiplierBurstFx"
-	fx_root.top_level = true
-	fx_root.global_position = burst_position
-	add_child(fx_root)
-
-	var flame := CPUParticles2D.new()
-	flame.one_shot = true
-	flame.amount = 36
-	flame.lifetime = MULTIPLIER_BURST_DURATION
-	flame.explosiveness = 0.82
-	flame.direction = Vector2.RIGHT if not is_stop_multiplier else Vector2(0.9, -0.1)
-	flame.spread = 34.0
-	flame.gravity = Vector2(0.0, -18.0)
-	flame.initial_velocity_min = 90.0
-	flame.initial_velocity_max = 180.0
-	flame.scale_amount_min = 1.4
-	flame.scale_amount_max = 2.6
-	var flame_gradient := Gradient.new()
-	var flame_color: Color = _UITheme.ROSE_ACCENT if is_stop_multiplier else _UITheme.SCORE_GOLD
-	flame_gradient.set_color(0, Color(1.0, 0.98, 0.72, 0.95))
-	flame_gradient.add_point(0.45, flame_color)
-	flame_gradient.set_color(1, Color(flame_color.r, flame_color.g, flame_color.b, 0.0))
-	flame.color_ramp = flame_gradient
-	fx_root.add_child(flame)
-
-	var tag := Label.new()
-	tag.text = "x%d+STOP" % multiplier if is_stop_multiplier else "x%d" % multiplier
-	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	tag.position = Vector2(-28.0, -18.0)
-	tag.size = Vector2(64.0, 24.0)
-	tag.add_theme_font_override("font", _UITheme.font_stats())
-	tag.add_theme_font_size_override("font_size", 22)
-	tag.add_theme_color_override("font_color", flame_color)
-	tag.add_theme_color_override("font_outline_color", Color("#05050A"))
-	tag.add_theme_constant_override("outline_size", 5)
-	fx_root.add_child(tag)
-
-	flame.emitting = true
-	fx_root.scale = Vector2(0.72, 0.72)
-	fx_root.modulate.a = 0.95
-	var tween: Tween = fx_root.create_tween()
-	tween.tween_property(fx_root, "scale", Vector2(1.12, 1.12), MULTIPLIER_BURST_DURATION * 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(fx_root, "global_position", burst_position + Vector2(34.0, -8.0), MULTIPLIER_BURST_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(fx_root, "modulate:a", 0.0, MULTIPLIER_BURST_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(fx_root.queue_free)
+	if _vfx != null:
+		_vfx._spawn_multiplier_burst(burst_position, multiplier, is_stop_multiplier)
 
 
 ## Compute effective per-die score contributions after proximity multipliers.
@@ -2273,33 +2115,9 @@ func _copy_int_array(values: Variant) -> Array[int]:
 # Juice overlays
 # ---------------------------------------------------------------------------
 
-const JACKPOT_CONFETTI_AMOUNT: int = 80
-const JACKPOT_CONFETTI_LIFETIME: float = 1.8
-
-
 func _spawn_jackpot_confetti() -> void:
-	var confetti := CPUParticles2D.new()
-	confetti.one_shot = true
-	confetti.amount = JACKPOT_CONFETTI_AMOUNT
-	confetti.lifetime = JACKPOT_CONFETTI_LIFETIME
-	confetti.explosiveness = 0.9
-	confetti.direction = Vector2(0, -1)
-	confetti.spread = 100.0
-	confetti.gravity = Vector2(0, 400)
-	confetti.initial_velocity_min = 200.0
-	confetti.initial_velocity_max = 500.0
-	confetti.scale_amount_min = 2.0
-	confetti.scale_amount_max = 5.0
-	var gradient := Gradient.new()
-	gradient.set_color(0, Color(1.0, 0.85, 0.0))
-	gradient.add_point(0.33, Color(1.0, 0.65, 0.0))
-	gradient.add_point(0.66, Color(1.0, 1.0, 0.4))
-	gradient.set_color(1, Color(1.0, 0.85, 0.0, 0.0))
-	confetti.color_ramp = gradient
-	confetti.position = Vector2(size.x / 2.0, size.y * 0.3)
-	add_child(confetti)
-	confetti.emitting = true
-	get_tree().create_timer(JACKPOT_CONFETTI_LIFETIME + 0.5).timeout.connect(_queue_free_if_valid.bind(confetti))
+	if _vfx != null:
+		_vfx.spawn_jackpot_confetti()
 
 
 func _queue_free_if_valid(node: Node) -> void:
@@ -2314,9 +2132,8 @@ func _show_bust_overlay(effective_stops: int, on_finished: Callable = Callable()
 
 
 func _shake_screen(intensity: float, duration: float) -> void:
-	if _screen_shake == null:
-		return
-	_screen_shake.shake(intensity, duration)
+	if _vfx != null:
+		_vfx.shake_screen(intensity, duration)
 
 
 func _on_intro_card_slotted(card_kind: String) -> void:
@@ -2782,7 +2599,7 @@ func _build_resume_payload_snapshot() -> Dictionary:
 func _build_roll_phase_state() -> Dictionary:
 	if _resume_surface == RESUME_SURFACE_TURN:
 		return _build_turn_checkpoint_roll_phase_state()
-	return {
+	return _snapshot_service.build_roll_phase_state({
 		"turn_state": int(turn_state),
 		"turn_number": turn_number,
 		"accumulated_stop_count": accumulated_stop_count,
@@ -2792,107 +2609,53 @@ func _build_roll_phase_state() -> Dictionary:
 		"bank_streak": bank_streak,
 		"reroll_count": _reroll_count,
 		"run_snapshot_recorded": _run_snapshot_recorded,
-		"triggered_combo_ids": _triggered_combo_ids.duplicate(true),
+		"triggered_combo_ids": _triggered_combo_ids,
 		"stage_had_bust": _stage_had_bust,
 		"turn_entered_high_risk": _turn_entered_high_risk,
-		"current_results": _serialize_face_array(current_results),
-		"dice_stopped": dice_stopped.duplicate(),
-		"dice_keep": dice_keep.duplicate(),
-		"dice_keep_locked": dice_keep_locked.duplicate(),
-		"die_reroll_counts": _die_reroll_counts.duplicate(),
-		"was_displaced": _was_displaced.duplicate(),
-		"cluster_child_flags": _cluster_child_flags.duplicate(),
-	}
+		"current_results": current_results,
+		"dice_stopped": dice_stopped,
+		"dice_keep": dice_keep,
+		"dice_keep_locked": dice_keep_locked,
+		"die_reroll_counts": _die_reroll_counts,
+		"was_displaced": _was_displaced,
+		"cluster_child_flags": _cluster_child_flags,
+	})
 
 
 func _build_turn_checkpoint_roll_phase_state() -> Dictionary:
-	var dice_count: int = GameManager.dice_pool.size()
-	var empty_results: Array = []
-	var stopped: Array = []
-	var keep: Array = []
-	var keep_locked: Array = []
-	var reroll_counts: Array = []
-	var displaced: Array = []
-	var cluster_children: Array = []
-	for _i: int in dice_count:
-		empty_results.append({})
-		stopped.append(false)
-		keep.append(false)
-		keep_locked.append(false)
-		reroll_counts.append(0)
-		displaced.append(false)
-		cluster_children.append(false)
-	return {
-		"turn_state": int(TurnState.IDLE),
+	return _snapshot_service.build_turn_checkpoint_state({
+		"dice_count": GameManager.dice_pool.size(),
 		"turn_number": turn_number,
-		"accumulated_stop_count": 0,
-		"accumulated_shield_count": 0,
-		"run_active": true,
 		"loop_complete_pending": _loop_complete_pending,
 		"bank_streak": bank_streak,
-		"reroll_count": 0,
 		"run_snapshot_recorded": _run_snapshot_recorded,
-		"triggered_combo_ids": {},
 		"stage_had_bust": _stage_had_bust,
-		"turn_entered_high_risk": false,
-		"current_results": empty_results,
-		"dice_stopped": stopped,
-		"dice_keep": keep,
-		"dice_keep_locked": keep_locked,
-		"die_reroll_counts": reroll_counts,
-		"was_displaced": displaced,
-		"cluster_child_flags": cluster_children,
-	}
+	})
 
 
 func _restore_roll_phase_state(data: Dictionary) -> void:
-	turn_state = int(data.get("turn_state", int(TurnState.IDLE))) as TurnState
-	turn_number = int(data.get("turn_number", 0))
-	accumulated_stop_count = int(data.get("accumulated_stop_count", 0))
-	accumulated_shield_count = int(data.get("accumulated_shield_count", 0))
-	_run_active = bool(data.get("run_active", true))
-	_loop_complete_pending = bool(data.get("loop_complete_pending", false))
-	bank_streak = int(data.get("bank_streak", 0))
-	_reroll_count = int(data.get("reroll_count", 0))
-	_run_snapshot_recorded = bool(data.get("run_snapshot_recorded", false))
-	_triggered_combo_ids = data.get("triggered_combo_ids", {}) as Dictionary
-	_stage_had_bust = bool(data.get("stage_had_bust", false))
-	_turn_entered_high_risk = bool(data.get("turn_entered_high_risk", false))
-	current_results = _deserialize_face_array(data.get("current_results", []) as Array)
-	dice_stopped.clear()
-	for value: Variant in data.get("dice_stopped", []) as Array:
-		dice_stopped.append(bool(value))
-	dice_keep.clear()
-	for value: Variant in data.get("dice_keep", []) as Array:
-		dice_keep.append(bool(value))
-	dice_keep_locked.clear()
-	for value: Variant in data.get("dice_keep_locked", []) as Array:
-		dice_keep_locked.append(bool(value))
-	_die_reroll_counts.clear()
-	for value: Variant in data.get("die_reroll_counts", []) as Array:
-		_die_reroll_counts.append(int(value))
-	_was_displaced.clear()
-	for value: Variant in data.get("was_displaced", []) as Array:
-		_was_displaced.append(bool(value))
-	_cluster_child_flags.clear()
-	for value: Variant in data.get("cluster_child_flags", []) as Array:
-		_cluster_child_flags.append(bool(value))
-
 	var expected_count: int = GameManager.dice_pool.size()
-	if current_results.size() != expected_count:
-		current_results.resize(expected_count)
-	if dice_stopped.size() != expected_count:
-		dice_stopped.resize(expected_count)
-	if dice_keep.size() != expected_count:
-		dice_keep.resize(expected_count)
-	if dice_keep_locked.size() != expected_count:
-		dice_keep_locked.resize(expected_count)
-	if _die_reroll_counts.size() != expected_count:
-		_die_reroll_counts.resize(expected_count)
-	if _was_displaced.size() != expected_count:
-		_was_displaced.resize(expected_count)
-	if _cluster_child_flags.size() != expected_count:
-		_cluster_child_flags.resize(expected_count)
+	var restored: Dictionary = _snapshot_service.restore_roll_phase_state(data, expected_count)
+
+	turn_state = int(restored.get("turn_state", int(TurnState.IDLE))) as TurnState
+	turn_number = int(restored.get("turn_number", 0))
+	accumulated_stop_count = int(restored.get("accumulated_stop_count", 0))
+	accumulated_shield_count = int(restored.get("accumulated_shield_count", 0))
+	_run_active = bool(restored.get("run_active", true))
+	_loop_complete_pending = bool(restored.get("loop_complete_pending", false))
+	bank_streak = int(restored.get("bank_streak", 0))
+	_reroll_count = int(restored.get("reroll_count", 0))
+	_run_snapshot_recorded = bool(restored.get("run_snapshot_recorded", false))
+	_triggered_combo_ids = restored.get("triggered_combo_ids", {}) as Dictionary
+	_stage_had_bust = bool(restored.get("stage_had_bust", false))
+	_turn_entered_high_risk = bool(restored.get("turn_entered_high_risk", false))
+	current_results = restored.get("current_results", []) as Array[DiceFaceData]
+	dice_stopped = restored.get("dice_stopped", []) as Array[bool]
+	dice_keep = restored.get("dice_keep", []) as Array[bool]
+	dice_keep_locked = restored.get("dice_keep_locked", []) as Array[bool]
+	_die_reroll_counts = restored.get("die_reroll_counts", []) as Array[int]
+	_was_displaced = restored.get("was_displaced", []) as Array[bool]
+	_cluster_child_flags = restored.get("cluster_child_flags", []) as Array[bool]
 
 	_is_roll_animating = false
 	_roll_anim_nonce += 1
@@ -2902,33 +2665,11 @@ func _restore_roll_phase_state(data: Dictionary) -> void:
 
 
 func _serialize_face_array(faces: Array[DiceFaceData]) -> Array:
-	var serialized: Array = []
-	for face: DiceFaceData in faces:
-		if face == null:
-			serialized.append({})
-			continue
-		serialized.append({
-			"type": int(face.type),
-			"value": int(face.value),
-		})
-	return serialized
+	return _snapshot_service.serialize_face_array(faces)
 
 
 func _deserialize_face_array(data: Array) -> Array[DiceFaceData]:
-	var faces: Array[DiceFaceData] = []
-	for entry: Variant in data:
-		if not (entry is Dictionary):
-			faces.append(null)
-			continue
-		var entry_dict: Dictionary = entry as Dictionary
-		if entry_dict.is_empty():
-			faces.append(null)
-			continue
-		var face := DiceFaceData.new()
-		face.type = int(entry_dict.get("type", int(DiceFaceData.FaceType.BLANK))) as DiceFaceData.FaceType
-		face.value = int(entry_dict.get("value", 0))
-		faces.append(face)
-	return faces
+	return _snapshot_service.deserialize_face_array(data)
 
 
 func _restore_resume_surface() -> void:
