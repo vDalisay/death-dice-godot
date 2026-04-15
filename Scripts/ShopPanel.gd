@@ -26,17 +26,12 @@ const DOUBLE_DOWN_MIN_GOLD: int = 10
 const CHASER_MIN_LOOP: int = 2
 const CHASER_MIN_LUCK: int = 2
 
-var _DoubleDownScene: PackedScene = preload("res://Scenes/DoubleDownOverlay.tscn")
 var _DiePickerOverlayScene: PackedScene = preload("res://Scenes/DiePickerOverlay.tscn")
 var _ShopItemCardScene: PackedScene = preload("res://Scenes/ShopItemCard.tscn")
 const DiceUpgradeServiceScript: GDScript = preload("res://Scripts/DiceUpgradeService.gd")
 const INSURANCE_BET_MIN_GOLD: int = 10
 const HEAT_BET_MIN_GOLD: int = 15
 const EVEN_ODD_BET_MIN_GOLD: int = 5
-
-var _InsuranceBetScene: PackedScene = preload("res://Scenes/InsuranceBetOverlay.tscn")
-var _HeatBetScene: PackedScene = preload("res://Scenes/HeatBetOverlay.tscn")
-var _EvenOddBetScene: PackedScene = preload("res://Scenes/EvenOddBetOverlay.tscn")
 
 @onready var _backdrop: ColorRect = $Backdrop
 @onready var _modal: PanelContainer = $CenterContainer/Modal
@@ -73,19 +68,16 @@ var _price_labels: Array[Label] = []
 var _card_panels: Array[PanelContainer] = []
 var _selected_item: ShopItemData = null
 var _selected_card_index: int = -1
-var _double_down_overlay: DoubleDownOverlay = null
-var _dd_used_this_shop: bool = false
-var _insurance_overlay: Node = null
-var _heat_overlay: Node = null
-var _even_odd_overlay: Node = null
 var _die_picker_overlay: Node = null
-var _ib_used_this_shop: bool = false
-var _hb_used_this_shop: bool = false
-var _eo_used_this_shop: bool = false
 var _transition_tween: Tween = null
 var _is_closing: bool = false
 var _current_stage_cleared: int = 0
 var _current_is_loop_complete: bool = false
+
+## Extracted components
+var _serializer: ShopSerializer = ShopSerializer.new()
+var _item_gen: ShopItemGenerator = ShopItemGenerator.new()
+var _bet_mgr: SideBetOverlayManager = null
 
 
 func _exit_tree() -> void:
@@ -101,6 +93,10 @@ func _ready() -> void:
 	GameManager.gold_changed.connect(_on_gold_changed)
 	if LocalizationManager != null:
 		LocalizationManager.locale_changed.connect(_on_locale_changed)
+	_bet_mgr = SideBetOverlayManager.new()
+	_bet_mgr.setup(self)
+	add_child(_bet_mgr)
+	_bet_mgr.overlay_resolved.connect(_on_bet_overlay_resolved)
 	_apply_responsive_layout()
 	_refresh_localized_labels()
 	visible = false
@@ -120,10 +116,7 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 	_current_stage_cleared = stage_just_cleared
 	_current_is_loop_complete = is_loop_complete
 	_continue_button.disabled = false
-	_dd_used_this_shop = false
-	_ib_used_this_shop = false
-	_hb_used_this_shop = false
-	_eo_used_this_shop = false
+	_bet_mgr.reset_used()
 	_apply_header_text()
 	_generate_items()
 	_refresh_display()
@@ -135,14 +128,14 @@ func open(stage_just_cleared: int, is_loop_complete: bool = false) -> void:
 
 func open_from_resume(snapshot: Dictionary) -> void:
 	_continue_button.disabled = false
-	_dd_used_this_shop = bool(snapshot.get("dd_used_this_shop", false))
-	_ib_used_this_shop = bool(snapshot.get("ib_used_this_shop", false))
-	_hb_used_this_shop = bool(snapshot.get("hb_used_this_shop", false))
-	_eo_used_this_shop = bool(snapshot.get("eo_used_this_shop", false))
+	_bet_mgr.dd_used = bool(snapshot.get("dd_used_this_shop", false))
+	_bet_mgr.ib_used = bool(snapshot.get("ib_used_this_shop", false))
+	_bet_mgr.hb_used = bool(snapshot.get("hb_used_this_shop", false))
+	_bet_mgr.eo_used = bool(snapshot.get("eo_used_this_shop", false))
 	_current_stage_cleared = int(snapshot.get("stage_just_cleared", GameManager.current_stage))
 	_current_is_loop_complete = bool(snapshot.get("is_loop_complete", false))
-	_dice_items = _deserialize_item_array(snapshot.get("dice_items", []) as Array)
-	_modifier_items = _deserialize_item_array(snapshot.get("modifier_items", []) as Array)
+	_dice_items = _serializer.deserialize_item_array(snapshot.get("dice_items", []) as Array)
+	_modifier_items = _serializer.deserialize_item_array(snapshot.get("modifier_items", []) as Array)
 	_build_item_cards()
 	_apply_header_text()
 	_refresh_display()
@@ -159,13 +152,13 @@ func build_resume_snapshot() -> Dictionary:
 	return {
 		"stage_just_cleared": _current_stage_cleared,
 		"is_loop_complete": _current_is_loop_complete,
-		"dd_used_this_shop": _dd_used_this_shop,
-		"ib_used_this_shop": _ib_used_this_shop,
-		"hb_used_this_shop": _hb_used_this_shop,
-		"eo_used_this_shop": _eo_used_this_shop,
+		"dd_used_this_shop": _bet_mgr.dd_used,
+		"ib_used_this_shop": _bet_mgr.ib_used,
+		"hb_used_this_shop": _bet_mgr.hb_used,
+		"eo_used_this_shop": _bet_mgr.eo_used,
 		"selected_card_index": _selected_card_index,
-		"dice_items": _serialize_item_array(_dice_items),
-		"modifier_items": _serialize_item_array(_modifier_items),
+		"dice_items": _serializer.serialize_item_array(_dice_items),
+		"modifier_items": _serializer.serialize_item_array(_modifier_items),
 	}
 
 
@@ -284,71 +277,27 @@ func _apply_responsive_layout() -> void:
 # ---------------------------------------------------------------------------
 
 func _generate_items() -> void:
-	_dice_items.clear()
-	_modifier_items.clear()
-	_bet_items.clear()
-
-	var dice_pool: Array[ShopItemData] = _build_dice_offer_pool()
-
-	GameManager.rng_shuffle_in_place("shop", dice_pool)
-	var pick_count: int = mini(DICE_SLOTS, dice_pool.size())
-	for i: int in pick_count:
-		_dice_items.append(dice_pool[i])
-
-	if not GameManager.dice_pool.is_empty():
-		_dice_items.append(ShopItemData.make_upgrade_die())
-	if _any_die_has_cursed_stop():
-		_dice_items.append(ShopItemData.make_cleanse_curse())
-	if GameManager.gold >= DOUBLE_DOWN_MIN_GOLD and not _dd_used_this_shop:
-		_bet_items.append(ShopItemData.make_double_down())
-	if GameManager.gold >= INSURANCE_BET_MIN_GOLD and not _ib_used_this_shop:
-		_bet_items.append(ShopItemData.make_insurance_bet())
-	if GameManager.gold >= HEAT_BET_MIN_GOLD and not _hb_used_this_shop:
-		_bet_items.append(ShopItemData.make_heat_bet())
-	if GameManager.gold >= EVEN_ODD_BET_MIN_GOLD and not _eo_used_this_shop:
-		_bet_items.append(ShopItemData.make_even_odd_bet())
-
-	if GameManager.can_add_modifier():
-		var mod_factories: Array[Callable] = RunModifier.all_factories()
-		var available_mods: Array[Callable] = []
-		for factory: Callable in mod_factories:
-			var sample: RunModifier = factory.call() as RunModifier
-			if not GameManager.has_modifier(sample.modifier_type):
-				available_mods.append(factory)
-		GameManager.rng_shuffle_in_place("shop", available_mods)
-		var mod_count: int = mini(MODIFIER_SLOTS, available_mods.size())
-		for i: int in mod_count:
-			var mod: RunModifier = available_mods[i].call() as RunModifier
-			_modifier_items.append(ShopItemData.make_buy_modifier(mod))
-
+	var bet_state: Dictionary = {
+		"dd_used": _bet_mgr.dd_used,
+		"ib_used": _bet_mgr.ib_used,
+		"hb_used": _bet_mgr.hb_used,
+		"eo_used": _bet_mgr.eo_used,
+	}
+	var offers: Dictionary = _item_gen.generate_offers(bet_state)
+	_dice_items.assign(offers["dice"] as Array)
+	_modifier_items.assign(offers["modifiers"] as Array)
+	_bet_items.assign(offers["bets"] as Array)
 	_build_item_cards()
 
 
+## Delegation stub — test backward compatibility.
 func _build_dice_offer_pool() -> Array[ShopItemData]:
-	var dice_pool: Array[ShopItemData] = [
-		ShopItemData.make_buy_simple_die(),
-		ShopItemData.make_buy_standard_die(),
-		ShopItemData.make_buy_blank_canvas_die(),
-		ShopItemData.make_buy_lucky_die(),
-		ShopItemData.make_buy_heart_die(),
-		ShopItemData.make_buy_pink_die(),
-		ShopItemData.make_buy_fortune_die(),
-		ShopItemData.make_buy_explosive_die(),
-		ShopItemData.make_buy_cluster_die(),
-	]
-	if GameManager.current_loop >= CHASER_MIN_LOOP or GameManager.prestige_shop_tier_active:
-		dice_pool.append(ShopItemData.make_buy_runner_die())
-		dice_pool.append(ShopItemData.make_buy_golden_die())
-		dice_pool.append(ShopItemData.make_buy_insurance_die())
-		dice_pool.append(ShopItemData.make_buy_heavy_die())
-	if _can_offer_spark_chaser_die():
-		dice_pool.append(ShopItemData.make_buy_spark_chaser_die())
-	return dice_pool
+	return _item_gen.build_dice_offer_pool()
 
 
+## Delegation stub — test backward compatibility.
 func _can_offer_spark_chaser_die() -> bool:
-	var loop_gate: bool = GameManager.current_loop >= CHASER_MIN_LOOP or GameManager.prestige_shop_tier_active
-	return loop_gate and GameManager.luck >= CHASER_MIN_LUCK
+	return _item_gen.can_offer_spark_chaser_die()
 
 
 func _build_item_cards() -> void:
@@ -606,16 +555,16 @@ func _on_buy_pressed(item: ShopItemData) -> void:
 		ShopItemData.ItemType.CLEANSE_CURSE:
 			_cleanse_random_cursed_die()
 		ShopItemData.ItemType.DOUBLE_DOWN:
-			_open_double_down()
+			_bet_mgr.open_double_down()
 			return
 		ShopItemData.ItemType.INSURANCE_BET:
-			_open_insurance_bet()
+			_bet_mgr.open_insurance_bet()
 			return
 		ShopItemData.ItemType.HEAT_BET:
-			_open_heat_bet()
+			_bet_mgr.open_heat_bet()
 			return
 		ShopItemData.ItemType.EVEN_ODD_BET:
-			_open_even_odd_bet()
+			_bet_mgr.open_even_odd_bet()
 			return
 
 	_refresh_display()
@@ -732,14 +681,6 @@ func _get_upgrade_preview() -> String:
 	return tr("SHOP_UPGRADE_PREVIEW_FMT").format({"candidates": ", ".join(previews)})
 
 
-func _any_die_has_cursed_stop() -> bool:
-	for die: DiceData in GameManager.dice_pool:
-		for face: DiceFaceData in die.faces:
-			if face.type == DiceFaceData.FaceType.CURSED_STOP:
-				return true
-	return false
-
-
 func _cleanse_random_cursed_die() -> void:
 	var cursed_dice: Array[DiceData] = []
 	for die: DiceData in GameManager.dice_pool:
@@ -765,24 +706,6 @@ func _dd_desc_text() -> String:
 		"value": GameManager.gold,
 		"reward": GameManager.gold * 2,
 	})
-
-
-func _open_double_down() -> void:
-	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
-		_double_down_overlay.queue_free()
-	_double_down_overlay = _DoubleDownScene.instantiate() as DoubleDownOverlay
-	add_child(_double_down_overlay)
-	_double_down_overlay.resolved.connect(_on_double_down_resolved)
-	_double_down_overlay.open(GameManager.gold)
-
-
-func _on_double_down_resolved() -> void:
-	_dd_used_this_shop = true
-	if _double_down_overlay != null and is_instance_valid(_double_down_overlay):
-		_double_down_overlay.queue_free()
-		_double_down_overlay = null
-	_generate_items()
-	_refresh_display()
 
 
 func _play_open_intro() -> void:
@@ -852,187 +775,7 @@ func _restore_gold_label_color() -> void:
 		_gold_label.add_theme_color_override("font_color", _UITheme.SCORE_GOLD)
 
 
-func _open_insurance_bet() -> void:
-	if _insurance_overlay != null and is_instance_valid(_insurance_overlay):
-		_insurance_overlay.queue_free()
-	var gold_before: int = GameManager.gold
-	_insurance_overlay = _InsuranceBetScene.instantiate()
-	add_child(_insurance_overlay)
-	_insurance_overlay.connect("resolved", Callable(self, "_on_insurance_bet_resolved").bind(gold_before))
-	_insurance_overlay.call("open")
-
-
-func _on_insurance_bet_resolved(gold_before: int) -> void:
-	if _insurance_overlay != null and is_instance_valid(_insurance_overlay):
-		_insurance_overlay.queue_free()
-		_insurance_overlay = null
-	if GameManager.gold < gold_before:
-		GameManager.track_shop_spend(gold_before - GameManager.gold)
-		_ib_used_this_shop = true
+## Callback: any side-bet overlay closed — regenerate offers and refresh.
+func _on_bet_overlay_resolved() -> void:
 	_generate_items()
 	_refresh_display()
-
-
-func _open_heat_bet() -> void:
-	if _heat_overlay != null and is_instance_valid(_heat_overlay):
-		_heat_overlay.queue_free()
-	var gold_before: int = GameManager.gold
-	_heat_overlay = _HeatBetScene.instantiate()
-	add_child(_heat_overlay)
-	_heat_overlay.connect("resolved", Callable(self, "_on_heat_bet_resolved").bind(gold_before))
-	_heat_overlay.call("open")
-
-
-func _on_heat_bet_resolved(gold_before: int) -> void:
-	if _heat_overlay != null and is_instance_valid(_heat_overlay):
-		_heat_overlay.queue_free()
-		_heat_overlay = null
-	if GameManager.gold < gold_before:
-		GameManager.track_shop_spend(gold_before - GameManager.gold)
-		_hb_used_this_shop = true
-	_generate_items()
-	_refresh_display()
-
-
-func _open_even_odd_bet() -> void:
-	if _even_odd_overlay != null and is_instance_valid(_even_odd_overlay):
-		_even_odd_overlay.queue_free()
-	var gold_before: int = GameManager.gold
-	_even_odd_overlay = _EvenOddBetScene.instantiate()
-	add_child(_even_odd_overlay)
-	_even_odd_overlay.connect("resolved", Callable(self, "_on_even_odd_bet_resolved").bind(gold_before))
-	_even_odd_overlay.call("open")
-
-
-func _on_even_odd_bet_resolved(gold_before: int) -> void:
-	if _even_odd_overlay != null and is_instance_valid(_even_odd_overlay):
-		_even_odd_overlay.queue_free()
-		_even_odd_overlay = null
-	if GameManager.gold < gold_before:
-		GameManager.track_shop_spend(gold_before - GameManager.gold)
-		_eo_used_this_shop = true
-	_generate_items()
-	_refresh_display()
-
-
-func _serialize_item_array(items: Array[ShopItemData]) -> Array[Dictionary]:
-	var serialized: Array[Dictionary] = []
-	for item: ShopItemData in items:
-		serialized.append(_serialize_item(item))
-	return serialized
-
-
-func _deserialize_item_array(items: Array) -> Array[ShopItemData]:
-	var deserialized: Array[ShopItemData] = []
-	for item_data: Variant in items:
-		if not (item_data is Dictionary):
-			continue
-		var item: ShopItemData = _deserialize_item(item_data as Dictionary)
-		if item != null:
-			deserialized.append(item)
-	return deserialized
-
-
-func _serialize_item(item: ShopItemData) -> Dictionary:
-	var modifier_type: int = -1
-	if item.modifier != null:
-		modifier_type = int(item.modifier.modifier_type)
-	return {
-		"item_type": int(item.item_type),
-		"item_name": item.item_name,
-		"description": item.description,
-		"cost": item.cost,
-		"modifier_type": modifier_type,
-	}
-
-
-func _deserialize_item(data: Dictionary) -> ShopItemData:
-	var item_type: int = int(data.get("item_type", -1))
-	if item_type < 0:
-		return null
-	var item: ShopItemData = _make_item_from_type(item_type)
-	if item == null:
-		return null
-	item.item_name = str(data.get("item_name", item.item_name))
-	item.description = str(data.get("description", item.description))
-	item.cost = int(data.get("cost", item.cost))
-	if item.item_type == ShopItemData.ItemType.BUY_MODIFIER:
-		var mod_type: int = int(data.get("modifier_type", -1))
-		item.modifier = _make_modifier_from_type(mod_type)
-	return item
-
-
-func _make_item_from_type(item_type: int) -> ShopItemData:
-	match item_type:
-		int(ShopItemData.ItemType.BUY_STANDARD_DIE):
-			return ShopItemData.make_buy_standard_die()
-		int(ShopItemData.ItemType.BUY_LUCKY_DIE):
-			return ShopItemData.make_buy_lucky_die()
-		int(ShopItemData.ItemType.BUY_GAMBLER_DIE):
-			return ShopItemData.make_buy_runner_die()
-		int(ShopItemData.ItemType.BUY_GOLDEN_DIE):
-			return ShopItemData.make_buy_golden_die()
-		int(ShopItemData.ItemType.BUY_INSURANCE_DIE):
-			return ShopItemData.make_buy_insurance_die()
-		int(ShopItemData.ItemType.BUY_HEAVY_DIE):
-			return ShopItemData.make_buy_heavy_die()
-		int(ShopItemData.ItemType.BUY_EXPLOSIVE_DIE):
-			return ShopItemData.make_buy_explosive_die()
-		int(ShopItemData.ItemType.BUY_BLANK_CANVAS_DIE):
-			return ShopItemData.make_buy_blank_canvas_die()
-		int(ShopItemData.ItemType.BUY_PINK_DIE):
-			return ShopItemData.make_buy_pink_die()
-		int(ShopItemData.ItemType.BUY_SIMPLE_DIE):
-			return ShopItemData.make_buy_simple_die()
-		int(ShopItemData.ItemType.UPGRADE_DIE):
-			return ShopItemData.make_upgrade_die()
-		int(ShopItemData.ItemType.BUY_MODIFIER):
-			return ShopItemData.make_buy_modifier(RunModifier.make_gamblers_rush())
-		int(ShopItemData.ItemType.CLEANSE_CURSE):
-			return ShopItemData.make_cleanse_curse()
-		int(ShopItemData.ItemType.DOUBLE_DOWN):
-			return ShopItemData.make_double_down()
-		int(ShopItemData.ItemType.BUY_FORTUNE_DIE):
-			return ShopItemData.make_buy_fortune_die()
-		int(ShopItemData.ItemType.BUY_HEART_DIE):
-			return ShopItemData.make_buy_heart_die()
-		int(ShopItemData.ItemType.INSURANCE_BET):
-			return ShopItemData.make_insurance_bet()
-		int(ShopItemData.ItemType.HEAT_BET):
-			return ShopItemData.make_heat_bet()
-		int(ShopItemData.ItemType.EVEN_ODD_BET):
-			return ShopItemData.make_even_odd_bet()
-		int(ShopItemData.ItemType.BUY_SPARK_CHASER_DIE):
-			return ShopItemData.make_buy_spark_chaser_die()
-	return null
-
-
-func _make_modifier_from_type(modifier_type: int) -> RunModifier:
-	match modifier_type:
-		int(RunModifier.ModifierType.GAMBLERS_RUSH):
-			return RunModifier.make_gamblers_rush()
-		int(RunModifier.ModifierType.EXPLOSOPHILE):
-			return RunModifier.make_explosophile()
-		int(RunModifier.ModifierType.IRON_BANK):
-			return RunModifier.make_iron_bank()
-		int(RunModifier.ModifierType.GLASS_CANNON):
-			return RunModifier.make_glass_cannon()
-		int(RunModifier.ModifierType.SHIELD_WALL):
-			return RunModifier.make_shield_wall()
-		int(RunModifier.ModifierType.MISER):
-			return RunModifier.make_miser()
-		int(RunModifier.ModifierType.DOUBLE_DOWN):
-			return RunModifier.make_double_down()
-		int(RunModifier.ModifierType.SCAVENGER):
-			return RunModifier.make_scavenger()
-		int(RunModifier.ModifierType.RECYCLER):
-			return RunModifier.make_recycler()
-		int(RunModifier.ModifierType.LAST_STAND):
-			return RunModifier.make_last_stand()
-		int(RunModifier.ModifierType.CHAIN_LIGHTNING):
-			return RunModifier.make_chain_lightning()
-		int(RunModifier.ModifierType.HIGH_ROLLER):
-			return RunModifier.make_high_roller()
-		int(RunModifier.ModifierType.OVERCHARGE):
-			return RunModifier.make_overcharge()
-	return RunModifier.make_gamblers_rush()
