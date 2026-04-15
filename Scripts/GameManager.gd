@@ -3,7 +3,6 @@ extends Node
 
 const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const SpecialStageCatalogScript: GDScript = preload("res://Scripts/SpecialStageCatalog.gd")
-const SpecialStageRegistryScript: GDScript = preload("res://Scripts/SpecialStageRegistry.gd")
 const RunSeedServiceScript: GDScript = preload("res://Scripts/RunSeedService.gd")
 const SpecialStageCatalog = SpecialStageCatalogScript
 const DiceData = preload("res://Scripts/DiceData.gd")
@@ -13,12 +12,7 @@ const RunModifier = preload("res://Scripts/RunModifier.gd")
 const BASE_STAGE_HANDS: int = 5
 const MAX_LIVES: int = BASE_STAGE_HANDS
 const STARTING_DICE_COUNT: int = 5
-const STAGES_LOOP_1: int = 5
-const STAGES_LOOP_2_PLUS: int = 7
-const BASE_STAGE_TARGET: int = 30
-const STAGE_TARGET_STEP: int = 25
 const STAGE_CLEAR_GOLD_BONUS: int = 20
-const LOOP_BONUS_GOLD_STEP: int = 10
 const MAX_MODIFIERS: int = 3
 const MISER_SPEND_THRESHOLD: int = 15
 const MISER_BONUS_GOLD: int = 20
@@ -56,11 +50,7 @@ const RUN_MODE_NAMES: Dictionary = {
 	RunMode.CLASSIC: "Classic",
 	RunMode.GAUNTLET: "Gauntlet",
 }
-const GAUNTLET_LOOP_MULT_STEP: float = 0.75
-const GAUNTLET_STAGE_STEP_MULT: float = 1.25
-const CLASSIC_LOOP_1_TARGETS: Array[int] = [18, 26, 34, 42, 52]
-const CLASSIC_LOOP_2_TARGETS: Array[int] = [24, 36, 48, 62, 78, 96, 118]
-const INITIAL_CLASSIC_STAGE_TARGET: int = 18
+const INITIAL_CLASSIC_STAGE_TARGET: int = StageProgressionService.INITIAL_CLASSIC_STAGE_TARGET
 
 signal score_changed(new_total: int)
 signal turn_banked(points: int, new_total: int)
@@ -115,6 +105,7 @@ var luck: int = 0
 var current_run_exp: int = 0
 var current_run_stop_shards: int = 0
 var cluster_bonus_depth: int = 0
+var cluster_child_extra_hands: int = 0
 var held_stop_count: int = 0
 var active_loop_contract_id: String = ""
 var active_loop_contract_progress: Dictionary = {}
@@ -142,16 +133,36 @@ var _miser_bonus_pending: bool = false
 var skip_archetype_picker: bool = false
 
 # ---------------------------------------------------------------------------
-# Side-bet state (cleared on shop_entered and reset_run)
+# Extracted services
 # ---------------------------------------------------------------------------
-## Insurance: payout awarded on bust. 0 = no active bet.
-var insurance_payout: int = 0
-## Heat Bet: stop count target (-1 = no active bet) and payout on hit.
-var heat_bet_target_stops: int = -1
-var heat_bet_payout: int = 0
-## Even/Odd Bet: is_even = player's pick; wager = 0 means no active bet.
-var even_odd_bet_is_even: bool = true
-var even_odd_bet_wager: int = 0
+var _side_bets: SideBetResolver = SideBetResolver.new()
+var _special_stage: SpecialStageService = SpecialStageService.new()
+
+# ---------------------------------------------------------------------------
+# Side-bet property forwarding (backward compat)
+# ---------------------------------------------------------------------------
+var insurance_payout: int:
+	get: return _side_bets.insurance_payout
+	set(v): _side_bets.insurance_payout = v
+var heat_bet_target_stops: int:
+	get: return _side_bets.heat_bet_target_stops
+	set(v): _side_bets.heat_bet_target_stops = v
+var heat_bet_payout: int:
+	get: return _side_bets.heat_bet_payout
+	set(v): _side_bets.heat_bet_payout = v
+var even_odd_bet_is_even: bool:
+	get: return _side_bets.even_odd_bet_is_even
+	set(v): _side_bets.even_odd_bet_is_even = v
+var even_odd_bet_wager: int:
+	get: return _side_bets.even_odd_bet_wager
+	set(v): _side_bets.even_odd_bet_wager = v
+
+# ---------------------------------------------------------------------------
+# Special stage property forwarding (backward compat)
+# ---------------------------------------------------------------------------
+var active_special_stage_id: String:
+	get: return _special_stage.active_id
+	set(v): _special_stage.active_id = v
 
 # ---------------------------------------------------------------------------
 # Prestige run flags (refreshed on reset_run)
@@ -162,8 +173,6 @@ var prestige_reward_reroll_available: bool = false
 var prestige_reroute_uses: int = 0
 var _revealed_loop_numbers: Array[int] = []
 var _last_call_heal_used_this_stage: bool = false
-var active_special_stage_id: String = ""
-var _special_stage_first_reroll_used: bool = false
 var _run_seed_locked: bool = false
 var _run_seed_service: RefCounted = RunSeedServiceScript.new()
 
@@ -542,6 +551,42 @@ func add_dice(die) -> void:
 	dice_pool.append(die)
 
 
+func add_cluster_child_extra_hands(amount: int = 1) -> void:
+	if amount <= 0:
+		return
+	cluster_child_extra_hands += amount
+
+
+func consume_cluster_children_for_new_hand() -> int:
+	var kept_pool: Array = []
+	var removed_count: int = 0
+	for entry: Variant in dice_pool:
+		if entry is DiceData:
+			var die: DiceData = entry as DiceData
+			if die.is_cluster and die.cluster_generation > 0:
+				if die.cluster_hands_remaining <= 0:
+					removed_count += 1
+					continue
+				die.cluster_hands_remaining = maxi(0, die.cluster_hands_remaining - 1)
+		kept_pool.append(entry)
+	dice_pool = kept_pool
+	return removed_count
+
+
+func purge_cluster_children_after_stage() -> int:
+	var kept_pool: Array = []
+	var removed_count: int = 0
+	for entry: Variant in dice_pool:
+		if entry is DiceData:
+			var die: DiceData = entry as DiceData
+			if die.is_cluster and die.cluster_generation > 0:
+				removed_count += 1
+				continue
+		kept_pool.append(entry)
+	dice_pool = kept_pool
+	return removed_count
+
+
 # ---------------------------------------------------------------------------
 # Score & gold
 # ---------------------------------------------------------------------------
@@ -590,30 +635,18 @@ func spend_gold(amount: int) -> bool:
 # ---------------------------------------------------------------------------
 
 func get_stages_in_current_loop() -> int:
-	if current_loop <= 1:
-		return STAGES_LOOP_1
-	return STAGES_LOOP_2_PLUS
+	return StageProgressionService.get_stages_in_loop(current_loop)
 
 
 func _loop_multiplier() -> float:
-	if run_mode == RunMode.GAUNTLET:
-		return 1.0 + GAUNTLET_LOOP_MULT_STEP * (current_loop - 1)
-	return 1.0 + 0.5 * (current_loop - 1)
+	return StageProgressionService.loop_multiplier(current_loop, run_mode == RunMode.GAUNTLET)
 
 
 func _calculate_stage_target(stage: int) -> int:
-	if run_mode == RunMode.CLASSIC:
-		var target_row: int = current_row if stage_map else (stage - 1)
-		var loop_targets: Array[int] = CLASSIC_LOOP_1_TARGETS if current_loop <= 1 else CLASSIC_LOOP_2_TARGETS
-		var base_target: int = loop_targets[clampi(target_row, 0, loop_targets.size() - 1)]
-		if current_loop <= 2:
-			return base_target
-		var loop_two_multiplier: float = 1.0 + 0.5 * (2 - 1)
-		return roundi(float(base_target) * (_loop_multiplier() / loop_two_multiplier))
-	var mult: float = _loop_multiplier()
 	var row: int = current_row if stage_map else (stage - 1)
-	var step_mult: float = GAUNTLET_STAGE_STEP_MULT if run_mode == RunMode.GAUNTLET else 1.0
-	return int(BASE_STAGE_TARGET * mult) + row * int(STAGE_TARGET_STEP * mult * step_mult)
+	return StageProgressionService.calculate_stage_target(
+		current_loop, row, run_mode == RunMode.GAUNTLET
+	)
 
 
 func set_run_mode(mode: int) -> void:
@@ -682,10 +715,9 @@ func is_final_stage() -> bool:
 
 
 func get_stage_clear_bonus() -> int:
-	var base: int = STAGE_CLEAR_GOLD_BONUS + LOOP_BONUS_GOLD_STEP * (current_loop - 1)
-	if chosen_archetype == Archetype.BLANK_SLATE:
-		base *= 2
-	return base
+	return StageProgressionService.get_stage_clear_bonus(
+		current_loop, chosen_archetype == Archetype.BLANK_SLATE
+	)
 
 
 # ---------------------------------------------------------------------------
@@ -719,6 +751,7 @@ func reset_run() -> void:
 	current_run_exp = 0
 	current_run_stop_shards = 0
 	cluster_bonus_depth = 0
+	cluster_child_extra_hands = 0
 	held_stop_count = 0
 	near_death_banks_this_stage = 0
 	near_death_banks_this_run = 0
@@ -776,95 +809,46 @@ func get_archetype_bank_rewards(effective_stops: int, is_near_death_bank: bool) 
 
 
 func enter_special_stage(rule_id: String) -> void:
-	if not SpecialStageRegistryScript.call("has_rule", rule_id):
-		clear_special_stage()
-		return
-	active_special_stage_id = rule_id
-	_special_stage_first_reroll_used = false
+	_special_stage.enter(rule_id)
 
 
 func clear_special_stage() -> void:
-	active_special_stage_id = ""
-	_special_stage_first_reroll_used = false
+	_special_stage.clear()
 
 
 func has_active_special_stage() -> bool:
-	return active_special_stage_id != ""
+	return _special_stage.is_active()
 
 
 func get_active_special_stage_name() -> String:
-	if not has_active_special_stage():
-		return ""
-	return str(SpecialStageRegistryScript.call("get_rule_name", active_special_stage_id))
+	return _special_stage.get_name()
 
 
 func get_active_special_stage_summary() -> String:
-	if not has_active_special_stage():
-		return ""
-	return str(SpecialStageRegistryScript.call("get_rule_summary", active_special_stage_id))
+	return _special_stage.get_summary()
 
 
 func get_active_special_stage_color() -> Color:
-	if not has_active_special_stage():
-		return Color.WHITE
-	return SpecialStageRegistryScript.call("get_rule_color", active_special_stage_id) as Color
+	return _special_stage.get_color()
 
 
 func begin_special_stage_turn() -> void:
-	_special_stage_first_reroll_used = false
+	_special_stage.begin_turn()
 
 
 func apply_special_stage_reroll_bonus(reroll_count: int) -> String:
-	if active_special_stage_id != "lucky_floor":
-		return ""
-	if reroll_count != 1 or _special_stage_first_reroll_used:
-		return ""
-	_special_stage_first_reroll_used = true
-	add_luck(2)
-	return "Lucky Floor: first reroll +2 LUCK"
+	var result: Dictionary = _special_stage.check_reroll_bonus(reroll_count)
+	if int(result.get("luck_bonus", 0)) > 0:
+		add_luck(int(result["luck_bonus"]))
+	return str(result.get("message", ""))
 
 
 func get_special_stage_bank_preview(effective_stops: int, reroll_count: int) -> Dictionary:
-	var result: Dictionary = {
-		"bonus_score": 0,
-		"bonus_gold": 0,
-		"bonus_luck": 0,
-		"status_parts": [],
-	}
-	match active_special_stage_id:
-		"lucky_floor":
-			if reroll_count >= 2:
-				result["bonus_gold"] = 12
-				(result["status_parts"] as Array[String]).append("Lucky Floor +12g")
-		"clean_room":
-			if effective_stops <= 1:
-				result["bonus_score"] = 6
-				(result["status_parts"] as Array[String]).append("Clean Room +6 score")
-		"precision_hall":
-			if effective_stops == 2:
-				result["bonus_gold"] = 8
-				(result["status_parts"] as Array[String]).append("Precision Hall +8g")
-	return result
+	return _special_stage.get_bank_preview(effective_stops, reroll_count)
 
 
 func get_special_stage_clear_rewards(effective_stops: int, will_clear_stage: bool) -> Dictionary:
-	var result: Dictionary = {
-		"bonus_gold": 0,
-		"bonus_luck": 0,
-		"status_parts": [],
-	}
-	if not will_clear_stage:
-		return result
-	match active_special_stage_id:
-		"clean_room":
-			if effective_stops <= 1:
-				result["bonus_gold"] = 15
-				(result["status_parts"] as Array[String]).append("Clean clear +15g")
-		"precision_hall":
-			if effective_stops == 2:
-				result["bonus_luck"] = 3
-				(result["status_parts"] as Array[String]).append("Exact clear +3 LUCK")
-	return result
+	return _special_stage.get_clear_rewards(effective_stops, will_clear_stage)
 
 
 # ---------------------------------------------------------------------------
@@ -945,71 +929,49 @@ func use_reroute_token() -> bool:
 # ---------------------------------------------------------------------------
 
 func _clear_side_bets() -> void:
-	insurance_payout = 0
-	heat_bet_target_stops = -1
-	heat_bet_payout = 0
-	even_odd_bet_wager = 0
+	_side_bets.clear()
 
 
 ## Place Insurance Bet: deduct premium, store payout for bust resolution.
 func set_insurance_bet(premium: int, payout: int) -> void:
-	insurance_payout = payout
+	_side_bets.place_insurance(payout)
 	remove_gold(premium)
 
 
 ## Called on bust. Returns the insurance payout (0 if no bet).
 func resolve_insurance_bet() -> int:
-	var payout: int = insurance_payout
+	var payout: int = _side_bets.resolve_insurance()
 	if payout > 0:
 		add_gold(payout)
-		insurance_payout = 0
 	return payout
 
 
 ## Place Heat Bet: deduct wager, store target and payout.
 func set_heat_bet(target_stops: int, wager: int, payout: int) -> void:
-	heat_bet_target_stops = target_stops
-	heat_bet_payout = payout
+	_side_bets.place_heat_bet(target_stops, payout)
 	remove_gold(wager)
 
 
 ## Called on bank. Returns payout if stop count matches target (0 otherwise).
 func resolve_heat_bet(actual_stops: int) -> int:
-	if heat_bet_target_stops < 0:
-		return 0
-	var payout: int = heat_bet_payout if actual_stops == heat_bet_target_stops else 0
+	var payout: int = _side_bets.resolve_heat(actual_stops)
 	if payout > 0:
 		add_gold(payout)
-	heat_bet_target_stops = -1
-	heat_bet_payout = 0
 	return payout
 
 
-## Place Even/Odd Bet: store pick and wager amount (not deducted yet — deducted on resolution).
+## Place Even/Odd Bet: store pick and wager amount (deducted immediately).
 func set_even_odd_bet(is_even: bool, wager: int) -> void:
-	even_odd_bet_is_even = is_even
-	even_odd_bet_wager = wager
+	_side_bets.place_even_odd_bet(is_even, wager)
 	remove_gold(wager)
 
 
-## Called on bank. Counts NUMBER-face parity among kept dice values.
-## Returns net gold change: +wager on win, 0 on push, -0 on loss (wager already deducted).
-## even_count / odd_count are the counts of even/odd NUMBER-face dice kept.
+## Called on bank. Returns net gold change: +wager on win, 0 on push, -wager on loss.
 func resolve_even_odd_bet(even_count: int, odd_count: int) -> int:
-	if even_odd_bet_wager <= 0:
-		return 0
-	var wager: int = even_odd_bet_wager
-	even_odd_bet_wager = 0
-	if even_count == odd_count:
-		# Push: refund the wager
-		add_gold(wager)
-		return 0
-	var player_wins: bool = (even_odd_bet_is_even and even_count > odd_count) or \
-		(not even_odd_bet_is_even and odd_count > even_count)
-	if player_wins:
-		add_gold(wager * 2)
-		return wager
-	return -wager
+	var result: Array[int] = _side_bets.resolve_even_odd(even_count, odd_count)
+	if result[1] > 0:
+		add_gold(result[1])
+	return result[0]
 
 
 # ---------------------------------------------------------------------------
@@ -1070,8 +1032,8 @@ func build_active_run_state() -> Dictionary:
 		"prestige_reroute_uses": prestige_reroute_uses,
 		"revealed_loop_numbers": _revealed_loop_numbers.duplicate(),
 		"last_call_heal_used_this_stage": _last_call_heal_used_this_stage,
-		"active_special_stage_id": active_special_stage_id,
-		"special_stage_first_reroll_used": _special_stage_first_reroll_used,
+		"active_special_stage_id": _special_stage.active_id,
+		"special_stage_first_reroll_used": _special_stage._first_reroll_used,
 		"dice_pool": _serialize_dice_pool(),
 		"active_modifiers": _serialize_modifiers(),
 		"stage_map": map_data,
@@ -1131,8 +1093,7 @@ func apply_active_run_state(data: Dictionary) -> void:
 	for loop_number: Variant in data.get("revealed_loop_numbers", []) as Array:
 		_revealed_loop_numbers.append(int(loop_number))
 	_last_call_heal_used_this_stage = bool(data.get("last_call_heal_used_this_stage", false))
-	active_special_stage_id = str(data.get("active_special_stage_id", ""))
-	_special_stage_first_reroll_used = bool(data.get("special_stage_first_reroll_used", false))
+	_special_stage.restore_snapshot(data)
 	dice_pool = _deserialize_dice_pool(data.get("dice_pool", []) as Array)
 	active_modifiers = _deserialize_modifiers(data.get("active_modifiers", []) as Array)
 	var stage_map_data: Dictionary = data.get("stage_map", {}) as Dictionary
