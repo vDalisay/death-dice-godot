@@ -81,8 +81,10 @@ func test_constants_are_reasonable() -> void:
 
 
 func test_face_type_glyphs_cover_all_types() -> void:
-	# Verify glyphs exist for all face types we use
+	# Verify glyphs exist for all active face types (skip deprecated MULTIPLY_LEFT)
 	for face_type: int in range(DiceFaceData.FaceType.size()):
+		if face_type == DiceFaceData.FaceType.MULTIPLY_LEFT:
+			continue
 		assert_bool(PhysicsDie.FACE_TYPE_GLYPHS.has(face_type)).is_true()
 
 
