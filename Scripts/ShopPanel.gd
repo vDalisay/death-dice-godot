@@ -228,7 +228,7 @@ func _apply_theme_styling() -> void:
 	_refresh_button.add_theme_font_override("font", _UITheme.font_display())
 	_refresh_button.add_theme_font_size_override("font_size", 12)
 	_continue_button.add_theme_font_override("font", _UITheme.font_display())
-	_continue_button.add_theme_font_size_override("font_size", 12
+	_continue_button.add_theme_font_size_override("font_size", 12)
 
 
 func _refresh_localized_labels() -> void:

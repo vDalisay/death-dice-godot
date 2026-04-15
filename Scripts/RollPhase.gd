@@ -162,7 +162,6 @@ const StageMapDataScript: GDScript = preload("res://Scripts/StageMapData.gd")
 const LoopContractCatalogScript: GDScript = preload("res://Scripts/LoopContractCatalog.gd")
 const LoopContractDataType: GDScript = preload("res://Scripts/LoopContractData.gd")
 const RollPhaseSnapshotScript: GDScript = preload("res://Scripts/RollPhaseSnapshot.gd")
-const RollPhaseSnapshotScript: GDScript = preload("res://Scripts/RollPhaseSnapshot.gd")
 const MAIN_MENU_SCENE_PATH: String = "res://Scenes/MainMenu.tscn"
 
 func _ready() -> void:
